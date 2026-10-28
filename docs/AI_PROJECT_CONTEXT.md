@@ -6,7 +6,7 @@
 
 ## Что такое Takt
 
-Простой менеджер проектов и задач вокруг **Kanban-доски** (Next.js + FastAPI + PostgreSQL).
+Простой менеджер проектов и задач вокруг **Kanban-доски** (Next.js + FastAPI + PostgreSQL + Flutter).
 
 После входа — доска последнего доступного проекта (или форма «Создайте первый проект»).  
 Демо-проекты (`is_demo=true`) видны только участникам; системный admin не получает к ним автоматический доступ.
@@ -17,32 +17,31 @@
 
 - Регистрация / вход; приглашения по email и поиск зарегистрированных
 - 4 столбца у новых проектов; без «Бэклог» в шаблоне
+- Новая задача → **первая позиция** столбца
 - Срочность через `priority`; удаление задачи — только автор
-- Уведомления in-app + Web Push
-- Изолированное демо: `demo@example.com` → проект **«Колледж ДГУ»** (8 demo-staff, `users.is_demo`)
+- Уведомления in-app + Web Push + FCM (mobile, опционально)
+- Изолированное демо: `demo@example.com` → проект **«Колледж ДГУ»**
+- Mobile: `mobile/` (Flutter), home screen widgets
 
 ## Backend заметки
 
-- Миграции: `003` invites, `004` push, `005` `projects.is_demo`, `006` `users.is_demo`
-- Env: `DEMO_USER_EMAIL`, `DEMO_USER_PASSWORD` (локально, не в git)
-- `scripts/setup_demo_workspace.py` — сегрегация demo/E2E
-- `scripts/seed_college_demo.py` — идемпотентный сид колледжа (задачи + in-app уведомления, без push)
-- `scripts/list_test_tasks.py` — просмотр кандидатов на удаление
+- Миграции: `003` invites, `004` push, `005` `projects.is_demo`, `006` `users.is_demo`, `007` `device_push_tokens`
+- Auth: cookies (web) + Bearer (mobile); CSRF пропускается при `Authorization: Bearer`
+- Env: `DEMO_USER_*`, `VAPID_*`, `FCM_ENABLED`, `FIREBASE_CREDENTIALS_FILE`
+- `scripts/seed_college_demo.py` — идемпотентный сид колледжа
 
 ## Команды
 
 ```bash
 docker compose up db -d
 cd backend && ./.venv/bin/alembic upgrade head
-DEMO_USER_EMAIL=… DEMO_USER_PASSWORD=… ./.venv/bin/python scripts/setup_demo_workspace.py
-./.venv/bin/python scripts/seed_college_demo.py
 ./.venv/bin/pytest
 cd frontend && npm test && npm run lint && npm run build
-# E2E использует DEMO_* / credentials file
-PW_CHANNEL=chrome npm run test:e2e
+cd mobile && flutter analyze && flutter test
+# Android emulator API: --dart-define=API_BASE=http://10.0.2.2:8000
 ```
 
 ## Статус (обновлено 2026-10-28)
 
-Демо-доска «Колледж ДГУ»: 8 demo-профилей сотрудников, ~23 задачи, in-app уведомления.  
-E2E в `[E2E] Playwright`. Рабочее «Общее» без tech-мусора. Commit/push/deploy только по разрешению.
+Flutter-клиент в `mobile/`, Android-виджет, заготовка iOS WidgetKit, FCM API, создание задач в начало столбца.  
+Push/FCM и iOS-виджет требуют ручной настройки Firebase/Xcode. Commit/push/deploy только по разрешению.
