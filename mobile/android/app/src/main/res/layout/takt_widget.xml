@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="#F7F8FA">
+
+    <TextView
+        android:id="@+id/widget_project"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#202938"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="Takt" />
+
+    <TextView
+        android:id="@+id/widget_count"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#315F72"
+        android:textSize="12sp"
+        android:text="0 незавершённых" />
+
+    <TextView
+        android:id="@+id/widget_tasks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#202938"
+        android:textSize="12sp"
+        android:lineSpacingExtra="2dp"
+        android:text="" />
+</LinearLayout>

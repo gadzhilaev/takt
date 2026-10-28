@@ -9,3 +9,10 @@ uploads/
 .DS_Store
 frontend/test-results/
 frontend/playwright-report/
+
+# Mobile secrets / local Firebase
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist
+**/firebase-adminsdk*.json
+mobile/.dart_tool/
+mobile/build/
