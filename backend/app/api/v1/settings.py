@@ -95,7 +95,7 @@ async def create_status(
     max_pos = await db.scalar(q)
     status = TaskStatus(
         name=body["name"],
-        color=body.get("color", "#94a3b8"),
+        color=body.get("color", "#607FA4"),
         position=float(body.get("position", (max_pos or 0) + 1)),
         is_done=bool(body.get("is_done", False)),
         project_id=project_id,

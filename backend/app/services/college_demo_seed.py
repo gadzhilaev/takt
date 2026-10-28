@@ -302,7 +302,16 @@ async def _ensure_statuses(db: AsyncSession, project: Project) -> dict[int, Task
             db.add(s)
             await db.flush()
             by_name[sname] = s
-    # Drop legacy «Бэклог» if somehow present (soft: leave empty, don't delete if tasks)
+    else:
+        # Demo board: keep standard column names aligned with current palette.
+        for pos, (sname, scolor, _p, is_done) in enumerate(DEFAULT_STATUS_TEMPLATE):
+            existing = by_name.get(sname)
+            if existing is None:
+                continue
+            if (existing.color or "").lower() != scolor.lower():
+                existing.color = scolor
+            existing.is_done = is_done
+            existing.position = float(pos)
     return {
         i: by_name[name]
         for i, (name, *_rest) in enumerate(DEFAULT_STATUS_TEMPLATE)

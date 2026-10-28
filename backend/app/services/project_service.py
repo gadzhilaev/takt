@@ -11,10 +11,10 @@ from app.models.user import User, UserRole
 from app.services.bootstrap import DEFAULT_STATUSES
 
 DEFAULT_STATUS_TEMPLATE = [
-    ("К выполнению", "#94a3b8", 0, False),
-    ("В работе", "#315F72", 1, False),
-    ("На проверке", "#5C7380", 2, False),
-    ("Готово", "#2f6b4f", 3, True),
+    ("К выполнению", "#607FA4", 0, False),
+    ("В работе", "#347FA4", 1, False),
+    ("На проверке", "#9062B8", 2, False),
+    ("Готово", "#398A62", 3, True),
 ]
 
 
