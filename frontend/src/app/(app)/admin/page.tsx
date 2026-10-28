@@ -37,7 +37,7 @@ export default function AdminPage() {
     password: genPassword(),
     must_change_password: true,
   });
-  const [tempPwd, setTempPwd] = useState<string | null>(null);
+  const [tempCreds, setTempCreds] = useState<{ email: string; password: string } | null>(null);
 
   const { data } = useQuery({
     queryKey: ["admin-users", search],
@@ -51,7 +51,9 @@ export default function AdminPage() {
         json: form,
       }),
     onSuccess: (res) => {
-      setTempPwd(res.temporary_password ?? form.password);
+      const email = form.email;
+      const password = res.temporary_password ?? form.password;
+      setTempCreds({ email, password });
       setForm({ name: "", email: "", role: "member", password: genPassword(), must_change_password: true });
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
@@ -60,16 +62,17 @@ export default function AdminPage() {
   const users = data?.items ?? [];
 
   function copyLogin() {
+    if (!tempCreds) return;
     const site = window.location.origin;
-    const text = `Адрес: ${site}\nEmail: ${form.email || "—"}\nПароль: ${tempPwd ?? form.password}`;
+    const text = `Адрес: ${site}\nEmail: ${tempCreds.email}\nПароль: ${tempCreds.password}`;
     navigator.clipboard.writeText(text);
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Админка · Пользователи</h1>
-        <Link href="/admin/settings" className="text-sm text-indigo-600 hover:underline">
+        <h1 className="page-title">Пользователи</h1>
+        <Link href="/admin/settings" className="text-sm font-medium text-[var(--accent)] hover:underline">
           Настройки команды →
         </Link>
       </div>
@@ -117,10 +120,22 @@ export default function AdminPage() {
             <Copy className="h-4 w-4" /> Скопировать данные для входа
           </Button>
         </div>
-        {tempPwd && (
-          <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-            Временный пароль (показан один раз): <strong>{tempPwd}</strong>
-          </p>
+        {tempCreds && (
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+            <p>
+              Данные для входа (показаны один раз): <strong>{tempCreds.email}</strong> /{" "}
+              <strong>{tempCreds.password}</strong>
+            </p>
+            <Button
+              className="mt-2"
+              size="sm"
+              variant="secondary"
+              type="button"
+              onClick={() => setTempCreds(null)}
+            >
+              Скрыть
+            </Button>
+          </div>
         )}
       </div>
 

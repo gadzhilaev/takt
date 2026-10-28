@@ -26,7 +26,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin" className="text-sm text-indigo-600">
+        <Link href="/admin" className="text-sm font-medium text-[var(--accent)]">
           ← Пользователи
         </Link>
         <h1 className="text-2xl font-semibold">Настройки команды</h1>

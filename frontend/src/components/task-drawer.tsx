@@ -55,8 +55,8 @@ export function TaskDrawer({
   const task = data?.task;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" role="dialog" aria-modal>
-      <div className="h-full w-full max-w-lg overflow-y-auto bg-white p-4 shadow-xl dark:bg-slate-950 md:rounded-l-xl">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" role="dialog" aria-modal="true" aria-label="Редактирование задачи">
+      <div className="h-full w-full max-w-lg overflow-y-auto bg-[var(--surface)] p-4 shadow-soft md:rounded-l-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Задача</h2>
           <Button variant="ghost" size="icon" aria-label="Закрыть" onClick={onClose}>
@@ -65,18 +65,32 @@ export function TaskDrawer({
         </div>
         {task ? (
           <div className="space-y-4">
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Название" />
-            <textarea
-              className="min-h-[120px] w-full rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onBlur={() => patch.mutate({ description })}
-              placeholder="Описание (можно HTML: b, ul, a)"
-            />
-            <label className="block text-sm">
-              Статус
+            <div>
+              <label className="label-text" htmlFor="drawer-title">
+                Название
+              </label>
+              <Input id="drawer-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div>
+              <label className="label-text" htmlFor="drawer-desc">
+                Описание
+              </label>
+              <textarea
+                id="drawer-desc"
+                className="field min-h-[120px] resize-y"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={() => patch.mutate({ description })}
+                placeholder="Кратко опишите, что нужно сделать…"
+              />
+            </div>
+            <div>
+              <label className="label-text" htmlFor="drawer-status">
+                Статус
+              </label>
               <select
-                className="mt-1 w-full rounded-lg border p-2 text-sm dark:bg-slate-900"
+                id="drawer-status"
+                className="field"
                 value={task.status_id}
                 onChange={(e) => patch.mutate({ status_id: e.target.value })}
               >
@@ -86,11 +100,14 @@ export function TaskDrawer({
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="block text-sm">
-              Приоритет
+            </div>
+            <div>
+              <label className="label-text" htmlFor="drawer-priority">
+                Важность
+              </label>
               <select
-                className="mt-1 w-full rounded-lg border p-2 text-sm dark:bg-slate-900"
+                id="drawer-priority"
+                className="field"
                 value={task.priority}
                 onChange={(e) => patch.mutate({ priority: e.target.value })}
               >
@@ -100,10 +117,10 @@ export function TaskDrawer({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">Загрузка…</p>
+          <p className="text-sm text-muted">Загрузка…</p>
         )}
       </div>
     </div>
