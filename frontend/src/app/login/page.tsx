@@ -9,6 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BrandLogo } from "@/components/brand-mark";
 
 const schema = z.object({
   email: z.string().email("Введите корректный email"),
@@ -29,46 +30,59 @@ export default function LoginPage() {
         json: values,
       });
       if (res.user.must_change_password) router.push("/change-password");
-      else router.push("/board");
+      else router.push("/home");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка входа");
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-slate-100 p-4 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="mb-2 text-2xl font-semibold">Вход в трекер</h1>
-        <p className="mb-6 text-sm text-slate-500">Email и пароль от администратора</p>
-        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="surface-panel w-full max-w-sm p-6">
+        <div className="mb-6 space-y-3">
+          <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
           <div>
-            <label className="mb-1 block text-sm font-medium">Email</label>
-            <Input type="email" autoComplete="email" {...form.register("email")} />
+            <h1 className="text-lg font-semibold tracking-tight">Вход</h1>
+            <p className="text-[13px] text-muted">Email и пароль выдаёт администратор</p>
+          </div>
+        </div>
+        <form className="space-y-3.5" method="post" action="#" onSubmit={form.handleSubmit(onSubmit)}>
+          <div>
+            <label className="label-text" htmlFor="login-email">
+              Email
+            </label>
+            <Input id="login-email" type="email" autoComplete="email" {...form.register("email")} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Пароль</label>
+            <label className="label-text" htmlFor="login-password">
+              Пароль
+            </label>
             <div className="relative">
               <Input
+                id="login-password"
                 type={show ? "text" : "password"}
                 autoComplete="current-password"
                 {...form.register("password")}
               />
               <button
                 type="button"
-                className="absolute right-2 top-2 text-slate-400"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-sm)] p-1.5 text-muted hover:bg-[var(--surface-2)]"
                 onClick={() => setShow((s) => !s)}
                 aria-label={show ? "Скрыть пароль" : "Показать пароль"}
               >
-                {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full">
-            Войти
+          {error && (
+            <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
+              {error}
+            </p>
+          )}
+          <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? "Входим…" : "Войти"}
           </Button>
         </form>
-        <p className="mt-6 text-center text-xs text-slate-500">Нет доступа? Обратитесь к администратору.</p>
       </div>
     </div>
   );

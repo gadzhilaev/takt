@@ -1,23 +1,27 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+const inter = Inter({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Трекер задач",
-  description: "Командный трекер задач",
+  title: "Takt — задачи команды",
+  description: "Командный трекер задач Takt",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/brand/takt-symbol.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru" suppressHydrationWarning>
-      <body className={`${geistSans.variable} min-h-screen font-sans antialiased`}>
+      <body className={`${inter.variable} min-h-screen font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>
