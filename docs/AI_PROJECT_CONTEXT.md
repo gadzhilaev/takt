@@ -25,7 +25,7 @@
 
 ## Backend заметки
 
-- Миграции: `003` invites, `004` push, `005` `projects.is_demo`, `006` `users.is_demo`, `007` `device_push_tokens`
+- Миграции: `003`–`007`; `008`/`009` remap standard status colors → Kanban presets (v2 accents)
 - Auth: cookies (web) + Bearer (mobile); CSRF пропускается при `Authorization: Bearer`
 - Env: `DEMO_USER_*`, `VAPID_*`, `FCM_ENABLED`, `FIREBASE_CREDENTIALS_FILE`
 - `scripts/seed_college_demo.py` — идемпотентный сид колледжа
@@ -43,5 +43,6 @@ cd mobile && flutter analyze && flutter test
 
 ## Статус (обновлено 2026-10-28)
 
-Flutter `mobile/`: bundle **`ru.gadzhilaev.takt`**, FCM soft-init, Android + iOS widgets (`TaktHomeWidget`, App Group `group.ru.gadzhilaev.takt`), иконка из `takt-symbol` на белом фоне, store draft `mobile/store/metadata.md`, миграция `007`.  
-Push: локальные Firebase-файлы под `ru.gadzhilaev.takt` + `FCM_ENABLED`. Прогон на эмуляторе / commit / push — только по запросу.
+Flutter `mobile/`: bundle **`ru.gadzhilaev.takt`**, FCM, виджеты; палитра Kanban в `kanban_colors.dart` (= web).  
+Kanban: усиленные пресеты столбцов (v2); миграции `008`/`009` обновляют только известные default hex.  
+Commit/push/deploy только по разрешению.
