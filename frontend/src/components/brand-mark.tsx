@@ -33,12 +33,9 @@ export function BrandMark({ className, title = "Takt" }: BrandProps) {
 
 /** Full horizontal logo (symbol + wordmark). Swaps to on-dark asset for contrast. */
 export function BrandLogo({ className, title = "Takt" }: BrandProps) {
-  const imgClass = cn(
-    "block w-auto object-contain object-left",
-    className
-  );
+  const imgClass = cn("h-6 w-auto max-w-[9rem] object-contain object-left", className);
   return (
-    <span className="inline-flex max-w-full items-center leading-none">
+    <span className="inline-grid max-w-full leading-none [grid-template-areas:'logo']">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/brand/takt-logo.svg"
@@ -46,7 +43,7 @@ export function BrandLogo({ className, title = "Takt" }: BrandProps) {
         width={LOGO_W}
         height={LOGO_H}
         decoding="async"
-        className={cn(imgClass, "dark:hidden")}
+        className={cn(imgClass, "[grid-area:logo] dark:hidden")}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -56,7 +53,7 @@ export function BrandLogo({ className, title = "Takt" }: BrandProps) {
         width={LOGO_W}
         height={LOGO_H}
         decoding="async"
-        className={cn(imgClass, "hidden dark:block")}
+        className={cn(imgClass, "[grid-area:logo] hidden dark:block")}
       />
     </span>
   );
@@ -64,9 +61,9 @@ export function BrandLogo({ className, title = "Takt" }: BrandProps) {
 
 /** Wordmark only (no symbol). */
 export function BrandText({ className, title = "Takt" }: BrandProps) {
-  const imgClass = cn("block w-auto object-contain object-left", className);
+  const imgClass = cn("h-5 w-auto max-w-[8rem] object-contain object-left", className);
   return (
-    <span className="inline-flex max-w-full items-center leading-none">
+    <span className="inline-grid max-w-full leading-none [grid-template-areas:'logo']">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/brand/takt-wordmark.svg"
@@ -74,7 +71,7 @@ export function BrandText({ className, title = "Takt" }: BrandProps) {
         width={WORD_W}
         height={WORD_H}
         decoding="async"
-        className={cn(imgClass, "dark:hidden")}
+        className={cn(imgClass, "[grid-area:logo] dark:hidden")}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -84,7 +81,7 @@ export function BrandText({ className, title = "Takt" }: BrandProps) {
         width={WORD_W}
         height={WORD_H}
         decoding="async"
-        className={cn(imgClass, "hidden dark:block")}
+        className={cn(imgClass, "[grid-area:logo] hidden dark:block")}
       />
     </span>
   );

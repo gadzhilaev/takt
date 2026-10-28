@@ -2,12 +2,59 @@
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Check } from "lucide-react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Status, Task } from "@/lib/types";
 import { UserAvatar } from "@/components/user-avatar";
 import { Select } from "@/components/ui/select";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
-import { urgencyColor } from "@/lib/urgency";
+import { urgencyCssVars, urgencyLabel } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
+
+const AVATAR_PX = 28;
+const AVATAR_GAP_PX = 4;
+const PLUS_RESERVE_PX = 22;
+
+function fitAssigneeCount(width: number, total: number): number {
+  if (total <= 0 || width <= 0) return 0;
+  const unit = AVATAR_PX + AVATAR_GAP_PX;
+  let n = Math.floor((width + AVATAR_GAP_PX) / unit);
+  n = Math.max(0, Math.min(total, n));
+  if (n >= total) return total;
+  n = Math.floor((width - PLUS_RESERVE_PX + AVATAR_GAP_PX) / unit);
+  return Math.max(1, Math.min(total - 1, n));
+}
+
+function AssigneeAvatars({ assignees }: { assignees: Task["assignees"] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(assignees.length);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setVisible(fitAssigneeCount(el.clientWidth, assignees.length));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [assignees.length]);
+
+  if (!assignees.length) return null;
+
+  const shown = assignees.slice(0, visible);
+  const more = assignees.length - shown.length;
+
+  return (
+    <div ref={ref} className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+      <div className="flex items-center gap-1">
+        {shown.map((a) => (
+          <UserAvatar key={a.id} name={a.name} avatarUrl={a.avatar_url} size={6} title={a.name} />
+        ))}
+      </div>
+      {more > 0 && (
+        <span className="shrink-0 text-[11px] tabular-nums text-[var(--kanban-card-desc)]">+{more}</span>
+      )}
+    </div>
+  );
+}
 
 export function TaskCard({
   task,
@@ -37,9 +84,7 @@ export function TaskCard({
     id: task.id,
     disabled: !draggable || overlay || isDragging,
   });
-  const assignees = task.assignees.slice(0, 4);
-  const more = Math.max(0, task.assignees.length - assignees.length);
-  const stripe = urgencyColor(task.priority);
+  const urgencyVars = urgencyCssVars(task.priority);
 
   return (
     <div
@@ -62,17 +107,14 @@ export function TaskCard({
               }
         }
         className={cn(
-          "relative w-full overflow-hidden rounded-[var(--radius)] border border-hairline bg-[var(--surface)]",
-          overlay && "shadow-md ring-1 ring-[var(--border)]",
-          isDone && !overlay && "opacity-90"
+          "kanban-task-card relative w-full overflow-hidden rounded-[var(--radius)]",
+          overlay && "kanban-task-card--overlay",
+          isDone && "kanban-task-card--done"
         )}
+        style={urgencyVars as CSSProperties}
         {...(draggable && !overlay ? { ...listeners, ...attributes } : {})}
       >
-        <span
-          className="absolute inset-y-0 left-0 w-[3px]"
-          style={{ backgroundColor: stripe }}
-          aria-hidden
-        />
+        <span className="kanban-task-urgency-stripe" aria-hidden />
         <button type="button" className="w-full p-2.5 pl-3.5 text-left" onClick={onOpen}>
           <div className="flex items-start gap-1.5">
             {isDone && (
@@ -84,18 +126,19 @@ export function TaskCard({
             )}
             <h3
               className={cn(
-                "min-w-0 flex-1 break-words text-[13px] font-medium leading-snug",
-                isDone ? "text-muted" : "text-foreground"
+                "min-w-0 flex-1 break-words text-[13px] font-semibold leading-snug",
+                isDone ? "text-[var(--kanban-done-title)]" : "text-[var(--kanban-card-title)]"
               )}
             >
               {task.title}
             </h3>
           </div>
+          <span className="kanban-urgency-badge mt-1.5">{urgencyLabel(task.priority)}</span>
           {task.description?.trim() && (
             <p
               className={cn(
-                "mt-1 line-clamp-2 text-[12px] leading-snug",
-                isDone ? "pl-5 text-muted/80" : "text-muted"
+                "mt-1.5 line-clamp-2 text-[12px] leading-snug",
+                isDone ? "pl-5 text-[var(--kanban-done-desc)]" : "text-[var(--kanban-card-desc)]"
               )}
             >
               {task.description}
@@ -103,29 +146,14 @@ export function TaskCard({
           )}
         </button>
 
-        {assignees.length > 0 && (
-          <div className={cn("flex items-center gap-1 px-2.5 pb-2.5 pl-3.5", isDone && "opacity-70")}>
-            <TooltipProvider>
-              <div className="flex -space-x-1.5">
-                {assignees.map((a) => (
-                  <Tooltip key={a.id} content={a.name}>
-                    <span
-                      className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                      tabIndex={0}
-                      aria-label={a.name}
-                    >
-                      <UserAvatar name={a.name} avatarUrl={a.avatar_url} size={6} title={a.name} />
-                    </span>
-                  </Tooltip>
-                ))}
-              </div>
-            </TooltipProvider>
-            {more > 0 && <span className="text-[11px] text-muted">+{more}</span>}
+        {task.assignees.length > 0 && (
+          <div className={cn("flex px-2.5 pb-2.5 pl-3.5", isDone && "opacity-85")}>
+            <AssigneeAvatars assignees={task.assignees} />
           </div>
         )}
 
         {statuses && onChangeStatus && (
-          <div className={cn("border-t border-hairline px-2.5 py-2 pl-3.5", isDone && "opacity-75")}>
+          <div className={cn("border-t border-hairline px-2.5 py-2 pl-3.5", isDone && "opacity-85")}>
             <Select
               aria-label={`Столбец «${task.title}»`}
               value={task.status_id}
