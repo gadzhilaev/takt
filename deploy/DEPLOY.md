@@ -1,7 +1,8 @@
-# Развёртывание «Трекер задач» на сервере
+# Развёртывание Takt на сервере
 
 Пошаговая инструкция: от чистого VPS до работающего сайта с HTTPS.  
-Стек: **PostgreSQL 16** + **FastAPI** + **Next.js 14** + **Caddy** (reverse proxy и Let's Encrypt).
+Стек: **PostgreSQL 16** + **FastAPI** + **Next.js 14** + **Caddy** (reverse proxy и Let's Encrypt).  
+Репозиторий: https://github.com/gadzhilaev/takt
 
 ---
 

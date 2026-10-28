@@ -1,11 +1,17 @@
-# Трекер задач (командный)
+# Takt
 
-Production-ready стек: **FastAPI + PostgreSQL + Next.js 14**, Docker, JWT в httpOnly cookie, WebSocket, Excel-отчёты.
+Платформа управления задачами, проектами и командной работой.
+
+Стек: **FastAPI + PostgreSQL + Next.js 14**, Docker, JWT в httpOnly cookie, WebSocket, Excel-отчёты.
+
+Репозиторий: [github.com/gadzhilaev/takt](https://github.com/gadzhilaev/takt)
+
+Контекст для AI-агентов: [`AGENTS.md`](AGENTS.md) · [`docs/AI_PROJECT_CONTEXT.md`](docs/AI_PROJECT_CONTEXT.md)
 
 ## Архитектура
 
 ```text
-track/
+takt/
 ├── backend/          # FastAPI, SQLAlchemy 2 async, Alembic, pytest
 │   └── app/
 │       ├── api/      # REST /api/v1, WebSocket /ws
@@ -19,17 +25,20 @@ track/
 ```
 
 - **Прокси (Caddy):** `/` → frontend, `/api/*` и `/ws` → backend.
-- **Данные:** PostgreSQL (volume `pgdata`), файлы в volume `uploads`.
+- **Данные:** PostgreSQL (volume `track_pgdata` при `COMPOSE_PROJECT_NAME=track`), файлы в volume `uploads`.
 - **Миграции:** `alembic upgrade head` при старте backend.
 - **Первый admin:** из `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME`, если админов ещё нет.
 
 Публичной регистрации нет (`POST /api/v1/auth/register` → 404).
+
+Технические имена БД/Docker (`POSTGRES_USER=track` и т.п.) сохранены для совместимости с существующими volumes — это не название продукта.
 
 ## Быстрый старт (Docker)
 
 ```bash
 cp .env.example .env
 # Задайте SECRET_KEY, POSTGRES_PASSWORD, ADMIN_PASSWORD
+# Для существующих volumes оставьте COMPOSE_PROJECT_NAME=track
 
 docker compose up --build -d
 ```
@@ -42,78 +51,54 @@ CLI администратора в контейнере:
 docker compose exec backend python -m app.cli create-admin --email admin@example.com --password 'NewPass123!'
 ```
 
-## Локальная разработка (Windows)
+## Локальная разработка
 
-1. **Поднять только PostgreSQL** (нужен запущенный Docker Desktop):
+1. **PostgreSQL** (Docker Desktop):
 
-```powershell
-cd track
+```bash
 docker compose up db -d
 ```
 
-2. **Зависимости backend** (рекомендуется Python **3.12**; на 3.13 тоже работает):
+2. **Backend** (Python 3.12+):
 
-```powershell
+```bash
 cd backend
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-`DATABASE_URL` берётся из `.env` в **корне** репозитория или из `backend/.env`. Пароль должен совпадать с `POSTGRES_PASSWORD` в `.env` (по умолчанию `track_dev_pass`).
+`DATABASE_URL` — из `.env` в корне или `backend/.env`. Пароль должен совпадать с `POSTGRES_PASSWORD`.
 
-3. **Frontend** — из корня или из `frontend/`:
+3. **Frontend:**
 
-```powershell
-cd track
+```bash
 npm run dev
-# то же самое: cd frontend && npm run dev
+# или: cd frontend && npm run dev
 ```
 
-В `frontend/.env.local` (опционально): `BACKEND_INTERNAL_URL=http://localhost:8000`
-
-**Ошибка `WinError 64` / `connection was closed` при `alembic`:** PostgreSQL не запущен или неверный `DATABASE_URL`. Проверьте: `docker compose ps`, затем снова `alembic upgrade head`.
-
-**`npm run dev` в корне без package.json:** используйте `npm run dev` из корня после `git pull` (есть корневой `package.json`) или `cd frontend`.
+Опционально `frontend/.env.local`: `BACKEND_INTERNAL_URL=http://localhost:8000`
 
 **Тесты:**
 
 ```bash
-cd backend
-# БД track_test должна существовать
-pytest
-ruff check app tests
+cd backend && pytest && ruff check app tests
+cd frontend && npm test && npm run lint && npm run build
+# E2E (нужны запущенные frontend+backend):
+cd frontend && PW_CHANNEL=chrome npm run test:e2e
 ```
 
 ## HTTPS и домен
 
-Полная пошаговая инструкция (сервер, DNS, `.env`, Caddy, бэкапы): **[deploy/DEPLOY.md](deploy/DEPLOY.md)**.
-
-Кратко:
-
-1. Укажите `DOMAIN=tasks.example.com` и `ACME_EMAIL` в `.env`.
-2. Пробросьте порты 80/443 на сервер.
-3. Установите `COOKIE_SECURE=true`, `CORS_ORIGINS=https://tasks.example.com`, `NEXT_PUBLIC_WS_URL=wss://tasks.example.com/ws`.
-4. `docker compose up -d` — Caddy получит сертификат Let's Encrypt.
+Полная инструкция: **[deploy/DEPLOY.md](deploy/DEPLOY.md)**.
 
 ## Резервное копирование БД
 
 ```bash
 docker compose exec db pg_dump -U track track > backup_$(date +%F).sql
-# Восстановление:
 cat backup.sql | docker compose exec -T db psql -U track track
 ```
-
-## Чеклист проверки
-
-1. Вход под admin из `.env`
-2. Админка → создать пользователя, скопировать логин/пароль
-3. Вход под пользователем → принудительная смена пароля
-4. Доска → создать задачу (C или «+»), перетащить в «Готово»
-5. Назначить исполнителя в карточке (PATCH через drawer — статус/приоритет)
-6. Отключить пользователя в админке
-7. Страница «Отчёт» и скачивание Excel
-8. Открыть с телефона — горизонтальный скролл колонок, смена статуса в карточке
 
 ## Переменные окружения
 

@@ -1,5 +1,5 @@
 {
-  "name": "track",
+  "name": "takt",
   "private": true,
   "scripts": {
     "dev": "npm run dev --prefix frontend",
@@ -7,7 +7,7 @@
     "db:up": "docker compose up db -d",
     "db:down": "docker compose stop db",
     "migrate": "cd backend && alembic upgrade head",
-    "backend": "cd backend && uvicorn app.main:app --reload --port 8000",
+    "backend": "cd backend && ./.venv/bin/uvicorn app.main:app --reload --port 8000",
     "setup:local": "npm run db:up && npm run migrate"
   }
 }

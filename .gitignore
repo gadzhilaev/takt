@@ -7,3 +7,5 @@ node_modules/
 uploads/
 *.xlsx
 .DS_Store
+frontend/test-results/
+frontend/playwright-report/
