@@ -1,135 +1,152 @@
 "use client";
 
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Project, User } from "@/lib/types";
+import type { Project } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorState } from "@/components/ui/error-state";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getLastProjectId, setLastProjectId } from "@/lib/last-project";
 
-function ProjectsPageInner() {
+function ProjectsInner() {
   const qc = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [open, setOpen] = useState(false);
+  const browse = searchParams.get("browse") === "1";
+  const wantNew = searchParams.get("new") === "1";
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [color, setColor] = useState("#315F72");
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["projects"],
     queryFn: () => api<{ items: Project[] }>("/api/v1/projects"),
   });
+  const projects = useMemo(() => data?.items ?? [], [data?.items]);
 
   useEffect(() => {
-    if (searchParams.get("create") !== "1" || !data?.items?.length) return;
-    const target = data.items.find((p) => p.is_default) ?? data.items[0];
-    router.replace(`/projects/${target.id}?create=1`);
-  }, [data?.items, router, searchParams]);
-  const { data: usersData } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => api<{ items: User[] }>("/api/v1/users"),
-  });
+    if (isLoading || !data) return;
+    if (browse || wantNew) return;
+    if (!projects.length) return;
+    const last = getLastProjectId();
+    const lastProject = last ? projects.find((p) => p.id === last) : undefined;
+    // Prefer college demo board over stale last-id pointing at archived/tech boards.
+    const college = projects.find((p) => p.name === "Колледж ДГУ");
+    const target =
+      (lastProject && lastProject.name !== "Демо-доска" ? lastProject : undefined) ||
+      college ||
+      projects.find((p) => p.is_default) ||
+      projects[0];
+    if (target) {
+      setLastProjectId(target.id);
+      router.replace(`/projects/${target.id}`);
+    }
+  }, [browse, data, isLoading, projects, router, wantNew]);
 
   const create = useMutation({
     mutationFn: () =>
       api<{ project: Project }>("/api/v1/projects", {
         method: "POST",
         json: {
-          name,
-          description: description || null,
-          color,
+          name: name.trim(),
+          description: null,
+          color: "#315F72",
           icon: "folder",
-          member_ids: (usersData?.items ?? []).map((u) => u.id),
+          member_ids: [],
         },
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["projects"] });
-      setOpen(false);
-      setName("");
-      setDescription("");
+      setLastProjectId(res.project.id);
+      router.replace(`/projects/${res.project.id}`);
     },
   });
 
-  if (isLoading) return <Skeleton className="h-48 w-full" />;
+  if (isLoading) return <Skeleton className="h-40 w-full max-w-md" />;
   if (isError) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
-  const projects = data?.items ?? [];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+  if (!projects.length || wantNew) {
+    return (
+      <div className="mx-auto max-w-md space-y-5 pt-8">
         <div>
-          <h1 className="page-title">Проекты</h1>
-          <p className="page-subtitle">Откройте доску проекта, чтобы видеть и двигать задачи</p>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {projects.length ? "Новый проект" : "Создайте первый проект"}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            Доска откроется сразу — столбцы «К выполнению», «В работе», «На проверке», «Готово».
+          </p>
         </div>
-        <Button onClick={() => setOpen((v) => !v)}>
-          <Plus className="h-4 w-4" /> Новый проект
-        </Button>
-      </div>
-
-      {open && (
         <form
-          className="surface-card grid gap-3 p-4 md:grid-cols-2"
+          className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
             if (name.trim()) create.mutate();
           }}
         >
-          <Input placeholder="Название" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label="Цвет" />
-          <Input
-            className="md:col-span-2"
-            placeholder="Описание"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <div className="flex gap-2 md:col-span-2">
-            <Button type="submit" disabled={create.isPending}>
-              Создать
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+          <div>
+            <label className="label-text" htmlFor="project-name">
+              Название проекта
+            </label>
+            <Input
+              id="project-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Например: Команда продукта"
+              autoFocus
+            />
+          </div>
+          <Button type="submit" disabled={!name.trim() || create.isPending} className="w-full">
+            Создать проект
+          </Button>
+          {projects.length > 0 && (
+            <Button type="button" variant="ghost" className="w-full" onClick={() => router.back()}>
               Отмена
             </Button>
-          </div>
+          )}
+          {create.isError && (
+            <p className="text-sm text-[var(--danger)]">{(create.error as Error).message}</p>
+          )}
         </form>
-      )}
+      </div>
+    );
+  }
 
-      {!projects.length ? (
-        <EmptyState title="Пока нет проектов" description="Создайте первый проект для доски задач" />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {projects.map((p) => (
-            <Link key={p.id} href={`/projects/${p.id}`} className="surface-panel block p-4 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="h-3.5 w-3.5 rounded-full" style={{ background: p.color }} />
-                <h2 className="text-lg font-semibold">{p.name}</h2>
-              </div>
-              <p className="mb-4 line-clamp-2 text-sm text-muted">{p.description || "Без описания"}</p>
-              <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
-                <div className="h-full bg-[var(--accent)]" style={{ width: `${p.progress?.percent ?? 0}%` }} />
-              </div>
-              <div className="text-xs text-muted">
-                {p.progress?.done ?? 0} из {p.progress?.total ?? 0} · {p.members.length} участников
-              </div>
-            </Link>
-          ))}
+  if (browse) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-lg font-semibold">Проекты</h1>
+          <Button size="sm" onClick={() => router.push("/projects?new=1")}>
+            Новый
+          </Button>
         </div>
-      )}
-    </div>
-  );
+        <ul className="divide-y divide-hairline rounded-[var(--radius-lg)] border border-hairline bg-[var(--surface)]">
+          {projects.map((p) => (
+            <li key={p.id}>
+              <Link
+                href={`/projects/${p.id}`}
+                className="flex items-center gap-2 px-3 py-3 text-sm hover:bg-[var(--surface-2)]"
+                onClick={() => setLastProjectId(p.id)}
+              >
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />
+                <span className="font-medium">{p.name}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return <p className="text-sm text-muted">Открываем доску…</p>;
 }
 
 export default function ProjectsPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-      <ProjectsPageInner />
+    <Suspense fallback={<Skeleton className="h-40 w-full max-w-md" />}>
+      <ProjectsInner />
     </Suspense>
   );
 }

@@ -32,6 +32,7 @@ export type Project = {
   icon: string;
   is_default: boolean;
   is_archived: boolean;
+  is_demo?: boolean;
   created_at: string;
   updated_at: string;
   members: ProjectMember[];

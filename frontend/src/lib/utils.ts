@@ -16,10 +16,10 @@ export function getInitials(name: string) {
 
 export function priorityLabel(p: string) {
   const map: Record<string, string> = {
-    low: "Низкий",
-    medium: "Средний",
-    high: "Высокий",
-    urgent: "Срочный",
+    low: "Обычная",
+    medium: "Обычная",
+    high: "Важно",
+    urgent: "Срочно",
   };
   return map[p] ?? p;
 }

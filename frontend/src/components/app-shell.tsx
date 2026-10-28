@@ -2,50 +2,44 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  FolderKanban,
-  ListTodo,
-  UserRound,
-  BarChart3,
-  Users,
-  LogOut,
-  Bell,
-  Menu,
-  X,
-  Search,
-  Plus,
-} from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { ChevronDown, ChevronRight, Menu, Plus } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { NotificationItem, Project, User as AppUser } from "@/lib/types";
+import type { Project, User as AppUser } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
-import { ThemeMenu } from "@/components/ui/theme-menu";
-import { BrandWordmark } from "@/components/brand-mark";
+import { BrandLogo, BrandMark } from "@/components/brand-mark";
+import { Dialog } from "@/components/ui/dialog";
+import { ProfileDrawer } from "@/components/profile-drawer";
+import { setLastProjectId } from "@/lib/last-project";
 import { cn } from "@/lib/utils";
 
-const nav = [
-  { href: "/home", label: "Обзор", hint: "Что важно сегодня", icon: LayoutDashboard },
-  { href: "/my", label: "Мои задачи", hint: "Поручения вам", icon: UserRound },
-  { href: "/projects", label: "Проекты", hint: "Доски по проектам", icon: FolderKanban },
-  { href: "/list", label: "Список", hint: "Все задачи таблицей", icon: ListTodo },
-  { href: "/report", label: "Отчёты", hint: "Сводка по команде", icon: BarChart3 },
-];
-
-const mobileNav = [
-  { href: "/home", label: "Обзор", icon: LayoutDashboard },
-  { href: "/my", label: "Мои", icon: UserRound },
-  { href: "/projects", label: "Проекты", icon: FolderKanban },
-  { href: "/list", label: "Список", icon: ListTodo },
-];
+type InviteItem = {
+  id: string;
+  project_id: string;
+  project_name: string | null;
+  email: string;
+  status: string;
+  invited_by_name: string | null;
+};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const qc = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("");
+  const [projectDesc, setProjectDesc] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
+  const [inviteSearch, setInviteSearch] = useState("");
+
   const { data } = useQuery({
     queryKey: ["me"],
     queryFn: () => api<{ user: AppUser }>("/api/v1/auth/me"),
@@ -54,226 +48,375 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: projectsData } = useQuery({
     queryKey: ["projects"],
     queryFn: () => api<{ items: Project[] }>("/api/v1/projects"),
-    staleTime: 30_000,
-  });
-  const { data: notifData } = useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => api<{ items: NotificationItem[]; unread: number }>("/api/v1/notifications?page_size=10"),
-    refetchInterval: 60_000,
     staleTime: 20_000,
   });
+  const { data: invitesData, refetch: refetchInvites } = useQuery({
+    queryKey: ["my-invites"],
+    queryFn: () => api<{ items: InviteItem[] }>("/api/v1/invites/mine"),
+    staleTime: 15_000,
+  });
+
   const user = data?.user;
   const projects = projectsData?.items ?? [];
-  const unread = notifData?.unread ?? 0;
-  const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
+  const myInvites = invitesData?.items ?? [];
 
-  async function logout() {
-    await api("/api/v1/auth/logout", { method: "POST" });
-    router.push("/login");
-  }
+  const currentProjectId = useMemo(() => {
+    const m = pathname.match(/^\/projects\/([^/?#]+)/);
+    return m?.[1] ?? null;
+  }, [pathname]);
 
-  function submitSearch(e: React.FormEvent) {
+  useEffect(() => {
+    if (currentProjectId) setLastProjectId(currentProjectId);
+  }, [currentProjectId]);
+
+  const createProject = useMutation({
+    mutationFn: () =>
+      api<{ project: Project }>("/api/v1/projects", {
+        method: "POST",
+        json: {
+          name: projectName.trim(),
+          description: projectDesc.trim() || null,
+          color: "#315F72",
+          icon: "folder",
+          member_ids: [],
+        },
+      }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      setCreateOpen(false);
+      setProjectName("");
+      setProjectDesc("");
+      setLastProjectId(res.project.id);
+      setMobileOpen(false);
+      router.push(`/projects/${res.project.id}`);
+    },
+  });
+
+  const inviteMut = useMutation({
+    mutationFn: (projectId: string) =>
+      api<{ invite: InviteItem; note?: string }>(`/api/v1/projects/${projectId}/invites`, {
+        method: "POST",
+        json: { email: inviteEmail.trim() },
+      }),
+    onSuccess: (res) => {
+      setInviteNote(res.note || "Приглашение создано");
+      setInviteEmail("");
+      qc.invalidateQueries({ queryKey: ["project", inviteOpen] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+
+  const { data: pendingInvites } = useQuery({
+    queryKey: ["project-invites", inviteOpen],
+    enabled: !!inviteOpen,
+    queryFn: () => api<{ items: InviteItem[] }>(`/api/v1/projects/${inviteOpen}/invites`),
+  });
+
+  const userSearch = useQuery({
+    queryKey: ["user-search", inviteOpen, inviteSearch],
+    enabled: !!inviteOpen && inviteSearch.trim().length >= 2,
+    queryFn: () =>
+      api<{ items: { id: string; name: string; email: string }[] }>(
+        `/api/v1/users?q=${encodeURIComponent(inviteSearch.trim())}&exclude_project_id=${inviteOpen}`
+      ),
+  });
+
+  function toggleExpand(id: string, e: React.MouseEvent) {
     e.preventDefault();
-    const q = search.trim();
-    if (!q) return;
-    router.push(`/list?search=${encodeURIComponent(q)}`);
-    setMobileOpen(false);
+    e.stopPropagation();
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function goCreate() {
-    const target = defaultProject ?? projects[0];
-    if (target) router.push(`/projects/${target.id}?create=1`);
-    else router.push("/projects?create=1");
+  function openProject(id: string) {
+    setLastProjectId(id);
     setMobileOpen(false);
+    router.push(`/projects/${id}`);
   }
 
   const Sidebar = (
-    <aside className="flex h-full w-[15.5rem] flex-col border-r border-hairline bg-[var(--surface)]">
+    <aside className="flex h-full w-[15.5rem] flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
       <div className="px-3.5 py-4">
-        <BrandWordmark />
+        <Link href="/projects" className="inline-flex" aria-label="Takt">
+          <BrandLogo className="h-6" />
+        </Link>
       </div>
 
-      <div className="px-3 pb-3">
-        <Button className="w-full justify-center" size="default" onClick={goCreate} aria-label="Создать задачу">
-          <Plus className="h-4 w-4" />
-          Создать задачу
-        </Button>
+      {myInvites.length > 0 && (
+        <div className="mx-3 mb-3 space-y-2 rounded-[var(--radius)] border border-hairline bg-[var(--surface-2)] p-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Приглашения</p>
+          {myInvites.map((inv) => (
+            <div key={inv.id} className="space-y-1.5">
+              <p className="text-xs leading-snug">
+                <span className="font-medium">{inv.project_name}</span>
+                {inv.invited_by_name ? ` · ${inv.invited_by_name}` : ""}
+              </p>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={async () => {
+                    const res = await api<{ project_id: string }>(`/api/v1/invites/${inv.id}/accept`, {
+                      method: "POST",
+                    });
+                    await qc.invalidateQueries({ queryKey: ["projects"] });
+                    await refetchInvites();
+                    openProject(res.project_id);
+                  }}
+                >
+                  Принять
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={async () => {
+                    await api(`/api/v1/invites/${inv.id}/decline`, { method: "POST" });
+                    refetchInvites();
+                  }}
+                >
+                  Отклонить
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="px-3 pb-1">
+        <p className="section-label px-1.5">Мои проекты</p>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3" aria-label="Основное меню">
-        {nav.map(({ href, label, hint, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3" aria-label="Проекты">
+        {projects.map((p) => {
+          const active = p.id === currentProjectId;
+          const open = !!expanded[p.id];
+          const isOwner = p.members.some((m) => m.user_id === user?.id && m.role === "admin");
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              data-active={active}
-              className="nav-link"
-              title={hint}
-            >
-              <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-              <span className="min-w-0 truncate">{label}</span>
-            </Link>
-          );
-        })}
-        {user?.role === "admin" && (
-          <Link
-            href="/admin"
-            onClick={() => setMobileOpen(false)}
-            data-active={pathname.startsWith("/admin")}
-            className="nav-link"
-            title="Пользователи и настройки"
-          >
-            <Users className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-            <span>Пользователи</span>
-          </Link>
-        )}
-
-        <div className="pt-4">
-          <div className="section-label px-2.5 pb-1.5">Проекты</div>
-          <div className="max-h-52 space-y-0.5 overflow-y-auto">
-            {projects.map((p) => (
-              <Link
-                key={p.id}
-                href={`/projects/${p.id}`}
-                onClick={() => setMobileOpen(false)}
+            <div key={p.id} className="rounded-[var(--radius)]">
+              <div
                 className={cn(
-                  "flex items-center gap-2 rounded-[var(--radius)] px-2.5 py-1.5 text-[13px]",
-                  pathname.includes(p.id)
-                    ? "bg-[var(--surface-2)] font-semibold text-foreground"
-                    : "text-[var(--muted-fg)] hover:bg-[var(--surface-2)]"
+                  "flex items-center gap-0.5 rounded-[var(--radius)] px-1 py-0.5",
+                  active && "bg-[var(--surface-2)]"
                 )}
               >
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: p.color }} />
-                <span className="truncate">{p.name}</span>
-              </Link>
-            ))}
-            {!projects.length && <p className="px-2.5 text-xs text-muted">Пока нет проектов</p>}
-          </div>
-        </div>
+                <button
+                  type="button"
+                  className="flex h-8 w-7 shrink-0 items-center justify-center rounded text-muted hover:text-foreground"
+                  aria-label={open ? "Свернуть участников" : "Показать участников"}
+                  onClick={(e) => toggleExpand(p.id, e)}
+                >
+                  {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "min-w-0 flex-1 truncate py-1.5 pr-2 text-left text-[13px]",
+                    active ? "font-semibold text-foreground" : "text-[var(--muted-fg)] hover:text-foreground"
+                  )}
+                  onClick={() => openProject(p.id)}
+                >
+                  {p.name}
+                </button>
+              </div>
+              {open && (
+                <ul className="mb-1 ml-7 space-y-0.5 border-l border-hairline pl-2">
+                  {p.members.map((m) => (
+                    <li key={m.user_id} className="flex items-center gap-1.5 py-1 text-xs text-muted">
+                      <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={5} />
+                      <span className="truncate">{m.name}</span>
+                    </li>
+                  ))}
+                  {isOwner && (
+                    <li>
+                      <button
+                        type="button"
+                        className="py-1 text-xs font-medium text-[var(--accent)]"
+                        onClick={() => {
+                          setInviteOpen(p.id);
+                          setInviteEmail("");
+                          setInviteNote("");
+                          setInviteSearch("");
+                        }}
+                      >
+                        + Добавить участника
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+        {!projects.length && <p className="px-2.5 py-2 text-xs text-muted">Пока нет проектов</p>}
       </nav>
 
       <div className="border-t border-hairline p-2.5">
+        <Button
+          variant="secondary"
+          className="mb-2 w-full justify-start"
+          size="sm"
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="h-4 w-4" /> Создать проект
+        </Button>
         {user && (
-          <div className="flex items-center gap-1.5">
-            <Link href="/profile" onClick={() => setMobileOpen(false)} className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 rounded-[var(--radius)] p-1 hover:bg-[var(--surface-2)]">
-                <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={8} />
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-semibold">{user.name}</div>
-                  <div className="truncate text-[11px] text-muted">{user.email}</div>
-                </div>
-              </div>
-            </Link>
-            <Button variant="ghost" size="icon" aria-label="Выйти" onClick={logout}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-[var(--radius)] px-1.5 py-1.5 text-left hover:bg-[var(--surface-2)]"
+            onClick={() => setProfileOpen(true)}
+          >
+            <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={8} />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{user.name}</span>
+          </button>
         )}
       </div>
     </aside>
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="flex min-h-screen">
-        <div className="hidden lg:block">{Sidebar}</div>
-        {mobileOpen && (
-          <div className="fixed inset-0 z-50 flex lg:hidden">
-            <div className="absolute inset-0 bg-black/35" onClick={() => setMobileOpen(false)} aria-hidden />
-            <div className="relative z-10 h-full border-r border-hairline">{Sidebar}</div>
-          </div>
-        )}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-hairline bg-[var(--surface)]/90 px-3 backdrop-blur md:gap-2.5 md:px-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              aria-label={mobileOpen ? "Закрыть меню" : "Открыть меню"}
-              onClick={() => setMobileOpen((v) => !v)}
-            >
-              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </Button>
-            <form onSubmit={submitSearch} className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Найти задачу…"
-                aria-label="Поиск задач"
-                className="field h-9 py-0 pl-8 pr-2"
-              />
-            </form>
-            <Button
-              variant="secondary"
-              size="icon"
-              className="hidden sm:inline-flex lg:hidden"
-              onClick={goCreate}
-              aria-label="Создать задачу"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Link
-              href="/inbox"
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] text-muted hover:bg-[var(--surface-2)] hover:text-foreground"
-              aria-label={unread ? `Уведомления, непрочитанных: ${unread}` : "Уведомления"}
-            >
-              <Bell className="h-4 w-4" />
-              {unread > 0 && (
-                <span className="absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--accent)] px-0.5 text-[9px] font-bold text-[var(--accent-fg)]">
-                  {unread > 9 ? "9+" : unread}
-                </span>
-              )}
-            </Link>
-            <ThemeMenu />
-            <Link href="/profile" className="hidden sm:block" aria-label="Профиль">
-              {user && <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={8} />}
-            </Link>
-          </header>
-
-          <main className="mx-auto w-full max-w-[1440px] flex-1 p-3 pb-[4.75rem] md:p-5 lg:pb-5">{children}</main>
-
-          <nav
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-[var(--surface)]/95 backdrop-blur safe-pb lg:hidden"
-            aria-label="Мобильная навигация"
-          >
-            <div className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pt-0.5">
-              {mobileNav.map(({ href, label, icon: Icon }) => {
-                const active = pathname === href || pathname.startsWith(href + "/");
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={cn(
-                      "flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] text-[10px] font-semibold",
-                      active ? "text-[var(--accent)]" : "text-muted"
-                    )}
-                  >
-                    <Icon className="h-[18px] w-[18px]" aria-hidden />
-                    {label}
-                  </Link>
-                );
-              })}
-              <button
-                type="button"
-                onClick={goCreate}
-                aria-label="Создать задачу"
-                className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] text-[10px] font-semibold text-[var(--accent)]"
-              >
-                <span
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)]"
-                  aria-hidden
-                >
-                  <Plus className="h-4 w-4" />
-                </span>
-                Создать
-              </button>
-            </div>
-          </nav>
+    <div className="flex min-h-screen">
+      <div className="hidden lg:block">{Sidebar}</div>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} aria-hidden />
+          <div className="relative z-10 h-full">{Sidebar}</div>
         </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-11 items-center gap-2 border-b border-hairline bg-[var(--surface)] px-3 lg:hidden">
+          <Button variant="ghost" size="icon" aria-label="Меню" onClick={() => setMobileOpen(true)}>
+            <Menu className="h-4 w-4" />
+          </Button>
+          <BrandMark className="h-6" />
+          <span className="truncate text-sm font-semibold">
+            {projects.find((p) => p.id === currentProjectId)?.name || "Takt"}
+          </span>
+        </header>
+        <main className="mx-auto w-full max-w-[1600px] flex-1 p-3 md:p-4">{children}</main>
       </div>
+
+      {user && <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} user={user} />}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen} title="Новый проект">
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (projectName.trim()) createProject.mutate();
+          }}
+        >
+          <div>
+            <label className="label-text" htmlFor="np-name">
+              Название
+            </label>
+            <Input id="np-name" value={projectName} onChange={(e) => setProjectName(e.target.value)} autoFocus />
+          </div>
+          <div>
+            <label className="label-text" htmlFor="np-desc">
+              Описание
+            </label>
+            <textarea
+              id="np-desc"
+              className="field min-h-[4rem] py-2"
+              value={projectDesc}
+              onChange={(e) => setProjectDesc(e.target.value)}
+              placeholder="Необязательно"
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={!projectName.trim() || createProject.isPending}>
+            Создать
+          </Button>
+          {createProject.isError && (
+            <p className="text-sm text-[var(--danger)]">{(createProject.error as Error).message}</p>
+          )}
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={!!inviteOpen}
+        onOpenChange={(v) => !v && setInviteOpen(null)}
+        title="Пригласить участника"
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (inviteOpen && inviteEmail.trim()) inviteMut.mutate(inviteOpen);
+          }}
+        >
+          <div>
+            <label className="label-text" htmlFor="inv-search">
+              Найти зарегистрированного
+            </label>
+            <Input
+              id="inv-search"
+              value={inviteSearch}
+              onChange={(e) => setInviteSearch(e.target.value)}
+              placeholder="Имя или email"
+              autoFocus
+            />
+            {(userSearch.data?.items?.length ?? 0) > 0 && (
+              <ul className="mt-1 max-h-36 overflow-y-auto rounded-[var(--radius)] border border-hairline">
+                {userSearch.data!.items.map((u) => (
+                  <li key={u.id}>
+                    <button
+                      type="button"
+                      className="flex w-full flex-col px-2.5 py-1.5 text-left text-sm hover:bg-[var(--surface-2)]"
+                      onClick={() => setInviteEmail(u.email)}
+                    >
+                      <span className="font-medium">{u.name}</span>
+                      <span className="text-xs text-muted">{u.email}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {inviteSearch.trim().length >= 2 && userSearch.isFetched && !(userSearch.data?.items?.length) && (
+              <p className="mt-1 text-xs text-muted">Никого не найдено — укажите email вручную ниже.</p>
+            )}
+          </div>
+          <div>
+            <label className="label-text" htmlFor="inv-email">
+              Email
+            </label>
+            <Input
+              id="inv-email"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="colleague@example.com"
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={!inviteEmail.trim() || inviteMut.isPending}>
+            Пригласить
+          </Button>
+          {inviteNote && <p className="text-xs text-muted">{inviteNote}</p>}
+          {inviteMut.isError && (
+            <p className="text-sm text-[var(--danger)]">{(inviteMut.error as Error).message}</p>
+          )}
+          {(pendingInvites?.items?.length ?? 0) > 0 && (
+            <div className="space-y-1 border-t border-hairline pt-3">
+              <p className="text-xs font-semibold text-muted">Ожидают ответа</p>
+              {pendingInvites!.items.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate">{inv.email}</span>
+                  <button
+                    type="button"
+                    className="text-[var(--danger)]"
+                    onClick={async () => {
+                      await api(`/api/v1/projects/${inviteOpen}/invites/${inv.id}`, { method: "DELETE" });
+                      qc.invalidateQueries({ queryKey: ["project-invites", inviteOpen] });
+                    }}
+                  >
+                    Отменить
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </form>
+      </Dialog>
     </div>
   );
 }

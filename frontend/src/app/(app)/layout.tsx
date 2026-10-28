@@ -2,26 +2,59 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { SplashScreen } from "@/components/splash-screen";
 import { api } from "@/lib/api";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { data, isError, isLoading } = useQuery({
+  const [bootError, setBootError] = useState<string | null>(null);
+  const me = useQuery({
     queryKey: ["me"],
     queryFn: () => api<{ user: { must_change_password: boolean } }>("/api/v1/auth/me"),
     retry: false,
   });
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api<{ items: unknown[] }>("/api/v1/projects"),
+    enabled: !!me.data && !me.isError,
+    retry: 1,
+  });
 
   useEffect(() => {
-    if (isError) router.replace("/login");
-    if (data?.user.must_change_password) router.replace("/change-password");
-  }, [isError, data, router]);
+    if (me.isError) router.replace("/login");
+    if (me.data?.user.must_change_password) router.replace("/change-password");
+  }, [me.isError, me.data, router]);
 
-  if (isLoading || isError) {
+  useEffect(() => {
+    if (projects.isError) setBootError((projects.error as Error)?.message || "Не удалось загрузить проекты");
+    else setBootError(null);
+  }, [projects.isError, projects.error]);
+
+  const ready = !!me.data && !me.isError && (projects.isSuccess || projects.isError);
+
+  if (me.isLoading || (me.data && projects.isLoading && !projects.isFetched)) {
+    return <SplashScreen />;
+  }
+
+  if (me.isError) {
+    return <SplashScreen />;
+  }
+
+  if (!ready) {
+    return <SplashScreen />;
+  }
+
+  if (bootError && !projects.data) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-500">Загрузка…</div>
+      <SplashScreen
+        error={bootError}
+        onRetry={() => {
+          setBootError(null);
+          projects.refetch();
+        }}
+      />
     );
   }
 

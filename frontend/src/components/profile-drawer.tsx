@@ -1,0 +1,332 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, Camera, LogOut, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import type { NotificationItem, User } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { UserAvatar } from "@/components/user-avatar";
+import { ThemeMenu } from "@/components/ui/theme-menu";
+import { disableWebPush, enableWebPush, getPushStatus } from "@/lib/web-push";
+
+export function ProfileDrawer({
+  open,
+  onClose,
+  user,
+}: {
+  open: boolean;
+  onClose: () => void;
+  user: User;
+}) {
+  const qc = useQueryClient();
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [pushMsg, setPushMsg] = useState("");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushState, setPushState] = useState<Awaited<ReturnType<typeof getPushStatus>> | null>(null);
+
+  const notificationsQuery = useQuery({
+    queryKey: ["notifications"],
+    enabled: open,
+    queryFn: () =>
+      api<{ items: NotificationItem[]; unread: number }>("/api/v1/notifications?page_size=20"),
+    refetchInterval: open ? 30_000 : false,
+  });
+
+  useEffect(() => {
+    if (open) {
+      setName(user.name);
+      setEmail(user.email);
+      setMsg("");
+      setErr("");
+      setPushMsg("");
+      getPushStatus().then(setPushState).catch(() => null);
+    }
+  }, [open, user]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const saveProfile = useMutation({
+    mutationFn: () => api<{ user: User }>("/api/v1/users/me", { method: "PATCH", json: { name, email } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me"] });
+      setMsg("Профиль сохранён");
+      setErr("");
+    },
+    onError: (e: Error) => setErr(e.message),
+  });
+
+  const changePassword = useMutation({
+    mutationFn: () =>
+      api("/api/v1/auth/change-password", {
+        method: "POST",
+        json: { current_password: currentPassword, new_password: newPassword },
+      }),
+    onSuccess: async () => {
+      setMsg("Пароль изменён — войдите снова");
+      await api("/api/v1/auth/logout", { method: "POST" }).catch(() => null);
+      router.push("/login");
+    },
+    onError: (e: Error) => setErr(e.message),
+  });
+
+  async function onAvatar(file: File | null) {
+    setErr("");
+    if (!file) {
+      await api("/api/v1/users/me/avatar", { method: "DELETE" });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      setMsg("Аватар удалён");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    const token = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1];
+    const res = await fetch("/api/v1/users/me/avatar", {
+      method: "POST",
+      credentials: "include",
+      headers: token ? { "X-CSRF-Token": decodeURIComponent(token) } : undefined,
+      body: fd,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setErr(body?.error?.message || "Не удалось загрузить аватар");
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["me"] });
+    setMsg("Аватар обновлён");
+  }
+
+  async function logout() {
+    await api("/api/v1/auth/logout", { method: "POST" });
+    router.push("/login");
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex justify-end">
+      <button type="button" className="absolute inset-0 bg-black/25" aria-label="Закрыть" onClick={onClose} />
+      <aside
+        className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-hairline bg-[var(--surface)] shadow-sm"
+        role="dialog"
+        aria-label="Мой профиль"
+      >
+        <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+          <h2 className="text-base font-semibold">Мой профиль</h2>
+          <div className="flex items-center gap-1">
+            <ThemeMenu />
+            <button type="button" className="rounded p-1.5 text-muted hover:bg-[var(--surface-2)]" onClick={onClose} aria-label="Закрыть">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-5 overflow-y-auto p-4">
+          <div className="flex flex-col items-center gap-3 pt-2">
+            <button
+              type="button"
+              className="group relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              onClick={() => fileRef.current?.click()}
+              aria-label="Изменить аватар"
+            >
+              <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={28} />
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                <span className="flex flex-col items-center gap-1 text-[12px] font-medium">
+                  <Camera className="h-5 w-5" />
+                  Изменить
+                </span>
+              </span>
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => onAvatar(e.target.files?.[0] ?? null)}
+            />
+            {user.avatar_url && (
+              <button
+                type="button"
+                className="text-sm text-muted hover:text-foreground"
+                onClick={() => onAvatar(null)}
+              >
+                Удалить фото
+              </button>
+            )}
+          </div>
+
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveProfile.mutate();
+            }}
+          >
+            <div>
+              <label className="label-text" htmlFor="profile-name">
+                Имя
+              </label>
+              <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div>
+              <label className="label-text" htmlFor="profile-email">
+                Email
+              </label>
+              <Input id="profile-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <Button type="submit" size="sm" disabled={saveProfile.isPending}>
+              Сохранить
+            </Button>
+          </form>
+
+          <div className="border-t border-hairline pt-4">
+            <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+              <Bell className="h-4 w-4" /> Уведомления
+            </p>
+            <div className="mb-3 space-y-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={pushBusy || pushState?.supported === false}
+                onClick={async () => {
+                  setPushBusy(true);
+                  setPushMsg("");
+                  try {
+                    if (pushState?.subscribed) {
+                      await disableWebPush();
+                      setPushMsg("Браузерные уведомления отключены");
+                    } else {
+                      const res = await enableWebPush();
+                      setPushMsg(res.message);
+                    }
+                    setPushState(await getPushStatus());
+                  } catch (e) {
+                    setPushMsg((e as Error).message || "Не удалось изменить уведомления");
+                  } finally {
+                    setPushBusy(false);
+                  }
+                }}
+              >
+                {pushState?.subscribed ? "Отключить push" : "Включить уведомления в браузере"}
+              </Button>
+              {pushMsg && <p className="text-xs text-muted">{pushMsg}</p>}
+              {pushState && !pushState.configured && pushState.supported && (
+                <p className="text-xs text-muted">
+                  Push на сервере не настроен (нужны VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY). In-app уведомления
+                  работают.
+                </p>
+              )}
+            </div>
+            <div className="max-h-48 space-y-2 overflow-y-auto">
+              {(notificationsQuery.data?.items ?? []).length === 0 && (
+                <p className="text-xs text-muted">Пока нет уведомлений</p>
+              )}
+              {(notificationsQuery.data?.items ?? []).map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  className={`block w-full rounded-[var(--radius)] border border-hairline px-2.5 py-2 text-left text-xs ${
+                    n.is_read ? "opacity-70" : "bg-[var(--surface-2)]"
+                  }`}
+                  onClick={async () => {
+                    if (!n.is_read) {
+                      await api(`/api/v1/notifications/${n.id}/read`, { method: "POST" });
+                      notificationsQuery.refetch();
+                    }
+                    if (n.project_id && n.task_id) {
+                      onClose();
+                      router.push(`/projects/${n.project_id}?task=${n.task_id}`);
+                    } else if (n.project_id) {
+                      onClose();
+                      router.push(`/projects/${n.project_id}`);
+                    }
+                  }}
+                >
+                  <span className="font-medium text-foreground">{n.title}</span>
+                  {n.body && <span className="mt-0.5 block text-muted">{n.body}</span>}
+                </button>
+              ))}
+            </div>
+            {(notificationsQuery.data?.unread ?? 0) > 0 && (
+              <button
+                type="button"
+                className="mt-2 text-xs text-[var(--accent)]"
+                onClick={async () => {
+                  await api("/api/v1/notifications/read-all", { method: "POST" });
+                  notificationsQuery.refetch();
+                }}
+              >
+                Отметить все прочитанными
+              </button>
+            )}
+          </div>
+
+          <div className="border-t border-hairline pt-4">
+            <p className="mb-2 text-sm font-semibold">Смена пароля</p>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                changePassword.mutate();
+              }}
+            >
+              <div>
+                <label className="label-text" htmlFor="cur-pass">
+                  Текущий пароль
+                </label>
+                <Input
+                  id="cur-pass"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label-text" htmlFor="new-pass">
+                  Новый пароль
+                </label>
+                <Input
+                  id="new-pass"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <Button type="submit" size="sm" variant="secondary" disabled={changePassword.isPending || newPassword.length < 8}>
+                Сменить пароль
+              </Button>
+            </form>
+          </div>
+
+          {msg && <p className="text-sm text-[var(--success)]">{msg}</p>}
+          {err && <p className="text-sm text-[var(--danger)]">{err}</p>}
+        </div>
+
+        <div className="border-t border-hairline p-3">
+          <Button variant="ghost" className="w-full justify-start" onClick={logout}>
+            <LogOut className="h-4 w-4" /> Выйти
+          </Button>
+        </div>
+      </aside>
+    </div>
+  );
+}

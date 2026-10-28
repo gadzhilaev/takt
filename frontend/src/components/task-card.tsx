@@ -1,175 +1,146 @@
 "use client";
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
-import { format, isPast, parseISO } from "date-fns";
-import { ru } from "date-fns/locale";
-import { MessageSquare, CheckSquare, GripVertical, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import type { Status, Task } from "@/lib/types";
 import { UserAvatar } from "@/components/user-avatar";
-import { cn, priorityLabel } from "@/lib/utils";
-
-const priorityChip: Record<string, string> = {
-  low: "bg-[var(--surface-2)] text-[var(--priority-low)] border border-hairline",
-  medium: "bg-[var(--accent-soft)] text-[var(--priority-medium)] border border-transparent",
-  high: "bg-[var(--warning-soft)] text-[var(--priority-high)] border border-transparent",
-  urgent: "bg-[var(--danger-soft)] text-[var(--priority-urgent)] border border-transparent",
-};
+import { Select } from "@/components/ui/select";
+import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { urgencyColor } from "@/lib/urgency";
+import { cn } from "@/lib/utils";
 
 export function TaskCard({
   task,
   onOpen,
-  onComplete,
   draggable = true,
   statuses,
   onChangeStatus,
+  isDone = false,
+  dropEdge = null,
+  overlay = false,
 }: {
   task: Task;
   onOpen: () => void;
-  onComplete?: () => void;
-  /** When false, hide drag handle and disable dnd-kit (mobile column mode). */
   draggable?: boolean;
   statuses?: Status[];
   onChangeStatus?: (statusId: string) => void;
+  isDone?: boolean;
+  dropEdge?: "before" | "after" | null;
+  /** Rendered inside DragOverlay — no sensors. */
+  overlay?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
-    disabled: !draggable,
+    disabled: !draggable || overlay,
   });
-  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: task.id, disabled: !draggable });
-  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
-  const overdue =
-    task.due_date &&
-    !task.closed_at &&
-    isPast(parseISO(task.due_date.endsWith("Z") ? task.due_date : `${task.due_date}Z`));
-  const assignees = task.assignees.slice(0, 3);
-  const more = Math.max(0, task.assignees.length - 3);
-  const done = !!task.closed_at || !!task.status?.is_done;
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: task.id,
+    disabled: !draggable || overlay || isDragging,
+  });
+  const assignees = task.assignees.slice(0, 4);
+  const more = Math.max(0, task.assignees.length - assignees.length);
+  const stripe = urgencyColor(task.priority);
 
   return (
-    <article
-      ref={(node) => {
-        setNodeRef(node);
-        setDropRef(node);
-      }}
-      style={style}
-      className={cn(
-        "w-full rounded-[var(--radius-lg)] border border-hairline bg-[var(--surface)] p-2",
-        isDragging && "opacity-55",
-        isOver && "ring-2 ring-[var(--ring)]"
-      )}
+    <div
+      className={cn("relative", isDragging && !overlay && "h-0 overflow-hidden opacity-0")}
+      aria-hidden={isDragging && !overlay ? true : undefined}
     >
-      <div className="flex gap-0.5">
-        {draggable && (
-          <button
-            type="button"
-            className="mt-0.5 flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-[var(--radius-sm)] text-muted hover:bg-[var(--surface-2)] active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ring)]"
-            aria-label={`Переместить задачу «${task.title}»`}
-            {...listeners}
-            {...attributes}
-          >
-            <GripVertical className="h-3.5 w-3.5" aria-hidden />
-          </button>
+      {!overlay && dropEdge === "before" && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 -translate-y-1 rounded-full bg-[var(--accent)]"
+          aria-hidden
+        />
+      )}
+      <article
+        ref={
+          overlay
+            ? undefined
+            : (node) => {
+                setNodeRef(node);
+                setDropRef(node);
+              }
+        }
+        className={cn(
+          "relative w-full overflow-hidden rounded-[var(--radius)] border border-hairline bg-[var(--surface)]",
+          overlay && "shadow-md ring-1 ring-[var(--border)]",
+          isDone && !overlay && "opacity-90"
         )}
-        <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ring)]"
-            onClick={onOpen}
-          >
-            <div className="mb-1 flex items-start justify-between gap-2">
-              <h3 className="break-words text-[13px] font-semibold leading-snug text-foreground">{task.title}</h3>
-              <span className={cn("chip shrink-0", priorityChip[task.priority])}>
-                {priorityLabel(task.priority)}
-              </span>
-            </div>
-            {task.due_date && (
-              <p className={cn("mb-1 text-[11px] font-medium", overdue ? "text-[var(--danger)]" : "text-muted")}>
-                {overdue ? "Просрочено: " : "Срок: "}
-                {format(parseISO(task.due_date), "d MMM", { locale: ru })}
-              </p>
+        {...(draggable && !overlay ? { ...listeners, ...attributes } : {})}
+      >
+        <span
+          className="absolute inset-y-0 left-0 w-[3px]"
+          style={{ backgroundColor: stripe }}
+          aria-hidden
+        />
+        <button type="button" className="w-full p-2.5 pl-3.5 text-left" onClick={onOpen}>
+          <div className="flex items-start gap-1.5">
+            {isDone && (
+              <Check
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--success)]"
+                strokeWidth={2.5}
+                aria-label="Выполнено"
+              />
             )}
-          </button>
-
-          {task.labels.length > 0 && (
-            <div className="mb-1.5 flex flex-wrap gap-1">
-              {task.labels.map((l) => (
-                <span
-                  key={l.id}
-                  className="chip border border-hairline bg-[var(--surface-2)] text-[var(--muted-fg)]"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: l.color }} aria-hidden />
-                  {l.name}
-                </span>
-              ))}
-            </div>
+            <h3
+              className={cn(
+                "min-w-0 flex-1 break-words text-[13px] font-medium leading-snug",
+                isDone ? "text-muted" : "text-foreground"
+              )}
+            >
+              {task.title}
+            </h3>
+          </div>
+          {task.description?.trim() && (
+            <p
+              className={cn(
+                "mt-1 line-clamp-2 text-[12px] leading-snug",
+                isDone ? "pl-5 text-muted/80" : "text-muted"
+              )}
+            >
+              {task.description}
+            </p>
           )}
+        </button>
 
-          {statuses && onChangeStatus && (
-            <div className="mb-2">
-              <label className="sr-only" htmlFor={`status-${task.id}`}>
-                Статус задачи «{task.title}»
-              </label>
-              <select
-                id={`status-${task.id}`}
-                className="field py-1.5 text-sm"
-                value={task.status_id}
-                onChange={(e) => onChangeStatus(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {statuses.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
+        {assignees.length > 0 && (
+          <div className={cn("flex items-center gap-1 px-2.5 pb-2.5 pl-3.5", isDone && "opacity-70")}>
+            <TooltipProvider>
               <div className="flex -space-x-1.5">
                 {assignees.map((a) => (
-                  <UserAvatar key={a.id} name={a.name} avatarUrl={a.avatar_url} size={7} />
+                  <Tooltip key={a.id} content={a.name}>
+                    <span
+                      className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      tabIndex={0}
+                      aria-label={a.name}
+                    >
+                      <UserAvatar name={a.name} avatarUrl={a.avatar_url} size={6} title={a.name} />
+                    </span>
+                  </Tooltip>
                 ))}
               </div>
-              <span className="truncate text-xs text-muted">
-                {assignees.length
-                  ? `${assignees.map((a) => a.name.split(" ")[0]).join(", ")}${more ? ` +${more}` : ""}`
-                  : "Без исполнителя"}
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {task.checklist_total > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-xs text-muted" title="Чеклист">
-                  <CheckSquare className="h-3.5 w-3.5" aria-hidden />
-                  {task.checklist_done}/{task.checklist_total}
-                </span>
-              )}
-              {(task.comment_count ?? 0) > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-xs text-muted" title="Комментарии">
-                  <MessageSquare className="h-3.5 w-3.5" aria-hidden />
-                  {task.comment_count}
-                </span>
-              )}
-              {onComplete && !done && (
-                <button
-                  type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--success)] hover:bg-[var(--success-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ring)]"
-                  aria-label={`Отметить «${task.title}» выполненной`}
-                  title="Готово"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onComplete();
-                  }}
-                >
-                  <Check className="h-4 w-4" aria-hidden />
-                </button>
-              )}
-            </div>
+            </TooltipProvider>
+            {more > 0 && <span className="text-[11px] text-muted">+{more}</span>}
           </div>
-        </div>
-      </div>
-    </article>
+        )}
+
+        {statuses && onChangeStatus && (
+          <div className={cn("border-t border-hairline px-2.5 py-2 pl-3.5", isDone && "opacity-75")}>
+            <Select
+              aria-label={`Столбец «${task.title}»`}
+              value={task.status_id}
+              onValueChange={onChangeStatus}
+              options={statuses.map((s) => ({ value: s.id, label: s.name }))}
+            />
+          </div>
+        )}
+      </article>
+      {!overlay && dropEdge === "after" && (
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-0.5 translate-y-1 rounded-full bg-[var(--accent)]"
+          aria-hidden
+        />
+      )}
+    </div>
   );
 }

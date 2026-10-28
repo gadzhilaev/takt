@@ -9,6 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import { BrandLogo } from "@/components/brand-mark";
 
 const schema = z.object({
@@ -30,7 +31,7 @@ export default function LoginPage() {
         json: values,
       });
       if (res.user.must_change_password) router.push("/change-password");
-      else router.push("/home");
+      else router.push("/projects");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка входа");
     }
@@ -43,7 +44,7 @@ export default function LoginPage() {
           <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Вход</h1>
-            <p className="text-[13px] text-muted">Email и пароль выдаёт администратор</p>
+            <p className="text-[13px] text-muted">Войдите или создайте аккаунт</p>
           </div>
         </div>
         <form className="space-y-3.5" method="post" action="#" onSubmit={form.handleSubmit(onSubmit)}>
@@ -83,6 +84,12 @@ export default function LoginPage() {
             {form.formState.isSubmitting ? "Входим…" : "Войти"}
           </Button>
         </form>
+        <p className="mt-4 text-center text-sm text-muted">
+          Нет аккаунта?{" "}
+          <Link href="/register" className="font-medium text-[var(--accent)]">
+            Регистрация
+          </Link>
+        </p>
       </div>
     </div>
   );
