@@ -38,7 +38,7 @@ function ProjectBoardInner() {
     queryFn: () => api<{ project: Project }>(`/api/v1/projects/${id}`),
   });
 
-  if (projectQuery.isLoading) return <Skeleton className="h-64 w-full" />;
+  if (projectQuery.isLoading) return <Skeleton className="h-64 w-full shrink-0" />;
   if (projectQuery.isError || !projectQuery.data?.project) {
     return (
       <ErrorState
@@ -61,8 +61,10 @@ function ProjectBoardInner() {
 
 export default function ProjectBoardPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-      <ProjectBoardInner />
-    </Suspense>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Suspense fallback={<Skeleton className="h-64 w-full shrink-0" />}>
+        <ProjectBoardInner />
+      </Suspense>
+    </div>
   );
 }

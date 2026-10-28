@@ -13,10 +13,10 @@ export function ColumnStartDroppable({
 }) {
   const { setNodeRef } = useDroppable({ id: `col-${statusId}-start` });
   return (
-    <div ref={setNodeRef} className="relative h-2 shrink-0">
+    <div ref={setNodeRef} className="relative h-0 shrink-0">
       {active && (
         <div
-          className="pointer-events-none absolute inset-x-0 top-1/2 z-10 h-0.5 -translate-y-1/2 rounded-full bg-[var(--accent)]"
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 rounded-full bg-[var(--accent)]"
           aria-hidden
         />
       )}
@@ -35,14 +35,14 @@ export function KanbanColumn({
 }) {
   const { setNodeRef } = useDroppable({ id: `col-${id}` });
   return (
-    <div ref={setNodeRef} className="relative w-[17.5rem] shrink-0">
+    <div ref={setNodeRef} className="relative flex h-full w-[17.5rem] shrink-0 flex-col">
       {showEmptyIndicator && (
         <div
           className="pointer-events-none absolute inset-x-3 top-[5.25rem] z-10 h-0.5 rounded-full bg-[var(--accent)]"
           aria-hidden
         />
       )}
-      <div className={cn("h-full min-w-0")}>{children}</div>
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col")}>{children}</div>
     </div>
   );
 }

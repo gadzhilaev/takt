@@ -135,8 +135,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const Sidebar = (
-    <aside className="flex h-full w-[15.5rem] flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
-      <div className="flex items-center justify-between gap-2 px-3.5 py-4">
+    <aside className="flex h-full w-[15.5rem] shrink-0 flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
+      <div className="flex shrink-0 items-center justify-between gap-2 px-3.5 py-4">
         <Link href="/projects" className="inline-flex min-w-0" aria-label="Takt">
           <BrandLogo className="h-6" />
         </Link>
@@ -184,11 +184,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="px-3 pb-1">
+      <div className="shrink-0 px-3 pb-1">
         <p className="section-label px-1.5">Мои проекты</p>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3" aria-label="Проекты">
+      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-2 pb-3" aria-label="Проекты">
         {projects.map((p) => {
           const active = p.id === currentProjectId;
           const open = !!expanded[p.id];
@@ -252,7 +252,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {!projects.length && <p className="px-2.5 py-2 text-xs text-muted">Пока нет проектов</p>}
       </nav>
 
-      <div className="border-t border-hairline p-2.5">
+      <div className="shrink-0 border-t border-hairline p-2.5">
         <Button
           variant="secondary"
           className="mb-2 w-full justify-start"
@@ -276,8 +276,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:block">{Sidebar}</div>
+    <div className="flex h-dvh overflow-hidden">
+      <div className="sticky top-0 hidden h-dvh shrink-0 self-start lg:block">{Sidebar}</div>
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} aria-hidden />
@@ -285,8 +285,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-11 items-center gap-2 border-b border-hairline bg-[var(--surface)] px-3 lg:hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="z-30 flex h-11 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--surface)] px-3 lg:hidden">
           <Button variant="ghost" size="icon" aria-label="Меню" onClick={() => setMobileOpen(true)}>
             <Menu className="h-4 w-4" />
           </Button>
@@ -296,7 +296,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           <ThemeMenu />
         </header>
-        <main className="mx-auto w-full max-w-[1600px] flex-1 p-3 md:p-4">{children}</main>
+        <main className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden bg-[var(--kanban-board-bg)] p-3 md:p-4">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">{children}</div>
+        </main>
       </div>
 
       {user && <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} user={user} />}

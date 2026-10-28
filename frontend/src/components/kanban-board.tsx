@@ -23,12 +23,13 @@ import { Select } from "@/components/ui/select";
 import { ColumnStartDroppable, KanbanColumn } from "@/components/kanban-column";
 import { TaskCard } from "@/components/task-card";
 import { TaskDrawer } from "@/components/task-drawer";
+import { MemberTasksSection } from "@/components/member-tasks-section";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { COLUMN_COLOR_PALETTE, columnAccentBar, softColumnTint } from "@/lib/column-colors";
+import { COLUMN_COLOR_PALETTE, columnShellStyle } from "@/lib/column-colors";
 import { URGENCY_OPTIONS, urgencyFromPriority } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 
@@ -208,7 +209,7 @@ export function KanbanBoard({
       if (action.type === "create") {
         return api("/api/v1/settings/statuses", {
           method: "POST",
-          json: { name: action.name, project_id: projectId, color: action.color || "#94a3b8" },
+                  json: { name: action.name, project_id: projectId, color: action.color || "#607FA4" },
         });
       }
       if (action.type === "rename" && action.id) {
@@ -378,13 +379,20 @@ export function KanbanBoard({
       }
 
       const activeRect = active.rect.current.translated ?? active.rect.current.initial;
-      if (!activeRect) {
-        setDropIndicator({ kind: "task", statusId: overTask.status_id, taskId: overId, edge: "before" });
+      let edge: "before" | "after" = "before";
+      if (activeRect) {
+        const activeMidY = activeRect.top + activeRect.height / 2;
+        const overMidY = over.rect.top + over.rect.height / 2;
+        edge = activeMidY < overMidY ? "before" : "after";
+      }
+
+      // First card "before" ≡ start of column — one indicator, not two.
+      const colPeers = (byStatus[overTask.status_id] ?? []).filter((t) => t.id !== activeIdStr);
+      if (edge === "before" && colPeers[0]?.id === overId) {
+        setDropIndicator({ kind: "start", statusId: overTask.status_id });
         return;
       }
-      const activeMidY = activeRect.top + activeRect.height / 2;
-      const overMidY = over.rect.top + over.rect.height / 2;
-      const edge: "before" | "after" = activeMidY < overMidY ? "before" : "after";
+
       setDropIndicator({ kind: "task", statusId: overTask.status_id, taskId: overId, edge });
     },
     [byStatus, tasks]
@@ -576,7 +584,7 @@ export function KanbanBoard({
     return (
       <button
         type="button"
-        className="flex w-full items-center gap-1 rounded-[var(--radius)] px-2 py-1.5 text-left text-[13px] text-muted hover:bg-[var(--surface)]/60 hover:text-foreground"
+        className="flex w-full items-center gap-1 rounded-[var(--radius)] px-2 py-1 text-left text-[13px] text-muted hover:bg-[var(--surface)]/60 hover:text-foreground"
         onClick={() => {
           setDraft(emptyDraft());
           setQuickCol(status.id);
@@ -684,16 +692,12 @@ export function KanbanBoard({
   function renderColumnShell(status: Status, body: ReactNode) {
     return (
       <div
-        className="flex w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
-        style={softColumnTint(status.color || "#94a3b8")}
+        className="kanban-column-shell flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+        style={columnShellStyle(status.color || "#607FA4")}
       >
-        <div
-          className="mb-2 h-1 w-full rounded-full"
-          style={columnAccentBar(status.color || "#94a3b8")}
-          aria-hidden
-        />
-        <div className="flex items-center gap-1.5 px-1 pb-2">{columnHeader(status)}</div>
-        <div className="mb-2 px-0.5">{renderQuickCreate(status)}</div>
+        <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
+        <div className="flex shrink-0 items-center gap-1.5 px-1 pb-1">{columnHeader(status)}</div>
+        <div className="mb-0.5 shrink-0 px-0.5">{renderQuickCreate(status)}</div>
         {body}
       </div>
     );
@@ -789,12 +793,14 @@ export function KanbanBoard({
     </Dialog>
   );
 
+  const boardFrame = "flex min-h-0 flex-1 flex-col gap-3";
+
   /* Mobile: one column */
   if (!isDesktop) {
     return (
-      <>
-        <div className="space-y-3">
-          <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Столбцы">
+      <div className={boardFrame}>
+        <div className="flex min-h-0 flex-1 flex-col space-y-3 overflow-hidden">
+          <div className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Столбцы">
             {statuses.map((status) => {
               const active = status.id === mobileStatus.id;
               return (
@@ -817,29 +823,31 @@ export function KanbanBoard({
             })}
           </div>
 
-          {renderColumnShell(
-            mobileStatus,
-            <div className="flex flex-col gap-2">
-              {mobileTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  draggable={false}
-                  isDone={!!statusById[task.status_id]?.is_done}
-                  statuses={statuses}
-                  onChangeStatus={(statusId) => moveToStatus(task, statusId)}
-                  onOpen={() => openTask(task.id)}
-                />
-              ))}
-              {!mobileTasks.length && (
-                <p className="py-8 text-center text-sm text-muted">Пока пусто</p>
-              )}
-            </div>
-          )}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {renderColumnShell(
+              mobileStatus,
+              <div className="flex flex-col gap-2">
+                {mobileTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    draggable={false}
+                    isDone={!!statusById[task.status_id]?.is_done}
+                    statuses={statuses}
+                    onChangeStatus={(statusId) => moveToStatus(task, statusId)}
+                    onOpen={() => openTask(task.id)}
+                  />
+                ))}
+                {!mobileTasks.length && (
+                  <p className="py-8 text-center text-sm text-muted">Пока пусто</p>
+                )}
+              </div>
+            )}
+          </div>
 
           {addingColumn ? (
             <form
-              className="flex gap-2"
+              className="flex shrink-0 gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (newColumnName.trim()) {
@@ -863,22 +871,29 @@ export function KanbanBoard({
           ) : (
             <button
               type="button"
-              className="text-sm text-muted hover:text-foreground"
+              className="shrink-0 text-sm text-muted hover:text-foreground"
               onClick={() => setAddingColumn(true)}
             >
               + Столбец
             </button>
           )}
         </div>
+        <MemberTasksSection
+          projectId={projectId}
+          members={members}
+          statuses={statuses}
+          tasks={tasks}
+          onOpenTask={openTask}
+        />
         {drawer}
         {deleteColumnDialog}
-      </>
+      </div>
     );
   }
 
   /* Desktop */
   return (
-    <>
+    <div className={boardFrame}>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -890,7 +905,7 @@ export function KanbanBoard({
           setDropIndicator(null);
         }}
       >
-        <div className="flex items-start gap-3 overflow-x-auto pb-4">
+        <div className="flex min-h-0 flex-1 items-stretch gap-3 overflow-x-auto">
           {statuses.map((status) => {
             const colTasks = byStatus[status.id] ?? [];
             const emptyDrop =
@@ -901,7 +916,7 @@ export function KanbanBoard({
               <KanbanColumn key={status.id} id={status.id} showEmptyIndicator={emptyDrop}>
                 {renderColumnShell(
                   status,
-                  <div className="flex max-h-[calc(100vh-12rem)] flex-col gap-2 overflow-y-auto">
+                  <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
                     <ColumnStartDroppable
                       statusId={status.id}
                       active={dropIndicator?.kind === "start" && dropIndicator.statusId === status.id}
@@ -921,7 +936,7 @@ export function KanbanBoard({
             );
           })}
 
-          <div className="w-56 shrink-0">
+          <div className="w-56 shrink-0 self-start">
             {addingColumn ? (
               <form
                 className="space-y-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/70 p-2.5"
@@ -971,8 +986,15 @@ export function KanbanBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
+      <MemberTasksSection
+        projectId={projectId}
+        members={members}
+        statuses={statuses}
+        tasks={tasks}
+        onOpenTask={openTask}
+      />
       {drawer}
       {deleteColumnDialog}
-    </>
+    </div>
   );
 }
