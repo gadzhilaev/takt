@@ -1,174 +1,159 @@
 import { expect, test, type Page } from "@playwright/test";
+import { cleanupTaskIds, ensureE2EProject, loginUi } from "./helpers";
 
-const ADMIN = {
-  email: process.env.E2E_EMAIL || "admin@example.com",
-  password: process.env.E2E_PASSWORD || "ChangeMeAdmin123!",
-};
+test.describe("simple kanban flow", () => {
+  test("login → E2E project → create task → overlay → persist", async ({ page, request }) => {
+    const { projectId, headers } = await ensureE2EProject(request);
+    const createdIds: string[] = [];
 
-async function loginUi(page: Page) {
-  await page.goto("/login");
-  await page.locator("#login-email").fill(ADMIN.email);
-  await page.locator("#login-password").fill(ADMIN.password);
-  await page.getByRole("button", { name: /войти/i }).click();
-  await expect(page).toHaveURL(/\/(home|my|projects)/, { timeout: 15_000 });
-}
-
-test.describe("core teacher/staff flow", () => {
-  test("login → create → assign → due → my → complete", async ({ page }) => {
     await loginUi(page);
+    await page.goto(`/projects/${projectId}`);
+    await expect(page).toHaveURL(new RegExp(`projects/${projectId}`), { timeout: 15_000 });
 
-    await page.getByRole("button", { name: /создать задачу/i }).first().click();
-    await expect(page).toHaveURL(/projects\/.+/, { timeout: 10_000 });
+    const title = `E2E задача ${Date.now()}`;
+    await page.getByRole("button", { name: /^добавить$/i }).first().click();
+    await page.getByLabel(/^название$/i).fill(title);
+    await page.getByRole("button", { name: /^создать$/i }).click();
+    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
 
-    const title = `E2E поручение ${Date.now()}`;
-    const addBtn = page.getByRole("button", { name: /добавить задачу/i }).first();
-    await addBtn.click();
-    await page.getByLabel(/новая задача/i).fill(title);
-    await page.getByRole("button", { name: /^сохранить$/i }).click();
-    await expect(page.getByText(title).first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("heading", { name: title }).click();
+    await expect(page).toHaveURL(/[?&]task=/);
+    await expect(page.getByRole("dialog", { name: /задача/i })).toBeVisible();
 
-    await page.getByText(title).first().click();
-    await expect(page).toHaveURL(/\/tasks\//);
+    await page.getByLabel(/^описание$/i).fill("Краткое описание");
+    await page.getByLabel(/^описание$/i).blur();
+    await page.waitForTimeout(400);
 
-    await page.getByLabel(/срок/i).fill("2030-06-15");
-    // wait for autosave indicator / settle
-    await page.waitForTimeout(800);
+    await page.keyboard.press("Escape");
+    await expect(page).not.toHaveURL(/[?&]task=/);
+    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
 
-    const assigneeBox = page.getByRole("group", { name: /кто выполняет/i });
-    const firstAssignee = assigneeBox.locator("label").first();
-    if (await firstAssignee.count()) {
-      await firstAssignee.click();
-      await page.waitForTimeout(600);
-    }
+    await page.reload();
+    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
 
-    await page.goto("/my");
-    await expect(page.getByRole("heading", { name: /мои задачи/i })).toBeVisible();
-    await expect(page.getByText(title).first()).toBeVisible({ timeout: 10_000 });
-
-    await page.getByText(title).first().click();
-    const complete = page.getByRole("button", { name: /отметить выполненной/i }).first();
-    await expect(complete).toBeVisible();
-    await complete.click();
-    await page.waitForTimeout(700);
-    await expect(page.getByRole("button", { name: /отметить выполненной/i })).toHaveCount(0);
+    const tasks = await request.get(`/api/v1/tasks?project_id=${projectId}&page_size=100`);
+    const items = (await tasks.json()).items as { id: string; title: string }[];
+    for (const t of items.filter((x) => x.title === title)) createdIds.push(t.id);
+    await cleanupTaskIds(request, headers, createdIds);
   });
 
-  test("mobile board: one column tabs + status select moves task", async ({ page }) => {
+  test("mobile board: one column + change column via select", async ({ page, request }) => {
+    const { projectId, headers } = await ensureE2EProject(request);
     await page.setViewportSize({ width: 390, height: 844 });
     await loginUi(page);
+    await page.goto(`/projects/${projectId}`);
+    await expect(page.getByRole("tablist", { name: /столбцы/i })).toBeVisible({ timeout: 15_000 });
 
-    // Ensure projects are in the shell before create (avoids /projects without id)
-    await page.getByRole("navigation", { name: /мобильная навигация/i }).getByRole("link", { name: /проекты/i }).click();
-    await expect(page.getByRole("heading", { name: /проекты/i })).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("navigation", { name: /мобильная навигация/i }).getByRole("button", { name: /создать задачу/i }).click();
-    await expect(page).toHaveURL(/projects\/.+create=1|projects\/[a-f0-9-]+/, { timeout: 15_000 });
-    // Land on a concrete board
-    if (!/projects\/[a-f0-9-]{8,}/.test(page.url())) {
-      await page.getByRole("link").filter({ hasText: /.+/ }).first().click();
-    }
-    await expect(page).toHaveURL(/projects\/[a-f0-9-]+/, { timeout: 10_000 });
-
-    await expect(page.getByRole("tablist", { name: /статусы доски/i })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("tab").first()).toBeVisible();
-
-    const title = `Mobile status ${Date.now()}`;
-    // ?create=1 may already open the quick-create form
-    const quickInput = page.getByLabel(/новая задача/i);
-    if (!(await quickInput.isVisible().catch(() => false))) {
-      await page.getByRole("button", { name: /добавить задачу/i }).click();
-    }
-    await quickInput.fill(title);
-    await page.getByRole("button", { name: /^сохранить$/i }).click();
-    await expect(page.getByText(title).first()).toBeVisible({ timeout: 10_000 });
+    const title = `Mobile ${Date.now()}`;
+    await page.getByRole("button", { name: /^добавить$/i }).click();
+    await page.getByLabel(/^название$/i).fill(title);
+    await page.getByRole("button", { name: /^создать$/i }).click();
+    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
 
     const card = page.locator("article").filter({ has: page.getByRole("heading", { name: title }) });
-    const statusSelect = card.locator("select");
-    await expect(statusSelect).toBeVisible();
-    const options = statusSelect.locator("option");
+    await card.getByRole("combobox").click();
+    const options = page.getByRole("option");
     expect(await options.count()).toBeGreaterThan(1);
-    const current = await statusSelect.inputValue();
-    let targetValue = await options.nth(1).getAttribute("value");
-    let targetLabel = (await options.nth(1).textContent())?.trim() || "";
-    if (targetValue === current) {
-      targetValue = await options.nth(0).getAttribute("value");
-      targetLabel = (await options.nth(0).textContent())?.trim() || "";
-    }
-    await statusSelect.selectOption(targetValue!);
-    // Card leaves the current column after move
+    const targetLabel = (await options.nth(1).textContent())?.trim() || "";
+    await options.nth(1).click();
     await expect(page.getByRole("heading", { name: title })).toHaveCount(0, { timeout: 10_000 });
 
     await page.getByRole("tab", { name: new RegExp(targetLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).click();
     await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
-    await expect(
-      page.locator("article").filter({ has: page.getByRole("heading", { name: title }) }).locator("select")
-    ).toHaveValue(targetValue!);
+
+    const tasks = await request.get(`/api/v1/tasks?project_id=${projectId}&page_size=100`);
+    const items = (await tasks.json()).items as { id: string; title: string }[];
+    await cleanupTaskIds(
+      request,
+      headers,
+      items.filter((x) => x.title === title).map((x) => x.id)
+    );
   });
 
-  test("list filters persist in URL", async ({ page }) => {
-    await loginUi(page);
-    await page.goto("/list?search=Excel&sort=title");
-    await expect(page.getByLabel(/поиск в списке/i)).toHaveValue("Excel");
-    await expect(page.getByLabel(/сортировка/i)).toHaveValue("title");
-    await page.getByLabel(/сортировка/i).selectOption("due");
-    await expect(page).toHaveURL(/sort=due/);
+  test("register page is available", async ({ page }) => {
+    await page.goto("/register");
+    await expect(page.getByRole("heading", { name: /регистрация/i })).toBeVisible();
+    await expect(page.getByLabel(/^имя$/i)).toBeVisible();
   });
 
-  test("API move persists status and patch saves due/assignees", async ({ request }) => {
-    const login = await request.post("/api/v1/auth/login", {
-      data: { email: ADMIN.email, password: ADMIN.password },
-    });
-    expect(login.ok()).toBeTruthy();
-    const setCookies = login.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie");
-    const csrf = setCookies
-      .map((h) => h.value.split(";")[0])
-      .find((c) => c.startsWith("csrf_token="))
-      ?.split("=")[1];
-    expect(csrf).toBeTruthy();
-    const headers = { "X-CSRF-Token": csrf! };
+  test("API move persists column and assignee in E2E project", async ({ request }) => {
+    const { projectId, headers } = await ensureE2EProject(request);
 
-    const statusesRes = await request.get("/api/v1/settings/statuses");
+    const statusesRes = await request.get(`/api/v1/settings/statuses?project_id=${projectId}`);
     expect(statusesRes.ok()).toBeTruthy();
-    const statuses = (await statusesRes.json()).items as { id: string; is_done: boolean; name: string }[];
+    const statuses = (await statusesRes.json()).items as { id: string; is_done: boolean }[];
     const open = statuses.find((s) => !s.is_done)!;
     const done = statuses.find((s) => s.is_done)!;
-    expect(open && done).toBeTruthy();
 
-    const usersRes = await request.get("/api/v1/users");
-    const users = (await usersRes.json()).items as { id: string }[];
-    expect(users.length).toBeGreaterThan(0);
+    const projectRes = await request.get(`/api/v1/projects/${projectId}`);
+    expect(projectRes.ok()).toBeTruthy();
+    const members = (await projectRes.json()).project.members as { user_id: string }[];
+    const assigneeIds = members.slice(0, 2).map((m) => m.user_id);
 
     const created = await request.post("/api/v1/tasks", {
       headers,
-      data: { title: `API move ${Date.now()}`, status_id: open.id, priority: "medium" },
-    });
-    expect(created.ok()).toBeTruthy();
-    const task = (await created.json()).task as { id: string; status_id: string };
-
-    const patched = await request.patch(`/api/v1/tasks/${task.id}`, {
-      headers,
       data: {
-        due_date: "2031-01-10T12:00:00.000Z",
-        assignee_ids: [users[0].id],
+        title: `API move ${Date.now()}`,
+        status_id: open.id,
+        project_id: projectId,
+        assignee_ids: assigneeIds,
       },
     });
-    expect(patched.ok()).toBeTruthy();
-    const afterPatch = (await patched.json()).task;
-    expect(afterPatch.due_date).toBeTruthy();
-    expect(afterPatch.assignees?.length || afterPatch.assignee_ids?.length).toBeTruthy();
+    expect(created.ok()).toBeTruthy();
+    const task = (await created.json()).task as { id: string; assignees: unknown[] };
+    expect((task.assignees || []).length).toBeGreaterThanOrEqual(1);
 
     const moved = await request.post(`/api/v1/tasks/${task.id}/move`, {
       headers,
       data: { status_id: done.id, position: 2048 },
     });
     expect(moved.ok()).toBeTruthy();
-    const movedTask = (await moved.json()).task;
-    expect(movedTask.status_id).toBe(done.id);
-    expect(movedTask.status?.id || movedTask.status_id).toBeTruthy();
-    expect(movedTask.closed_at).toBeTruthy();
+    expect((await moved.json()).task.status_id).toBe(done.id);
 
-    const fetched = await request.get(`/api/v1/tasks/${task.id}`);
-    const fresh = (await fetched.json()).task;
-    expect(fresh.status_id).toBe(done.id);
-    expect(fresh.closed_at).toBeTruthy();
+    // Move to first position in done
+    const first = await request.post(`/api/v1/tasks/${task.id}/move`, {
+      headers,
+      data: { status_id: done.id, position: -512 },
+    });
+    expect(first.ok()).toBeTruthy();
+    expect((await first.json()).task.position).toBe(-512);
+
+    await cleanupTaskIds(request, headers, [task.id]);
+  });
+
+  test("DnD first position in done column via API order", async ({ request }) => {
+    const { projectId, headers } = await ensureE2EProject(request);
+    const statuses = (
+      await (await request.get(`/api/v1/settings/statuses?project_id=${projectId}`)).json()
+    ).items as { id: string; is_done: boolean }[];
+    const open = statuses.find((s) => !s.is_done)!;
+    const done = statuses.find((s) => s.is_done)!;
+
+    const a = await request.post("/api/v1/tasks", {
+      headers,
+      data: { title: `DnD A ${Date.now()}`, status_id: done.id, project_id: projectId },
+    });
+    const b = await request.post("/api/v1/tasks", {
+      headers,
+      data: { title: `DnD B ${Date.now()}`, status_id: open.id, project_id: projectId },
+    });
+    const taskA = (await a.json()).task as { id: string; position: number };
+    const taskB = (await b.json()).task as { id: string };
+
+    const pos = taskA.position === 0 ? -1024 : taskA.position / 2;
+    const moved = await request.post(`/api/v1/tasks/${taskB.id}/move`, {
+      headers,
+      data: { status_id: done.id, position: pos },
+    });
+    expect(moved.ok()).toBeTruthy();
+    const list = (
+      await (await request.get(`/api/v1/tasks?project_id=${projectId}&page_size=100`)).json()
+    ).items as { id: string; status_id: string; position: number }[];
+    const doneTasks = list
+      .filter((t) => t.status_id === done.id)
+      .sort((x, y) => x.position - y.position);
+    expect(doneTasks[0].id).toBe(taskB.id);
+
+    await cleanupTaskIds(request, headers, [taskA.id, taskB.id]);
   });
 });

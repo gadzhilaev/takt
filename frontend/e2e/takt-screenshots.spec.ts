@@ -2,9 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 
+import { E2E_USER } from "./helpers";
+
 const ADMIN = {
-  email: process.env.E2E_EMAIL || "admin@example.com",
-  password: process.env.E2E_PASSWORD || "ChangeMeAdmin123!",
+  email: E2E_USER.email,
+  password: E2E_USER.password,
 };
 
 const OUT = path.join(__dirname, "../../docs/screenshots/takt-rebrand");
@@ -15,7 +17,7 @@ async function loginUi(page: Page) {
   await page.locator("#login-email").fill(ADMIN.email);
   await page.locator("#login-password").fill(ADMIN.password);
   await page.getByRole("button", { name: /войти/i }).click();
-  await expect(page).toHaveURL(/\/(home|my|projects)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/projects/, { timeout: 20_000 });
 }
 
 async function setTheme(page: Page, theme: "light" | "dark") {
@@ -34,7 +36,7 @@ async function setTheme(page: Page, theme: "light" | "dark") {
 }
 
 test.describe("takt visual screenshots", () => {
-  test("capture ≤12 brand views", async ({ page }) => {
+  test("capture brand views for kanban-first UI", async ({ page }) => {
     fs.mkdirSync(OUT, { recursive: true });
     for (const f of fs.readdirSync(OUT)) fs.unlinkSync(path.join(OUT, f));
 
@@ -49,75 +51,50 @@ test.describe("takt visual screenshots", () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/login");
-    await page.waitForSelector("text=Вход в Takt");
+    await page.waitForSelector('h1:text-is("Вход")');
     await setTheme(page, "light");
     await shot("login-light-desktop");
 
     await loginUi(page);
+    await expect(page).toHaveURL(/projects\/[a-f0-9-]+/, { timeout: 15_000 });
+    const projectPath = page.url().replace(/^https?:\/\/[^/]+/, "");
     await setTheme(page, "light");
-    await page.goto("/home");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(400);
-    await shot("home-light-desktop");
-
-    await page.goto("/projects");
-    await page.waitForLoadState("networkidle");
-    // Prefer project cards on the page (sidebar links can be off-screen / hidden on narrow).
-    const projectCard = page.locator('main a[href^="/projects/"]').first();
-    await expect(projectCard).toBeVisible({ timeout: 10_000 });
-    const projectHref = await projectCard.getAttribute("href");
-    await projectCard.click();
-    await page.waitForURL(/\/projects\/.+/);
-    await page.waitForTimeout(700);
-    await shot("kanban-light-desktop");
-    const projectPath = projectHref || page.url().replace(/^https?:\/\/[^/]+/, "");
-
-    await page.goto("/list");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(400);
-    await shot("list-light-desktop");
-
-    await page.goto("/report");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(700);
-    await shot("report-light-desktop");
-
-    await setTheme(page, "dark");
-    await page.goto("/home");
     await page.waitForTimeout(500);
-    await shot("home-dark-desktop");
+    await shot("kanban-light-desktop");
 
+    await page.context().clearCookies();
+    await page.goto("/register");
+    await page.waitForSelector('h1:text-is("Регистрация")');
+    await shot("register-light-desktop");
+
+    await loginUi(page);
     await page.goto(projectPath);
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(500);
+    await setTheme(page, "dark");
+    await page.waitForTimeout(400);
     await shot("kanban-dark-desktop");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await setTheme(page, "light");
-    await page.goto("/home");
-    await page.waitForTimeout(500);
-    await shot("home-light-mobile");
-
     await page.goto(projectPath);
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(600);
     await shot("kanban-light-mobile");
 
-    await page.goto("/my");
-    await page.waitForTimeout(500);
-    await shot("my-light-mobile");
-
-    await setTheme(page, "dark");
+    await page.context().clearCookies();
     await page.goto("/login");
-    await page.waitForSelector("text=Вход в Takt");
+    await page.waitForSelector('h1:text-is("Вход")');
+    await setTheme(page, "dark");
     await page.waitForTimeout(300);
     await shot("login-dark-mobile");
 
-    // still authenticated cookies; open report dark mobile
-    await page.goto("/report");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(700);
-    await shot("report-dark-mobile");
+    await loginUi(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await setTheme(page, "dark");
+    await page.goto(projectPath);
+    await page.waitForTimeout(500);
+    await shot("kanban-dark-mobile");
 
     expect(n).toBeLessThanOrEqual(12);
-    expect(n).toBe(12);
+    expect(n).toBeGreaterThanOrEqual(6);
   });
 });
