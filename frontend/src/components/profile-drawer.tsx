@@ -9,7 +9,6 @@ import type { NotificationItem, User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
-import { ThemeMenu } from "@/components/ui/theme-menu";
 import { disableWebPush, enableWebPush, getPushStatus } from "@/lib/web-push";
 
 export function ProfileDrawer({
@@ -129,12 +128,9 @@ export function ProfileDrawer({
       >
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
           <h2 className="text-base font-semibold">Мой профиль</h2>
-          <div className="flex items-center gap-1">
-            <ThemeMenu />
-            <button type="button" className="rounded p-1.5 text-muted hover:bg-[var(--surface-2)]" onClick={onClose} aria-label="Закрыть">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <button type="button" className="rounded p-1.5 text-muted hover:bg-[var(--surface-2)]" onClick={onClose} aria-label="Закрыть">
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto p-4">

@@ -13,6 +13,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { BrandLogo, BrandMark } from "@/components/brand-mark";
 import { Dialog } from "@/components/ui/dialog";
 import { ProfileDrawer } from "@/components/profile-drawer";
+import { ThemeMenu } from "@/components/ui/theme-menu";
 import { setLastProjectId } from "@/lib/last-project";
 import { cn } from "@/lib/utils";
 
@@ -135,10 +136,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const Sidebar = (
     <aside className="flex h-full w-[15.5rem] flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
-      <div className="px-3.5 py-4">
-        <Link href="/projects" className="inline-flex" aria-label="Takt">
+      <div className="flex items-center justify-between gap-2 px-3.5 py-4">
+        <Link href="/projects" className="inline-flex min-w-0" aria-label="Takt">
           <BrandLogo className="h-6" />
         </Link>
+        <ThemeMenu />
       </div>
 
       {myInvites.length > 0 && (
@@ -289,9 +291,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="h-4 w-4" />
           </Button>
           <BrandMark className="h-6" />
-          <span className="truncate text-sm font-semibold">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {projects.find((p) => p.id === currentProjectId)?.name || "Takt"}
           </span>
+          <ThemeMenu />
         </header>
         <main className="mx-auto w-full max-w-[1600px] flex-1 p-3 md:p-4">{children}</main>
       </div>
