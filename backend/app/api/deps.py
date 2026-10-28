@@ -15,13 +15,24 @@ ACCESS_COOKIE = "access_token"
 REFRESH_COOKIE = "refresh_token"
 
 
+def _token_from_auth_header(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
+        return None
+    return parts[1].strip()
+
+
 async def get_current_user_optional(
     db: Annotated[AsyncSession, Depends(get_db)],
     access_token: Annotated[str | None, Cookie(alias=ACCESS_COOKIE)] = None,
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
 ) -> User | None:
-    if not access_token:
+    raw = access_token or _token_from_auth_header(authorization)
+    if not raw:
         return None
-    payload = decode_token(access_token)
+    payload = decode_token(raw)
     if not payload or payload.get("type") != "access":
         return None
     try:
@@ -59,11 +70,15 @@ async def verify_csrf(
     request: Request,
     csrf_header: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
     csrf_cookie: Annotated[str | None, Cookie(alias="csrf_token")] = None,
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
 ) -> None:
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return
     settings = get_settings()
     if settings.ENV == "test":
+        return
+    # Mobile / API clients authenticate with Bearer JWT — CSRF does not apply.
+    if _token_from_auth_header(authorization):
         return
     if not validate_csrf_token(csrf_header or "", csrf_cookie):
         raise HTTPException(

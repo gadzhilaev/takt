@@ -164,12 +164,20 @@ async def subtask_stats_for(
 
 
 async def next_position(db: AsyncSession, status_id: uuid.UUID) -> float:
-    max_pos = await db.scalar(
-        select(func.max(Task.position)).where(
+    """Place a new task at the top of the column (before the current first card).
+
+    Uses fractional indexing: empty column → 0; otherwise min(position) − 1024.
+    Concurrent creates that race on the same min may land with equal positions;
+    list order remains stable by (position, id) and DnD mid-points still work.
+    """
+    min_pos = await db.scalar(
+        select(func.min(Task.position)).where(
             Task.status_id == status_id, Task.deleted_at.is_(None)
         )
     )
-    return (max_pos or 0) + 1024.0
+    if min_pos is None:
+        return 0.0
+    return float(min_pos) - 1024.0
 
 
 async def get_or_create_label(db: AsyncSession, name: str, color: str = "#22c55e") -> Label:

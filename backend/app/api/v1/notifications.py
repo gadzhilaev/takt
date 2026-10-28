@@ -12,7 +12,7 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.notification import Notification
 from app.models.user import User
-from app.services import push_service
+from app.services import fcm_service, push_service
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -25,6 +25,12 @@ class PushSubscribeIn(BaseModel):
 
 class PushUnsubscribeIn(BaseModel):
     endpoint: str = Field(min_length=8)
+
+
+class DeviceTokenIn(BaseModel):
+    token: str = Field(min_length=8)
+    platform: str = Field(description="ios | android")
+    app_version: str | None = None
 
 
 @router.get("")
@@ -147,6 +153,36 @@ async def push_unsubscribe(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await push_service.delete_subscription(db, user_id=user.id, endpoint=body.endpoint)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/device-token", dependencies=[Depends(verify_csrf)])
+async def register_device_token(
+    body: DeviceTokenIn,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Register FCM token for mobile. Safe to call repeatedly (upsert by token)."""
+    await fcm_service.upsert_device_token(
+        db,
+        user_id=user.id,
+        token=body.token.strip(),
+        platform=body.platform,
+        app_version=body.app_version,
+    )
+    await db.commit()
+    settings = get_settings()
+    return {"ok": True, "fcm_configured": fcm_service.fcm_configured(settings)}
+
+
+@router.delete("/device-token", dependencies=[Depends(verify_csrf)])
+async def unregister_device_token(
+    body: DeviceTokenIn,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await fcm_service.delete_device_token(db, user_id=user.id, token=body.token.strip())
     await db.commit()
     return {"ok": True}
 

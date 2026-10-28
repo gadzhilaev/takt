@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     VAPID_SUBJECT: str = "mailto:admin@example.com"
     APP_PUBLIC_URL: str = "http://localhost:3000"
 
+    # Firebase Cloud Messaging (mobile). Path to service-account JSON — never commit the file.
+    FIREBASE_CREDENTIALS_FILE: str = ""
+    FCM_ENABLED: bool = False
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

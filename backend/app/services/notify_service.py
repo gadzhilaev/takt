@@ -9,7 +9,7 @@ from app.core.config import Settings, get_settings
 from app.models.notification import Notification
 from app.models.task import Task
 from app.models.user import User
-from app.services import push_service
+from app.services import fcm_service, push_service
 from app.services.ru_names import format_assignment_title, format_completed_title
 
 
@@ -92,6 +92,19 @@ async def notify_assignees(
             url=link,
             tag=f"assign-{task.id}",
         )
+        await fcm_service.send_fcm_to_users(
+            db,
+            settings,
+            user_ids=[uid],
+            title="Takt",
+            body=title,
+            data={
+                "kind": "task_assigned",
+                "task_id": str(task.id),
+                "project_id": str(task.project_id) if task.project_id else "",
+                "url": link,
+            },
+        )
 
 
 async def notify_task_completed(
@@ -117,12 +130,26 @@ async def notify_task_completed(
         task_id=task.id,
         project_id=task.project_id,
     )
+    link = task_deep_link(task.project_id, task.id)
     await push_service.send_push_to_users(
         db,
         settings,
         user_ids=[task.author_id],
         title="Takt",
         body=title,
-        url=task_deep_link(task.project_id, task.id),
+        url=link,
         tag=f"done-{task.id}",
+    )
+    await fcm_service.send_fcm_to_users(
+        db,
+        settings,
+        user_ids=[task.author_id],
+        title="Takt",
+        body=title,
+        data={
+            "kind": "task_completed",
+            "task_id": str(task.id),
+            "project_id": str(task.project_id) if task.project_id else "",
+            "url": link,
+        },
     )

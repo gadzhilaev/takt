@@ -98,7 +98,13 @@ async def register(
     access, refresh, _ = await auth_service.create_token_pair(db, user)
     await db.commit()
     _set_auth_cookies(response, access, refresh)
-    return {"user": _user_public(user)}
+    # Tokens in body for mobile (Bearer); cookies remain for the web app.
+    return {
+        "user": _user_public(user),
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/login")
@@ -128,7 +134,12 @@ async def login(
     access, refresh, _ = await auth_service.create_token_pair(db, user)
     await db.commit()
     _set_auth_cookies(response, access, refresh)
-    return {"user": _user_public(user)}
+    return {
+        "user": _user_public(user),
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/logout", dependencies=[Depends(verify_csrf)])
@@ -155,22 +166,39 @@ async def me(user: Annotated[User, Depends(get_current_user)]):
 
 @router.post("/refresh")
 async def refresh(
+    request: Request,
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     refresh_token: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ):
-    if not refresh_token:
+    # Mobile may send {"refresh_token": "..."} in JSON body instead of a cookie.
+    body_token: str | None = None
+    try:
+        payload = await request.json()
+        if isinstance(payload, dict):
+            raw = payload.get("refresh_token")
+            if isinstance(raw, str) and raw.strip():
+                body_token = raw.strip()
+    except Exception:
+        body_token = None
+    token = refresh_token or body_token
+    if not token:
         raise HTTPException(
             status_code=401,
             detail={"error": {"code": "no_refresh", "message": "Нет сессии"}},
         )
     try:
-        access, new_refresh, user = await auth_service.refresh_session(db, refresh_token)
+        access, new_refresh, user = await auth_service.refresh_session(db, token)
     except auth_service.AuthError as e:
         raise HTTPException(status_code=401, detail={"error": {"code": e.code, "message": e.message}})
     await db.commit()
     _set_auth_cookies(response, access, new_refresh)
-    return {"user": _user_public(user)}
+    return {
+        "user": _user_public(user),
+        "access_token": access,
+        "refresh_token": new_refresh,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/change-password", dependencies=[Depends(verify_csrf)])
