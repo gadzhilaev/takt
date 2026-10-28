@@ -45,7 +45,7 @@ class WidgetSync {
     await HomeWidget.updateWidget(
       name: AppConfig.widgetNameAndroid,
       iOSName: AppConfig.widgetNameIos,
-      qualifiedAndroidName: 'ru.takt.takt_mobile.${AppConfig.widgetNameAndroid}',
+      qualifiedAndroidName: 'ru.gadzhilaev.takt.${AppConfig.widgetNameAndroid}',
     );
   }
 
@@ -59,7 +59,7 @@ class WidgetSync {
     await HomeWidget.updateWidget(
       name: AppConfig.widgetNameAndroid,
       iOSName: AppConfig.widgetNameIos,
-      qualifiedAndroidName: 'ru.takt.takt_mobile.${AppConfig.widgetNameAndroid}',
+      qualifiedAndroidName: 'ru.gadzhilaev.takt.${AppConfig.widgetNameAndroid}',
     );
   }
 

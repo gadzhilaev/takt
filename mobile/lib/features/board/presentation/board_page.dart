@@ -127,7 +127,7 @@ class _BoardPageState extends State<BoardPage> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: state.columns.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, i) {
                     final c = state.columns[i];
                     final selected = i == state.columnIndex;
@@ -157,7 +157,7 @@ class _BoardPageState extends State<BoardPage> {
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
                         itemCount: state.currentTasks.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, i) {
                           final task = state.currentTasks[i];
                           return _TaskTile(task: task, onTap: () => _openTask(task));

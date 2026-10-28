@@ -64,7 +64,7 @@ class ProjectsRepository {
       '/api/v1/users',
       queryParameters: {
         if (q != null && q.isNotEmpty) 'q': q,
-        if (excludeProjectId != null) 'exclude_project_id': excludeProjectId,
+        'exclude_project_id': ?excludeProjectId,
       },
     );
     final items = res.data?['items'] as List<dynamic>? ?? [];

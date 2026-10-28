@@ -1,7 +1,7 @@
 import WidgetKit
 import SwiftUI
 
-/// WidgetKit extension for Takt. Requires App Group `group.ru.takt.mobile`
+/// WidgetKit extension for Takt. Requires App Group `group.ru.gadzhilaev.takt`
 /// shared with the Flutter Runner target (configure in Xcode).
 struct TaktEntry: TimelineEntry {
     let date: Date
@@ -26,7 +26,7 @@ struct Provider: TimelineProvider {
     }
 
     private func loadEntry() -> TaktEntry {
-        let defaults = UserDefaults(suiteName: "group.ru.takt.mobile")
+        let defaults = UserDefaults(suiteName: "group.ru.gadzhilaev.takt")
         let project = defaults?.string(forKey: "project_name") ?? "Takt"
         let count = defaults?.integer(forKey: "open_count") ?? 0
         var lines: [String] = []

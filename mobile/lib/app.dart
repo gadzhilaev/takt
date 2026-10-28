@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import 'core/api_client.dart';
+import 'core/push/fcm_bootstrap.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/token_storage.dart';
@@ -15,35 +17,62 @@ import 'features/projects/data/projects_repository.dart';
 import 'features/widget_sync/widget_sync.dart';
 
 class TaktApp extends StatefulWidget {
-  const TaktApp({super.key});
+  const TaktApp({
+    super.key,
+    required this.tokens,
+    required this.api,
+    required this.fcm,
+  });
+
+  final TokenStorage tokens;
+  final ApiClient api;
+  final FcmBootstrap fcm;
+
+  /// Set before runApp / from FCM / widget launch.
+  static String? pendingDeepLink;
 
   @override
   State<TaktApp> createState() => _TaktAppState();
 }
 
 class _TaktAppState extends State<TaktApp> {
-  late final TokenStorage _tokens;
-  late final ApiClient _api;
   late final WidgetSync _widgetSync;
   late final AuthRepository _authRepo;
   late final AuthCubit _authCubit;
   late final BoardCubit _boardCubit;
+  late final NotificationsRepository _notifications;
+  late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
-    _tokens = TokenStorage();
-    _api = ApiClient(tokens: _tokens);
     _widgetSync = WidgetSync();
-    _authRepo = AuthRepository(api: _api, tokens: _tokens);
-    _authCubit = AuthCubit(auth: _authRepo, api: _api, widgetSync: _widgetSync)..bootstrap();
-    final projects = ProjectsRepository(_api);
+    _authRepo = AuthRepository(api: widget.api, tokens: widget.tokens);
+    _notifications = NotificationsRepository(widget.api);
+    _authCubit = AuthCubit(
+      auth: _authRepo,
+      api: widget.api,
+      widgetSync: _widgetSync,
+      fcm: widget.fcm,
+    )..bootstrap();
+    final projects = ProjectsRepository(widget.api);
     _boardCubit = BoardCubit(
-      board: BoardRepository(_api),
+      board: BoardRepository(widget.api),
       projects: projects,
-      api: _api,
+      api: widget.api,
       widgetSync: _widgetSync,
     );
+    _router = createRouter(_authCubit);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _consumeDeepLink());
+  }
+
+  void _consumeDeepLink() {
+    final link = TaktApp.pendingDeepLink;
+    if (link == null || link.isEmpty) return;
+    TaktApp.pendingDeepLink = null;
+    if (_authCubit.state is AuthAuthenticated) {
+      _router.go(link.startsWith('/') ? link : '/board');
+    }
   }
 
   @override
@@ -55,29 +84,34 @@ class _TaktAppState extends State<TaktApp> {
 
   @override
   Widget build(BuildContext context) {
-    final router = createRouter(_authCubit);
     return MultiRepositoryProvider(
       providers: [
-        RepositoryProvider.value(value: _api),
+        RepositoryProvider.value(value: widget.api),
         RepositoryProvider.value(value: _authRepo),
-        RepositoryProvider.value(value: ProjectsRepository(_api)),
-        RepositoryProvider.value(value: BoardRepository(_api)),
-        RepositoryProvider.value(value: NotificationsRepository(_api)),
-        RepositoryProvider.value(value: ProfileRepository(_api)),
+        RepositoryProvider.value(value: ProjectsRepository(widget.api)),
+        RepositoryProvider.value(value: BoardRepository(widget.api)),
+        RepositoryProvider.value(value: _notifications),
+        RepositoryProvider.value(value: ProfileRepository(widget.api)),
         RepositoryProvider.value(value: _widgetSync),
+        RepositoryProvider.value(value: widget.fcm),
       ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider.value(value: _authCubit),
           BlocProvider.value(value: _boardCubit),
         ],
-        child: MaterialApp.router(
-          title: 'Takt',
-          theme: buildLightTheme(),
-          darkTheme: buildDarkTheme(),
-          themeMode: ThemeMode.system,
-          routerConfig: router,
-          debugShowCheckedModeBanner: false,
+        child: BlocListener<AuthCubit, AuthState>(
+          listener: (context, state) {
+            if (state is AuthAuthenticated) _consumeDeepLink();
+          },
+          child: MaterialApp.router(
+            title: 'Takt',
+            theme: buildLightTheme(),
+            darkTheme: buildDarkTheme(),
+            themeMode: ThemeMode.system,
+            routerConfig: _router,
+            debugShowCheckedModeBanner: false,
+          ),
         ),
       ),
     );

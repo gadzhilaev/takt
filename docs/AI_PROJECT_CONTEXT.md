@@ -43,5 +43,5 @@ cd mobile && flutter analyze && flutter test
 
 ## Статус (обновлено 2026-10-28)
 
-Flutter-клиент в `mobile/`, Android-виджет, заготовка iOS WidgetKit, FCM API, создание задач в начало столбца.  
-Push/FCM и iOS-виджет требуют ручной настройки Firebase/Xcode. Commit/push/deploy только по разрешению.
+Flutter `mobile/`: bundle **`ru.gadzhilaev.takt`**, FCM soft-init, Android + iOS widgets (`TaktHomeWidget`, App Group `group.ru.gadzhilaev.takt`), иконка из `takt-symbol` на белом фоне, store draft `mobile/store/metadata.md`, миграция `007`.  
+Push: локальные Firebase-файлы под `ru.gadzhilaev.takt` + `FCM_ENABLED`. Прогон на эмуляторе / commit / push — только по запросу.

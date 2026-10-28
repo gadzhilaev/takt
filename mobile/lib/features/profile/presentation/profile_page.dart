@@ -54,15 +54,20 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () async {
+              final profileRepo = context.read<ProfileRepository>();
+              final authCubit = context.read<AuthCubit>();
+              final api = context.read<ApiClient>();
               try {
-                final user = await context.read<ProfileRepository>().update(
-                      name: _name.text,
-                      email: _email.text,
-                    );
-                context.read<AuthCubit>().setUser(user);
+                final user = await profileRepo.update(
+                  name: _name.text,
+                  email: _email.text,
+                );
+                if (!mounted) return;
+                authCubit.setUser(user);
                 setState(() => _message = 'Сохранено');
               } catch (e) {
-                setState(() => _message = context.read<ApiClient>().messageFromError(e));
+                if (!mounted) return;
+                setState(() => _message = api.messageFromError(e));
               }
             },
             child: const Text('Сохранить'),
@@ -113,15 +118,19 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (ok != true || !context.mounted) return;
+    final authRepo = context.read<AuthRepository>();
+    final api = context.read<ApiClient>();
     try {
-      await context.read<AuthRepository>().changePassword(
-            currentPassword: current.text,
-            newPassword: next.text,
-            newPasswordConfirm: confirm.text,
-          );
+      await authRepo.changePassword(
+        currentPassword: current.text,
+        newPassword: next.text,
+        newPasswordConfirm: confirm.text,
+      );
+      if (!mounted) return;
       setState(() => _message = 'Пароль обновлён');
     } catch (e) {
-      setState(() => _message = context.read<ApiClient>().messageFromError(e));
+      if (!mounted) return;
+      setState(() => _message = api.messageFromError(e));
     }
   }
 
@@ -139,19 +148,24 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (ok != true || !context.mounted) return;
+    final projectsRepo = context.read<ProjectsRepository>();
+    final api = context.read<ApiClient>();
     try {
-      final projects = await context.read<ProjectsRepository>().listProjects();
+      final projects = await projectsRepo.listProjects();
+      if (!mounted) return;
       if (projects.isEmpty) {
         setState(() => _message = 'Сначала создайте проект');
         return;
       }
-      await context.read<ProjectsRepository>().inviteMember(
-            projectId: projects.first.id,
-            email: email.text,
-          );
+      await projectsRepo.inviteMember(
+        projectId: projects.first.id,
+        email: email.text,
+      );
+      if (!mounted) return;
       setState(() => _message = 'Приглашение отправлено');
     } catch (e) {
-      setState(() => _message = context.read<ApiClient>().messageFromError(e));
+      if (!mounted) return;
+      setState(() => _message = api.messageFromError(e));
     }
   }
 }

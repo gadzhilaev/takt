@@ -5,27 +5,25 @@ import '../../../core/token_storage.dart';
 import '../../../shared/models/models.dart';
 
 class AuthRepository {
-  AuthRepository({required ApiClient api, required TokenStorage tokens})
-      : _api = api,
-        _tokens = tokens;
+  AuthRepository({required this.api, required this.tokens});
 
-  final ApiClient _api;
-  final TokenStorage _tokens;
+  final ApiClient api;
+  final TokenStorage tokens;
 
   Future<UserProfile?> restoreSession() async {
-    final access = await _tokens.readAccess();
+    final access = await tokens.readAccess();
     if (access == null || access.isEmpty) return null;
     try {
-      final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/me');
+      final res = await api.dio.get<Map<String, dynamic>>('/api/v1/auth/me');
       return UserProfile.fromJson(res.data!['user'] as Map<String, dynamic>);
     } catch (_) {
-      await _tokens.clear();
+      await tokens.clear();
       return null;
     }
   }
 
   Future<UserProfile> login({required String email, required String password}) async {
-    final res = await _api.dio.post<Map<String, dynamic>>(
+    final res = await api.dio.post<Map<String, dynamic>>(
       '/api/v1/auth/login',
       data: {'email': email.trim(), 'password': password},
     );
@@ -39,7 +37,7 @@ class AuthRepository {
     required String password,
     required String passwordConfirm,
   }) async {
-    final res = await _api.dio.post<Map<String, dynamic>>(
+    final res = await api.dio.post<Map<String, dynamic>>(
       '/api/v1/auth/register',
       data: {
         'name': name.trim(),
@@ -54,11 +52,11 @@ class AuthRepository {
 
   Future<void> logout() async {
     try {
-      await _api.dio.post('/api/v1/auth/logout');
+      await api.dio.post('/api/v1/auth/logout');
     } on DioException {
       /* ignore network on logout */
     }
-    await _tokens.clear();
+    await tokens.clear();
   }
 
   Future<void> changePassword({
@@ -66,7 +64,7 @@ class AuthRepository {
     required String newPassword,
     required String newPasswordConfirm,
   }) async {
-    await _api.dio.post(
+    await api.dio.post(
       '/api/v1/auth/change-password',
       data: {
         'current_password': currentPassword,
@@ -82,6 +80,6 @@ class AuthRepository {
     if (access == null || refresh == null) {
       throw StateError('Сервер не вернул токены для мобильного клиента');
     }
-    await _tokens.saveTokens(access: access, refresh: refresh);
+    await tokens.saveTokens(access: access, refresh: refresh);
   }
 }

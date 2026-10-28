@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/push/fcm_bootstrap.dart';
 import '../../../shared/models/models.dart';
 import '../../widget_sync/widget_sync.dart';
 import '../data/auth_repository.dart';
@@ -40,29 +41,29 @@ class AuthFailure extends AuthState {
 
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit({
-    required AuthRepository auth,
-    required ApiClient api,
-    required WidgetSync widgetSync,
-  })  : _auth = auth,
-        _api = api,
-        _widgetSync = widgetSync,
-        super(const AuthUnknown());
+    required this.auth,
+    required this.api,
+    required this.widgetSync,
+    this.fcm,
+  }) : super(const AuthUnknown());
 
-  final AuthRepository _auth;
-  final ApiClient _api;
-  final WidgetSync _widgetSync;
+  final AuthRepository auth;
+  final ApiClient api;
+  final WidgetSync widgetSync;
+  final FcmBootstrap? fcm;
 
   Future<void> bootstrap() async {
     emit(const AuthLoading());
     try {
-      final user = await _auth.restoreSession();
+      final user = await auth.restoreSession();
       if (user == null) {
         emit(const AuthGuest());
       } else {
         emit(AuthAuthenticated(user));
+        await fcm?.registerForUser();
       }
     } catch (e) {
-      emit(AuthFailure(_api.messageFromError(e)));
+      emit(AuthFailure(api.messageFromError(e)));
       emit(const AuthGuest());
     }
   }
@@ -70,10 +71,11 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> login(String email, String password) async {
     emit(const AuthLoading());
     try {
-      final user = await _auth.login(email: email, password: password);
+      final user = await auth.login(email: email, password: password);
       emit(AuthAuthenticated(user));
+      await fcm?.registerForUser();
     } catch (e) {
-      emit(AuthFailure(_api.messageFromError(e)));
+      emit(AuthFailure(api.messageFromError(e)));
       emit(const AuthGuest());
     }
   }
@@ -86,22 +88,24 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     try {
-      final user = await _auth.register(
+      final user = await auth.register(
         name: name,
         email: email,
         password: password,
         passwordConfirm: passwordConfirm,
       );
       emit(AuthAuthenticated(user));
+      await fcm?.registerForUser();
     } catch (e) {
-      emit(AuthFailure(_api.messageFromError(e)));
+      emit(AuthFailure(api.messageFromError(e)));
       emit(const AuthGuest());
     }
   }
 
   Future<void> logout() async {
-    await _auth.logout();
-    await _widgetSync.clearOnLogout();
+    await fcm?.unregister();
+    await auth.logout();
+    await widgetSync.clearOnLogout();
     emit(const AuthGuest());
   }
 

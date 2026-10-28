@@ -68,27 +68,23 @@ class BoardState extends Equatable {
 
 class BoardCubit extends Cubit<BoardState> {
   BoardCubit({
-    required BoardRepository board,
-    required ProjectsRepository projects,
-    required ApiClient api,
-    required WidgetSync widgetSync,
-  })  : _board = board,
-        _projects = projects,
-        _api = api,
-        _widgetSync = widgetSync,
-        super(const BoardState());
+    required this.board,
+    required this.projects,
+    required this.api,
+    required this.widgetSync,
+  }) : super(const BoardState());
 
-  final BoardRepository _board;
-  final ProjectsRepository _projects;
-  final ApiClient _api;
-  final WidgetSync _widgetSync;
+  final BoardRepository board;
+  final ProjectsRepository projects;
+  final ApiClient api;
+  final WidgetSync widgetSync;
 
   static const _lastProjectKey = 'takt_last_project_id';
 
   Future<void> bootstrap() async {
     emit(state.copyWith(loading: true, clearError: true));
     try {
-      final projects = await _projects.listProjects();
+      final projects = await this.projects.listProjects();
       final prefs = await SharedPreferences.getInstance();
       final lastId = prefs.getString(_lastProjectKey);
       Project? selected;
@@ -114,7 +110,7 @@ class BoardCubit extends Cubit<BoardState> {
       emit(state.copyWith(
         loading: false,
         offline: true,
-        error: _api.messageFromError(e),
+        error: api.messageFromError(e),
       ));
     }
   }
@@ -127,25 +123,25 @@ class BoardCubit extends Cubit<BoardState> {
         (p) => p.id == projectId,
         orElse: () => list.isNotEmpty ? list.first : (throw StateError('no project')),
       );
-      final board = await _board.loadBoard(projectId);
+      final loaded = await board.loadBoard(projectId);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastProjectKey, projectId);
       emit(state.copyWith(
         projects: list.isEmpty ? [project] : list,
         project: project,
-        columns: board.columns,
-        tasks: board.tasks,
+        columns: loaded.columns,
+        tasks: loaded.tasks,
         columnIndex: 0,
         loading: false,
         offline: false,
       ));
-      await _widgetSync.publishBoard(
+      await widgetSync.publishBoard(
         project: project,
-        columns: board.columns,
-        tasks: board.tasks,
+        columns: loaded.columns,
+        tasks: loaded.tasks,
       );
     } catch (e) {
-      emit(state.copyWith(loading: false, offline: true, error: _api.messageFromError(e)));
+      emit(state.copyWith(loading: false, offline: true, error: api.messageFromError(e)));
     }
   }
 
@@ -168,7 +164,7 @@ class BoardCubit extends Cubit<BoardState> {
       return;
     }
     try {
-      final task = await _board.createTask(
+      final task = await board.createTask(
         projectId: project.id,
         statusId: col.id,
         title: title,
@@ -178,13 +174,13 @@ class BoardCubit extends Cubit<BoardState> {
       );
       final next = [task, ...state.tasks.where((t) => t.id != task.id)];
       emit(state.copyWith(tasks: next, clearError: true));
-      await _widgetSync.publishBoard(
+      await widgetSync.publishBoard(
         project: project,
         columns: state.columns,
         tasks: next,
       );
     } catch (e) {
-      emit(state.copyWith(error: _api.messageFromError(e)));
+      emit(state.copyWith(error: api.messageFromError(e)));
     }
   }
 
@@ -199,7 +195,7 @@ class BoardCubit extends Cubit<BoardState> {
         : peers.map((t) => t.position).reduce((a, b) => a < b ? a : b);
     final position = peers.isEmpty ? 0.0 : minPos - 1024;
     try {
-      final updated = await _board.moveTask(
+      final updated = await board.moveTask(
         taskId: task.id,
         statusId: statusId,
         position: position,
@@ -207,14 +203,14 @@ class BoardCubit extends Cubit<BoardState> {
       final next = state.tasks.map((t) => t.id == updated.id ? updated : t).toList();
       emit(state.copyWith(tasks: next, clearError: true));
       if (state.project != null) {
-        await _widgetSync.publishBoard(
+        await widgetSync.publishBoard(
           project: state.project!,
           columns: state.columns,
           tasks: next,
         );
       }
     } catch (e) {
-      emit(state.copyWith(error: _api.messageFromError(e)));
+      emit(state.copyWith(error: api.messageFromError(e)));
     }
   }
 
@@ -224,7 +220,7 @@ class BoardCubit extends Cubit<BoardState> {
       return;
     }
     try {
-      final saved = await _board.updateTask(
+      final saved = await board.updateTask(
         taskId: updated.id,
         title: updated.title,
         description: updated.description,
@@ -235,18 +231,18 @@ class BoardCubit extends Cubit<BoardState> {
       final next = state.tasks.map((t) => t.id == saved.id ? saved : t).toList();
       emit(state.copyWith(tasks: next, clearError: true));
     } catch (e) {
-      emit(state.copyWith(error: _api.messageFromError(e)));
+      emit(state.copyWith(error: api.messageFromError(e)));
     }
   }
 
   Future<void> createProject(String name) async {
     try {
-      final p = await _projects.createProject(name: name);
+      final p = await projects.createProject(name: name);
       final list = [...state.projects, p];
       emit(state.copyWith(projects: list));
       await openProject(p.id, projects: list);
     } catch (e) {
-      emit(state.copyWith(error: _api.messageFromError(e)));
+      emit(state.copyWith(error: api.messageFromError(e)));
     }
   }
 }

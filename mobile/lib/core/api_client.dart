@@ -4,9 +4,8 @@ import 'config.dart';
 import 'token_storage.dart';
 
 class ApiClient {
-  ApiClient({required TokenStorage tokens, String? baseUrl})
-      : _tokens = tokens,
-        dio = Dio(
+  ApiClient({required this.tokens, String? baseUrl})
+      : dio = Dio(
           BaseOptions(
             baseUrl: baseUrl ?? AppConfig.apiBase,
             connectTimeout: const Duration(seconds: 15),
@@ -17,7 +16,7 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final access = await _tokens.readAccess();
+          final access = await tokens.readAccess();
           if (access != null && access.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $access';
           }
@@ -28,7 +27,7 @@ class ApiClient {
             final refreshed = await _tryRefresh();
             if (refreshed) {
               final req = error.requestOptions;
-              final access = await _tokens.readAccess();
+              final access = await tokens.readAccess();
               req.headers['Authorization'] = 'Bearer $access';
               try {
                 final clone = await dio.fetch(req);
@@ -44,7 +43,7 @@ class ApiClient {
     );
   }
 
-  final TokenStorage _tokens;
+  final TokenStorage tokens;
   final Dio dio;
   bool _refreshing = false;
 
@@ -52,7 +51,7 @@ class ApiClient {
     if (_refreshing) return false;
     _refreshing = true;
     try {
-      final refresh = await _tokens.readRefresh();
+      final refresh = await tokens.readRefresh();
       if (refresh == null || refresh.isEmpty) return false;
       final res = await Dio(
         BaseOptions(baseUrl: dio.options.baseUrl),
@@ -65,10 +64,10 @@ class ApiClient {
       final access = data['access_token'] as String?;
       final nextRefresh = data['refresh_token'] as String?;
       if (access == null || nextRefresh == null) return false;
-      await _tokens.saveTokens(access: access, refresh: nextRefresh);
+      await tokens.saveTokens(access: access, refresh: nextRefresh);
       return true;
     } catch (_) {
-      await _tokens.clear();
+      await tokens.clear();
       return false;
     } finally {
       _refreshing = false;

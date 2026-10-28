@@ -32,4 +32,14 @@ class NotificationsRepository {
       data: {'token': token, 'platform': platform},
     );
   }
+
+  Future<void> unregisterDeviceToken({
+    required String token,
+    required String platform,
+  }) async {
+    await _api.dio.delete(
+      '/api/v1/notifications/device-token',
+      data: {'token': token, 'platform': platform},
+    );
+  }
 }

@@ -7,7 +7,7 @@ class AppConfig {
     defaultValue: 'http://127.0.0.1:8000',
   );
 
-  static const appGroupId = 'group.ru.takt.mobile';
+  static const appGroupId = 'group.ru.gadzhilaev.takt';
   static const widgetNameAndroid = 'TaktWidgetProvider';
   static const widgetNameIos = 'TaktHomeWidget';
 }

@@ -1,4 +1,4 @@
-package ru.takt.takt_mobile
+package ru.gadzhilaev.takt
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

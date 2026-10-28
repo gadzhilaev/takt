@@ -23,8 +23,8 @@ GoRouter createRouter(AuthCubit authCubit) {
       return null;
     },
     routes: [
-      GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterPage()),
+      GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(path: '/register', builder: (_, _) => const RegisterPage()),
       GoRoute(
         path: '/board',
         builder: (context, state) {
@@ -38,8 +38,8 @@ GoRouter createRouter(AuthCubit authCubit) {
           return BoardPage(deepTaskId: taskId);
         },
       ),
-      GoRoute(path: '/notifications', builder: (_, __) => const NotificationsPage()),
-      GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
+      GoRoute(path: '/notifications', builder: (_, _) => const NotificationsPage()),
+      GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
     ],
   );
 }
