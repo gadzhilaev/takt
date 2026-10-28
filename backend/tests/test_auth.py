@@ -3,9 +3,12 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_register_not_found(client: AsyncClient):
-    r = await client.post("/api/v1/auth/register", json={"email": "a@b.com", "password": "x"})
-    assert r.status_code == 404
+async def test_register_validation(client: AsyncClient):
+    r = await client.post(
+        "/api/v1/auth/register",
+        json={"name": "A", "email": "bad", "password": "short", "password_confirm": "short"},
+    )
+    assert r.status_code == 422
 
 
 @pytest.mark.asyncio

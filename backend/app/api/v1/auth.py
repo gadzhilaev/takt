@@ -1,23 +1,25 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from app.core.limiter import limiter
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user, verify_csrf
 from app.api.serializers import avatar_url
 from app.core.config import get_settings
 from app.core.csrf import CSRF_COOKIE, generate_csrf_token
+from app.core.limiter import limiter
 from app.core.security import decode_token, hash_password
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import (
     ChangePasswordRequest,
     ForceChangePasswordRequest,
     LoginRequest,
+    RegisterRequest,
     UserPublic,
 )
-from app.services import auth_service
+from app.services import auth_service, invite_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -65,6 +67,38 @@ def _user_public(user: User) -> UserPublic:
         avatar_url=avatar_url(user),
         must_change_password=user.must_change_password,
     )
+
+
+@router.post("/register")
+@limiter.limit("5/minute")
+async def register(
+    request: Request,
+    body: RegisterRequest,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    email = str(body.email).lower().strip()
+    existing = await db.scalar(select(User).where(User.email == email))
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "email_taken", "message": "Email уже зарегистрирован"}},
+        )
+    user = User(
+        email=email,
+        name=body.name.strip(),
+        password_hash=hash_password(body.password),
+        role=UserRole.member,
+        is_active=True,
+        must_change_password=False,
+    )
+    db.add(user)
+    await db.flush()
+    await invite_service.link_pending_invites_to_user(db, user)
+    access, refresh, _ = await auth_service.create_token_pair(db, user)
+    await db.commit()
+    _set_auth_cookies(response, access, refresh)
+    return {"user": _user_public(user)}
 
 
 @router.post("/login")

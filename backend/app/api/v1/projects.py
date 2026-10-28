@@ -39,6 +39,7 @@ def _project_out(project, members_users: dict[uuid.UUID, User], progress: dict |
         icon=project.icon,
         is_default=project.is_default,
         is_archived=project.is_archived,
+        is_demo=bool(getattr(project, "is_demo", False)),
         created_at=project.created_at,
         updated_at=project.updated_at,
         members=members,

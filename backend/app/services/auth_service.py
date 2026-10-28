@@ -71,6 +71,12 @@ async def authenticate_user(
         raise AuthError("invalid_credentials", "Неверный email или пароль")
     if not user.is_active:
         raise AuthError("inactive", "Учётная запись отключена")
+    # Demo staff profiles (is_demo) cannot log in — except the dedicated DEMO_USER_EMAIL viewer.
+    from app.core.config import get_settings
+
+    demo_email = (get_settings().DEMO_USER_EMAIL or "").strip().lower()
+    if getattr(user, "is_demo", False) and user.email.lower() != demo_email:
+        raise AuthError("demo_profile", "Демонстрационный профиль недоступен для входа")
     clear_login_attempts(email, ip)
     user.last_login_at = datetime.now(UTC)
     await db.flush()

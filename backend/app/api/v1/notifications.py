@@ -2,16 +2,29 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, verify_csrf
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.notification import Notification
 from app.models.user import User
+from app.services import push_service
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+
+class PushSubscribeIn(BaseModel):
+    endpoint: str
+    keys: dict[str, str]
+    user_agent: str | None = None
+
+
+class PushUnsubscribeIn(BaseModel):
+    endpoint: str = Field(min_length=8)
 
 
 @router.get("")
@@ -85,6 +98,59 @@ async def mark_all_read(
     return {"ok": True}
 
 
+@router.get("/push/vapid-public-key")
+async def vapid_public_key(user: Annotated[User, Depends(get_current_user)]):
+    settings = get_settings()
+    return {
+        "public_key": settings.VAPID_PUBLIC_KEY or None,
+        "configured": push_service.vapid_configured(settings),
+    }
+
+
+@router.post("/push/subscribe", dependencies=[Depends(verify_csrf)])
+async def push_subscribe(
+    body: PushSubscribeIn,
+    request: Request,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    settings = get_settings()
+    if not push_service.vapid_configured(settings):
+        raise HTTPException(
+            status_code=503,
+            detail={"error": {"code": "push_disabled", "message": "Web Push не настроен на сервере"}},
+        )
+    p256dh = body.keys.get("p256dh")
+    auth = body.keys.get("auth")
+    if not p256dh or not auth:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "invalid_keys", "message": "Нужны keys.p256dh и keys.auth"}},
+        )
+    ua = body.user_agent or request.headers.get("user-agent")
+    await push_service.upsert_subscription(
+        db,
+        user_id=user.id,
+        endpoint=body.endpoint,
+        p256dh=p256dh,
+        auth=auth,
+        user_agent=ua,
+    )
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/push/unsubscribe", dependencies=[Depends(verify_csrf)])
+async def push_unsubscribe(
+    body: PushUnsubscribeIn,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await push_service.delete_subscription(db, user_id=user.id, endpoint=body.endpoint)
+    await db.commit()
+    return {"ok": True}
+
+
 async def notify_users(
     db: AsyncSession,
     *,
@@ -96,6 +162,7 @@ async def notify_users(
     task_id: uuid.UUID | None = None,
     project_id: uuid.UUID | None = None,
 ) -> None:
+    """Legacy helper kept for invite flow."""
     now = datetime.now(UTC)
     for uid in set(user_ids):
         if actor_id and uid == actor_id:

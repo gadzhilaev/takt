@@ -1,9 +1,22 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1)
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    password_confirm: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.password != self.password_confirm:
+            raise ValueError("Пароли не совпадают")
+        return self
 
 
 class ChangePasswordRequest(BaseModel):

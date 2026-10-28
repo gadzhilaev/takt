@@ -10,11 +10,10 @@ from app.models.team import TaskStatus, TeamSettings
 from app.models.user import User, UserRole
 
 DEFAULT_STATUSES = [
-    ("Бэклог", "#94a3b8", 0, False),
-    ("К выполнению", "#3b82f6", 1, False),
-    ("В работе", "#f59e0b", 2, False),
-    ("На проверке", "#8b5cf6", 3, False),
-    ("Готово", "#22c55e", 4, True),
+    ("К выполнению", "#94a3b8", 0, False),
+    ("В работе", "#315F72", 1, False),
+    ("На проверке", "#5C7380", 2, False),
+    ("Готово", "#2f6b4f", 3, True),
 ]
 
 
@@ -99,8 +98,14 @@ async def ensure_admin_user(db: AsyncSession, settings: Settings) -> User | None
 
 
 async def ensure_project_memberships(db: AsyncSession, project: Project) -> None:
-    users = (await db.execute(select(User))).scalars().all()
-    for user in users:
+    """Keep system admins on the default board. Do not auto-attach demo/seed users
+    (or every registered member) — that polluted «Общее» with E2E/demo traffic.
+    Ordinary users join via project create / invites.
+    """
+    admins = (
+        await db.execute(select(User).where(User.role == UserRole.admin, User.is_active.is_(True)))
+    ).scalars().all()
+    for user in admins:
         exists = await db.scalar(
             select(ProjectMember.id).where(
                 ProjectMember.project_id == project.id,
@@ -109,8 +114,13 @@ async def ensure_project_memberships(db: AsyncSession, project: Project) -> None
         )
         if exists:
             continue
-        role = ProjectMemberRole.admin if user.role == UserRole.admin else ProjectMemberRole.member
-        db.add(ProjectMember(project_id=project.id, user_id=user.id, role=role))
+        db.add(
+            ProjectMember(
+                project_id=project.id,
+                user_id=user.id,
+                role=ProjectMemberRole.admin,
+            )
+        )
 
 
 async def bootstrap_db(db: AsyncSession, settings: Settings) -> None:

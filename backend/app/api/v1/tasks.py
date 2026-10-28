@@ -31,10 +31,46 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.models.project import ProjectMemberRole
-from app.services import task_service
+from app.services import notify_service, task_service
 from app.services.websocket_hub import ws_manager
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+async def _user_names(db: AsyncSession, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    if not user_ids:
+        return {}
+    rows = (await db.execute(select(User.id, User.name).where(User.id.in_(user_ids)))).all()
+    return {row[0]: row[1] for row in rows}
+
+
+async def _ensure_assignees_in_project(
+    db: AsyncSession, project_id: uuid.UUID, assignee_ids: list[uuid.UUID]
+) -> None:
+    from app.models.project import ProjectMember
+
+    if not assignee_ids:
+        return
+    rows = (
+        await db.execute(
+            select(ProjectMember.user_id).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id.in_(assignee_ids),
+            )
+        )
+    ).scalars().all()
+    allowed = set(rows)
+    missing = [uid for uid in assignee_ids if uid not in allowed]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "code": "assignee_not_member",
+                    "message": "Исполнителем может быть только участник проекта",
+                }
+            },
+        )
 
 
 async def _task_out(db: AsyncSession, task: Task):
@@ -145,12 +181,24 @@ async def create_task(
         task.closed_at = datetime.now(UTC)
     db.add(task)
     await db.flush()
+    if body.assignee_ids:
+        await _ensure_assignees_in_project(db, project_id, body.assignee_ids)
     for uid in body.assignee_ids:
         db.add(TaskAssignee(task_id=task.id, user_id=uid))
     for name in body.label_names:
         label = await task_service.get_or_create_label(db, name.strip())
         db.add(TaskLabel(task_id=task.id, label_id=label.id))
     await task_service.log_activity(db, task.id, user.id, "created")
+    await db.flush()
+    if body.assignee_ids:
+        name_map = await _user_names(db, body.assignee_ids)
+        await notify_service.notify_assignees(
+            db,
+            actor=user,
+            task=task,
+            new_assignee_ids=list(body.assignee_ids),
+            all_assignees=[(uid, name_map.get(uid, "Участник")) for uid in body.assignee_ids],
+        )
     await db.commit()
     task = await task_service.get_task(db, task.id)
     out = await _task_out(db, task)  # type: ignore[arg-type]
@@ -197,19 +245,33 @@ async def update_task(
         task.due_date = body.due_date
     if body.position is not None:
         task.position = body.position
+    newly_done = False
     if body.status_id is not None:
         status = await task_service.get_status(db, body.status_id)
         if not status:
             raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
         old = str(task.status_id)
-        await task_service.apply_status_change(db, task, status)
+        newly_done = await task_service.apply_status_change(db, task, status)
         await task_service.log_activity(db, task.id, user.id, "status_changed", "status_id", old, str(status.id))
     if body.assignee_ids is not None:
+        prev_ids = {a.user_id for a in (task.assignees or [])}
+        if task.project_id and body.assignee_ids:
+            await _ensure_assignees_in_project(db, task.project_id, body.assignee_ids)
         await db.execute(delete(TaskAssignee).where(TaskAssignee.task_id == task.id))
         await db.flush()
         for uid in body.assignee_ids:
             db.add(TaskAssignee(task_id=task.id, user_id=uid))
         await task_service.log_activity(db, task.id, user.id, "assignees_changed")
+        new_ids = [uid for uid in body.assignee_ids if uid not in prev_ids]
+        if new_ids:
+            name_map = await _user_names(db, list(body.assignee_ids))
+            await notify_service.notify_assignees(
+                db,
+                actor=user,
+                task=task,
+                new_assignee_ids=new_ids,
+                all_assignees=[(uid, name_map.get(uid, "Участник")) for uid in body.assignee_ids],
+            )
     if body.label_names is not None:
         await db.execute(delete(TaskLabel).where(TaskLabel.task_id == task.id))
         await db.flush()
@@ -222,6 +284,8 @@ async def update_task(
     if body.archived is False and task.archived_at is not None:
         task.archived_at = None
         await task_service.log_activity(db, task.id, user.id, "unarchived")
+    if newly_done:
+        await notify_service.notify_task_completed(db, actor=user, task=task)
     await db.commit()
     task = await task_service.get_task(db, task.id)
     out = await _task_out(db, task)  # type: ignore[arg-type]
@@ -242,9 +306,11 @@ async def move_task(
     status = await task_service.get_status(db, body.status_id)
     if not status:
         raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
-    await task_service.apply_status_change(db, task, status)
+    newly_done = await task_service.apply_status_change(db, task, status)
     task.position = body.position
     await task_service.log_activity(db, task.id, user.id, "moved", "status_id", None, str(status.id))
+    if newly_done:
+        await notify_service.notify_task_completed(db, actor=user, task=task)
     await db.commit()
     task = await task_service.get_task(db, task.id)
     out = await _task_out(db, task)  # type: ignore[arg-type]

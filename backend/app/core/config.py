@@ -40,6 +40,16 @@ class Settings(BaseSettings):
 
     SEED_DEMO_DATA: bool = False
 
+    # Isolated demo workspace (password must come from env / private file — never commit).
+    DEMO_USER_EMAIL: str = "demo@example.com"
+    DEMO_USER_PASSWORD: str = ""
+
+    # Web Push (VAPID). Leave empty to disable push; in-app notifications still work.
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:admin@example.com"
+    APP_PUBLIC_URL: str = "http://localhost:3000"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

@@ -22,6 +22,7 @@ class ProjectOut(BaseModel):
     icon: str
     is_default: bool
     is_archived: bool
+    is_demo: bool = False
     created_at: datetime
     updated_at: datetime
     members: list[ProjectMemberOut] = []

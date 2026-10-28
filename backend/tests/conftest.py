@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 os.environ["ENV"] = "test"
-os.environ["DATABASE_URL"] = os.environ.get(
-    "DATABASE_URL",
-    "postgresql+asyncpg://track:track_dev_pass@localhost:5433/track_test",
+# Always use the dedicated test database — never inherit DATABASE_URL from .env
+# (that pointed at `track` and drop_all wiped the working demo workspace).
+os.environ["DATABASE_URL"] = (
+    "postgresql+asyncpg://track:track_dev_pass@localhost:5433/track_test"
 )
 os.environ["SECRET_KEY"] = "test-secret-key-minimum-32-characters-long"
 os.environ["ADMIN_EMAIL"] = "admin@test.com"
@@ -65,3 +66,13 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def admin_client(client: AsyncClient) -> AsyncClient:
+    r = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@test.com", "password": "Admin123!Test"},
+    )
+    assert r.status_code == 200
+    return client

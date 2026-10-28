@@ -24,6 +24,7 @@ class Project(Base, TimestampMixin):
     icon: Mapped[str] = mapped_column(String(40), default="folder", nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
     members: Mapped[list["ProjectMember"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"

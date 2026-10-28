@@ -24,6 +24,7 @@ class User(Base, TimestampMixin):
     avatar_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.member, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

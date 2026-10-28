@@ -11,10 +11,10 @@ from app.models.user import User, UserRole
 from app.services.bootstrap import DEFAULT_STATUSES
 
 DEFAULT_STATUS_TEMPLATE = [
-    ("К выполнению", "#3b82f6", 0, False),
-    ("В работе", "#f59e0b", 1, False),
-    ("На проверке", "#8b5cf6", 2, False),
-    ("Готово", "#22c55e", 3, True),
+    ("К выполнению", "#94a3b8", 0, False),
+    ("В работе", "#315F72", 1, False),
+    ("На проверке", "#5C7380", 2, False),
+    ("Готово", "#2f6b4f", 3, True),
 ]
 
 
@@ -30,7 +30,8 @@ async def get_project(db: AsyncSession, project_id: uuid.UUID) -> Project | None
 async def list_projects_for_user(
     db: AsyncSession, user: User, *, include_archived: bool = False
 ) -> list[Project]:
-    q = (
+    """Membership-based list. Demo projects are never auto-visible to system admins."""
+    membership = (
         select(Project)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
         .where(ProjectMember.user_id == user.id)
@@ -38,20 +39,38 @@ async def list_projects_for_user(
         .order_by(Project.is_default.desc(), Project.name.asc())
     )
     if not include_archived:
-        q = q.where(Project.is_archived.is_(False))
-    if user.role == UserRole.admin:
-        q = select(Project).options(selectinload(Project.members)).order_by(
-            Project.is_default.desc(), Project.name.asc()
+        membership = membership.where(Project.is_archived.is_(False))
+
+    if user.role != UserRole.admin:
+        return list((await db.execute(membership)).scalars().unique().all())
+
+    # System admin: all non-demo projects + demo projects where they are a member.
+    admin_q = (
+        select(Project)
+        .outerjoin(
+            ProjectMember,
+            (ProjectMember.project_id == Project.id) & (ProjectMember.user_id == user.id),
         )
-        if not include_archived:
-            q = q.where(Project.is_archived.is_(False))
-    return list((await db.execute(q)).scalars().unique().all())
+        .where(
+            (Project.is_demo.is_(False))
+            | (ProjectMember.user_id == user.id)
+        )
+        .options(selectinload(Project.members))
+        .order_by(Project.is_default.desc(), Project.name.asc())
+    )
+    if not include_archived:
+        admin_q = admin_q.where(Project.is_archived.is_(False))
+    return list((await db.execute(admin_q)).scalars().unique().all())
 
 
 async def user_project_role(
     db: AsyncSession, user: User, project_id: uuid.UUID
 ) -> ProjectMemberRole | None:
-    if user.role == UserRole.admin:
+    project = await db.get(Project, project_id)
+    if project is None:
+        return None
+    # Demo projects require explicit membership even for system admins.
+    if user.role == UserRole.admin and not project.is_demo:
         return ProjectMemberRole.admin
     row = await db.scalar(
         select(ProjectMember.role).where(
@@ -92,13 +111,27 @@ async def create_project(
     creator: User,
     member_ids: list[uuid.UUID] | None = None,
 ) -> Project:
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    name_clean = name.strip()
+    desc = description or ""
+    is_demo = (
+        name_clean.startswith("[E2E]")
+        or "[demo-workspace]" in desc.lower()
+        or (
+            bool(settings.DEMO_USER_EMAIL)
+            and creator.email.lower() == settings.DEMO_USER_EMAIL.lower()
+        )
+    )
     project = Project(
-        name=name.strip(),
+        name=name_clean,
         description=description,
         color=color or "#4f46e5",
         icon=icon or "folder",
         is_default=False,
         is_archived=False,
+        is_demo=is_demo,
     )
     db.add(project)
     await db.flush()

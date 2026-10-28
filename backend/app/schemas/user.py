@@ -46,3 +46,4 @@ class UserCreateResult(BaseModel):
 
 class ProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    email: EmailStr | None = None

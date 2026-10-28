@@ -1,5 +1,7 @@
 from app.models.auth import RefreshToken
+from app.models.invite import ProjectInvite, ProjectInviteStatus
 from app.models.notification import Notification
+from app.models.push_subscription import PushSubscription
 from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.task import (
     ActivityLog,
@@ -34,4 +36,7 @@ __all__ = [
     "ProjectMember",
     "ProjectMemberRole",
     "Notification",
+    "PushSubscription",
+    "ProjectInvite",
+    "ProjectInviteStatus",
 ]

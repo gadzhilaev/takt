@@ -16,7 +16,7 @@ from app.models.task import (
     TaskPriority,
 )
 from app.models.team import TaskStatus
-from app.models.user import User, UserRole
+from app.models.user import User
 
 
 async def get_status(db: AsyncSession, status_id: uuid.UUID) -> TaskStatus | None:
@@ -45,7 +45,9 @@ async def log_activity(
     )
 
 
-async def apply_status_change(db: AsyncSession, task: Task, new_status: TaskStatus) -> None:
+async def apply_status_change(db: AsyncSession, task: Task, new_status: TaskStatus) -> bool:
+    """Apply status. Returns True if task newly entered an is_done column."""
+    was_done = bool(task.status.is_done) if task.status is not None else False
     task.status_id = new_status.id
     # Keep loaded relationship in sync — otherwise serializers return a stale nested status
     # until the identity map is expired/refetched.
@@ -54,6 +56,7 @@ async def apply_status_change(db: AsyncSession, task: Task, new_status: TaskStat
         task.closed_at = datetime.now(UTC)
     else:
         task.closed_at = None
+    return bool(new_status.is_done) and not was_done
 
 
 def task_query_base():
@@ -181,8 +184,7 @@ async def get_or_create_label(db: AsyncSession, name: str, color: str = "#22c55e
 
 
 def can_delete_task(user: User, task: Task) -> bool:
-    if user.role == UserRole.admin:
-        return True
+    """Only the task author may delete — no owner/admin override."""
     return task.author_id == user.id
 
 

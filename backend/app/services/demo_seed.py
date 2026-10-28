@@ -78,6 +78,7 @@ async def _ensure_project(db: AsyncSession, meta: dict, members: list[User]) -> 
         result = await db.execute(select(Project).where(Project.name == meta["name"], Project.is_default.is_(False)))
         project = result.scalar_one_or_none()
     if project:
+        project.is_demo = True
         return project
     project = Project(
         name=meta["name"],
@@ -86,6 +87,7 @@ async def _ensure_project(db: AsyncSession, meta: dict, members: list[User]) -> 
         icon=meta["icon"],
         is_default=False,
         is_archived=False,
+        is_demo=True,
     )
     db.add(project)
     await db.flush()
@@ -99,8 +101,10 @@ async def _ensure_project(db: AsyncSession, meta: dict, members: list[User]) -> 
                 is_done=is_done,
             )
         )
-    for u in members:
-        role = ProjectMemberRole.admin if u.role == UserRole.admin else ProjectMemberRole.member
+    demo_members = [u for u in members if u.role != UserRole.admin]
+    for i, u in enumerate(demo_members):
+        # First demo member becomes project admin; never auto-attach system admin.
+        role = ProjectMemberRole.admin if i == 0 else ProjectMemberRole.member
         db.add(ProjectMember(project_id=project.id, user_id=u.id, role=role))
     await db.flush()
     return project
@@ -217,25 +221,25 @@ async def seed_demo_content(db: AsyncSession) -> dict:
         specs: list[dict] = []
         if meta["key"] == "mobile":
             specs = [
-                dict(title="Онбординг экраны", status=todo, priority=TaskPriority.high, due=-2, assignees=[designer], desc="## Онбординг\nСверстать 3 экрана welcome.", checklist=[("Макет Figma", True), ("Верстка", False)], comments=[(admin, "Нужен тёмный режим")], labels=["ui"]),
+                dict(title="Онбординг экраны", status=todo, priority=TaskPriority.high, due=-2, assignees=[designer], desc="## Онбординг\nСверстать 3 экрана welcome.", checklist=[("Макет Figma", True), ("Верстка", False)], comments=[(member, "Нужен тёмный режим")], labels=["ui"]),
                 dict(title="Push-уведомления", status=doing, priority=TaskPriority.urgent, due=1, assignees=[member], desc="Интеграция FCM/APNs.", checklist=[("Сертификаты", True), ("Клиент", False), ("Тесты", False)], comments=[(member, "Жду ключи")], labels=["mobile"]),
                 dict(title="Офлайн-кэш задач", status=review, priority=TaskPriority.medium, due=3, assignees=[member], desc="Кэш списка при потере сети.", checklist=[], comments=[], labels=["mobile"]),
-                dict(title="Авторизация по биометрии", status=done, priority=TaskPriority.medium, due=-10, assignees=[member, designer], desc="FaceID / Fingerprint.", checklist=[("iOS", True), ("Android", True)], comments=[(admin, "Принято")], labels=["security"]),
+                dict(title="Авторизация по биометрии", status=done, priority=TaskPriority.medium, due=-10, assignees=[member, designer], desc="FaceID / Fingerprint.", checklist=[("iOS", True), ("Android", True)], comments=[(designer, "Принято")], labels=["security"]),
             ]
         elif meta["key"] == "api":
             specs = [
                 dict(title="Пагинация задач", status=todo, priority=TaskPriority.medium, due=5, assignees=[member], desc="Cursor pagination для `/tasks`.", checklist=[("Спека", False)], comments=[], labels=["api"]),
-                dict(title="RBAC проектов", status=doing, priority=TaskPriority.high, due=2, assignees=[admin], desc="Права admin/member/viewer.", checklist=[("Модель", True), ("Тесты", False)], comments=[(admin, "В работе")], labels=["security"]),
+                dict(title="RBAC проектов", status=doing, priority=TaskPriority.high, due=2, assignees=[member], desc="Права admin/member/viewer.", checklist=[("Модель", True), ("Тесты", False)], comments=[(member, "В работе")], labels=["security"]),
                 dict(title="Экспорт Excel", status=review, priority=TaskPriority.low, due=0, assignees=[member], desc="Проверить кириллицу в filename.", checklist=[("Fix header", True)], comments=[], labels=["reports"]),
-                dict(title="Bootstrap admin", status=done, priority=TaskPriority.low, due=-20, assignees=[admin], desc="Создание первого админа.", checklist=[("CLI", True)], comments=[], labels=["infra"]),
-                dict(title="Просроченный инцидент 500", status=todo, priority=TaskPriority.urgent, due=-1, assignees=[member, admin], desc="Разбор падения StatusOut.", checklist=[("Reproduce", True), ("Fix", False)], comments=[(member, "Правлю сериализацию")], labels=["bug"]),
+                dict(title="Bootstrap admin", status=done, priority=TaskPriority.low, due=-20, assignees=[member], desc="Создание первого админа.", checklist=[("CLI", True)], comments=[], labels=["infra"]),
+                dict(title="Просроченный инцидент 500", status=todo, priority=TaskPriority.urgent, due=-1, assignees=[member, designer], desc="Разбор падения StatusOut.", checklist=[("Reproduce", True), ("Fix", False)], comments=[(member, "Правлю сериализацию")], labels=["bug"]),
             ]
         else:
             specs = [
                 dict(title="Главный экран лендинга", status=todo, priority=TaskPriority.high, due=4, assignees=[designer], desc="Hero + CTA.", checklist=[("Копирайт", False), ("Макет", False)], comments=[], labels=["web"]),
                 dict(title="Форма заявки", status=doing, priority=TaskPriority.medium, due=2, assignees=[member], desc="Валидация и отправка.", checklist=[("API", True), ("UI", False)], comments=[(designer, "Нужны состояния ошибок")], labels=["web"]),
                 dict(title="SEO мета-теги", status=review, priority=TaskPriority.low, due=7, assignees=[member], desc="title/description/og.", checklist=[], comments=[], labels=["seo"]),
-                dict(title="Деплой на Vercel", status=done, priority=TaskPriority.medium, due=-5, assignees=[admin], desc="Прод preview.", checklist=[("DNS", True), ("CI", True)], comments=[(admin, "Готово")], labels=["infra"]),
+                dict(title="Деплой на Vercel", status=done, priority=TaskPriority.medium, due=-5, assignees=[member], desc="Прод preview.", checklist=[("DNS", True), ("CI", True)], comments=[(member, "Готово")], labels=["infra"]),
             ]
 
         for s in specs:
@@ -244,7 +248,7 @@ async def seed_demo_content(db: AsyncSession) -> dict:
                 project=project,
                 status=s["status"],
                 title=s["title"],
-                author=admin,
+                author=member,
                 priority=s["priority"],
                 due_offset_days=s["due"],
                 assignees=s["assignees"],
