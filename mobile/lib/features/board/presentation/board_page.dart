@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/kanban_colors.dart';
 import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
 import '../cubit/board_cubit.dart';
@@ -20,7 +21,7 @@ class _BoardPageState extends State<BoardPage> {
   @override
   void initState() {
     super.initState();
-      context.read<BoardCubit>().bootstrap().then((_) {
+    context.read<BoardCubit>().bootstrap().then((_) {
       if (!mounted || widget.deepTaskId == null) return;
       TaskItem? task;
       for (final t in context.read<BoardCubit>().state.tasks) {
@@ -77,7 +78,14 @@ class _BoardPageState extends State<BoardPage> {
         }
 
         final col = state.currentColumn;
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final columnBg = col == null
+            ? Theme.of(context).scaffoldBackgroundColor
+            : KanbanColors.columnBackground(col.color, dark: dark);
+        final accent = col == null ? null : KanbanColors.columnAccent(col.color);
+
         return Scaffold(
+          backgroundColor: columnBg,
           appBar: AppBar(
             titleSpacing: 16,
             title: DropdownButtonHideUnderline(
@@ -131,9 +139,14 @@ class _BoardPageState extends State<BoardPage> {
                   itemBuilder: (context, i) {
                     final c = state.columns[i];
                     final selected = i == state.columnIndex;
+                    final chipAccent = KanbanColors.columnAccent(c.color);
                     return ChoiceChip(
                       label: Text(c.name),
                       selected: selected,
+                      selectedColor: KanbanColors.columnBackground(c.color, dark: dark),
+                      side: BorderSide(
+                        color: selected ? chipAccent : Theme.of(context).dividerColor,
+                      ),
                       onSelected: (_) => context.read<BoardCubit>().selectColumn(i),
                     );
                   },
@@ -141,9 +154,23 @@ class _BoardPageState extends State<BoardPage> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: Text(
-                  col == null ? '' : '${state.currentTasks.length} задач',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).hintColor),
+                child: Row(
+                  children: [
+                    if (accent != null) ...[
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      col == null ? '' : '${state.currentTasks.length} задач',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: dark ? KanbanColors.descDark : KanbanColors.descLight,
+                          ),
+                    ),
+                  ],
                 ),
               ),
               Expanded(
@@ -151,7 +178,9 @@ class _BoardPageState extends State<BoardPage> {
                     ? Center(
                         child: Text(
                           'Пока пусто',
-                          style: TextStyle(color: Theme.of(context).hintColor),
+                          style: TextStyle(
+                            color: dark ? KanbanColors.descDark : KanbanColors.descLight,
+                          ),
                         ),
                       )
                     : ListView.separated(
@@ -213,72 +242,116 @@ class _TaskTile extends StatelessWidget {
   final TaskItem task;
   final VoidCallback onTap;
 
-  Color _urgencyColor(String p) {
-    switch (p) {
-      case 'urgent':
-        return TaktColors.urgent;
-      case 'high':
-        return TaktColors.important;
-      default:
-        return TaktColors.normal;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final muted = task.isDone;
+    final urgency = KanbanColors.urgency(task.priority, dark: dark);
+    final titleColor = muted
+        ? (dark ? KanbanColors.doneTitleDark : KanbanColors.doneTitleLight)
+        : (dark ? KanbanColors.titleDark : KanbanColors.titleLight);
+    final descColor = dark ? KanbanColors.descDark : KanbanColors.descLight;
+
     return Material(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(12),
+      color: dark ? KanbanColors.cardBgDark : KanbanColors.cardBgLight,
+      elevation: 1.5,
+      shadowColor: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: dark ? KanbanColors.cardBorderDark : KanbanColors.cardBorderLight,
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: IntrinsicHeight(
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
                 width: 4,
-                height: 40,
                 decoration: BoxDecoration(
-                  color: _urgencyColor(task.priority),
-                  borderRadius: BorderRadius.circular(4),
+                  color: urgency.fg,
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
                 ),
               ),
-              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (muted) ...[
-                          Icon(Icons.check_circle, size: 16, color: Theme.of(context).hintColor),
-                          const SizedBox(width: 6),
-                        ],
-                        Expanded(
-                          child: Text(
-                            task.title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              decoration: muted ? TextDecoration.lineThrough : null,
-                              color: muted ? Theme.of(context).hintColor : null,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (muted) ...[
+                            Icon(Icons.check_circle, size: 16, color: descColor),
+                            const SizedBox(width: 6),
+                          ],
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: titleColor,
+                                decoration: muted ? TextDecoration.lineThrough : null,
+                                decorationColor: titleColor,
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: urgency.bg,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              urgency.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: urgency.fg,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (task.assignees.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            ...task.assignees.take(3).map((a) {
+                              final initial = a.name.isNotEmpty ? a.name[0].toUpperCase() : '?';
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: CircleAvatar(
+                                  radius: 11,
+                                  backgroundColor: dark
+                                      ? const Color(0xFF4A5563)
+                                      : const Color(0xFFE4F0F6),
+                                  child: Text(
+                                    initial,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: dark ? KanbanColors.titleDark : const Color(0xFF326E8B),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                            if (task.assignees.length > 3)
+                              Text(
+                                '+${task.assignees.length - 3}',
+                                style: TextStyle(fontSize: 11, color: descColor),
+                              ),
+                          ],
                         ),
                       ],
-                    ),
-                    if (task.assignees.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        task.assignees.map((a) => a.name).join(', '),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],

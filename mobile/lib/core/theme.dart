@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'kanban_colors.dart';
+
 class TaktColors {
   static const accent = Color(0xFF315F72);
   static const graphite = Color(0xFF202938);
-  static const canvas = Color(0xFFF7F8FA);
-  static const urgent = Color(0xFFC2413B);
-  static const important = Color(0xFFB7791F);
-  static const normal = Color(0xFF315F72);
+  static const canvas = KanbanColors.boardBgLight;
+  static const urgent = Color(0xFFC63F3F);
+  static const important = Color(0xFFC47A12);
+  static const normal = Color(0xFF326E8B);
 }
 
 ThemeData buildLightTheme() {
@@ -16,14 +18,14 @@ ThemeData buildLightTheme() {
     colorScheme: ColorScheme.fromSeed(
       seedColor: TaktColors.accent,
       primary: TaktColors.accent,
-      surface: Colors.white,
+      surface: KanbanColors.cardBgLight,
       brightness: Brightness.light,
     ),
-    scaffoldBackgroundColor: TaktColors.canvas,
+    scaffoldBackgroundColor: KanbanColors.boardBgLight,
   );
   return base.copyWith(
     appBarTheme: const AppBarTheme(
-      backgroundColor: TaktColors.canvas,
+      backgroundColor: KanbanColors.boardBgLight,
       foregroundColor: TaktColors.graphite,
       elevation: 0,
       centerTitle: false,
@@ -32,6 +34,10 @@ ThemeData buildLightTheme() {
         fontSize: 18,
         fontWeight: FontWeight.w600,
       ),
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      selectedColor: const Color(0xFFE1EDF5),
+      checkmarkColor: const Color(0xFF347FA4),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -61,8 +67,8 @@ ThemeData buildLightTheme() {
 }
 
 ThemeData buildDarkTheme() {
-  const surface = Color(0xFF1A222C);
-  const canvas = Color(0xFF141A22);
+  const surface = KanbanColors.cardBgDark;
+  const canvas = KanbanColors.boardBgDark;
   final base = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/kanban_colors.dart';
 import '../../../shared/models/models.dart';
 import '../cubit/board_cubit.dart';
 
@@ -35,17 +36,6 @@ class _TaskSheetState extends State<TaskSheet> {
     _title.dispose();
     _description.dispose();
     super.dispose();
-  }
-
-  String _priorityLabel(String p) {
-    switch (p) {
-      case 'urgent':
-        return 'Срочно';
-      case 'high':
-        return 'Важно';
-      default:
-        return 'Обычная';
-    }
   }
 
   @override
@@ -224,7 +214,26 @@ class _TaskSheetState extends State<TaskSheet> {
               const SizedBox(height: 12),
               Text('Срочность', style: Theme.of(context).textTheme.labelMedium),
               const SizedBox(height: 4),
-              Text(_priorityLabel(widget.task.priority)),
+              Builder(
+                builder: (context) {
+                  final dark = Theme.of(context).brightness == Brightness.dark;
+                  final u = KanbanColors.urgency(widget.task.priority, dark: dark);
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: u.bg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        u.label,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: u.fg),
+                      ),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 12),
               Text('Исполнители', style: Theme.of(context).textTheme.labelMedium),
               const SizedBox(height: 4),

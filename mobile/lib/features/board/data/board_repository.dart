@@ -95,7 +95,7 @@ class BoardRepository {
   Future<StatusColumn> createColumn({
     required String projectId,
     required String name,
-    String color = '#94a3b8',
+    String color = '#607FA4',
   }) async {
     final res = await _api.dio.post<Map<String, dynamic>>(
       '/api/v1/settings/statuses',
