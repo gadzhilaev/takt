@@ -87,11 +87,19 @@ async def export_excel(
         )
     employees = await by_employee(db, p_start, p_end)
     history = await history_for_export(db, p_start, p_end)
+    from urllib.parse import quote
+
     period_label = f"{p_start.date()} — {p_end.date()}"
     data = build_report_workbook(team_name, period_label, metrics, task_rows, employees, history)
-    filename = f"Отчёт_{team_name}_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    stamp = datetime.now().strftime("%Y-%m-%d")
+    ascii_name = f"report_{stamp}.xlsx"
+    utf8_name = quote(f"Отчёт_{team_name}_{stamp}.xlsx")
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
+            )
+        },
     )

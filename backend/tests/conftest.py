@@ -6,23 +6,29 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
-os.environ.setdefault("ENV", "test")
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://track:track@localhost:5432/track_test")
-os.environ.setdefault("SECRET_KEY", "test-secret-key-minimum-32-characters-long")
-os.environ.setdefault("ADMIN_EMAIL", "admin@test.com")
-os.environ.setdefault("ADMIN_PASSWORD", "Admin123!Test")
-os.environ.setdefault("ADMIN_NAME", "Admin")
+os.environ["ENV"] = "test"
+os.environ["DATABASE_URL"] = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://track:track_dev_pass@localhost:5433/track_test",
+)
+os.environ["SECRET_KEY"] = "test-secret-key-minimum-32-characters-long"
+os.environ["ADMIN_EMAIL"] = "admin@test.com"
+os.environ["ADMIN_PASSWORD"] = "Admin123!Test"
+os.environ["ADMIN_NAME"] = "Admin"
+os.environ["SEED_DEMO_DATA"] = "false"
+
+from app.core.config import get_settings
+
+get_settings.cache_clear()
 
 from app.db.session import get_db
 from app.main import app
 from app.models.base import Base
 from app.services.bootstrap import bootstrap_db
-from app.core.config import get_settings
 
-get_settings.cache_clear()
-
-engine = create_async_engine(os.environ["DATABASE_URL"], echo=False)
+engine = create_async_engine(os.environ["DATABASE_URL"], echo=False, poolclass=NullPool)
 TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -33,7 +39,7 @@ def event_loop():
     loop.close()
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def prepare_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
@@ -41,15 +47,18 @@ async def prepare_db():
     async with TestSession() as db:
         await bootstrap_db(db, get_settings())
     yield
-    await engine.dispose()
 
 
 @pytest_asyncio.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
     async def override_get_db():
         async with TestSession() as session:
-            yield session
-            await session.commit()
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)

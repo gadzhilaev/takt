@@ -1,0 +1,115 @@
+import uuid
+from datetime import UTC, datetime
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user, verify_csrf
+from app.db.session import get_db
+from app.models.notification import Notification
+from app.models.user import User
+
+router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+
+@router.get("")
+async def list_notifications(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    unread_only: bool = False,
+    page: int = 1,
+    page_size: int = 50,
+):
+    q = select(Notification).where(Notification.user_id == user.id)
+    if unread_only:
+        q = q.where(Notification.is_read.is_(False))
+    total = await db.scalar(select(func.count()).select_from(q.subquery())) or 0
+    rows = (
+        await db.execute(
+            q.order_by(Notification.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    ).scalars().all()
+    unread = await db.scalar(
+        select(func.count()).where(
+            Notification.user_id == user.id, Notification.is_read.is_(False)
+        )
+    )
+    return {
+        "items": [
+            {
+                "id": str(n.id),
+                "kind": n.kind,
+                "title": n.title,
+                "body": n.body,
+                "task_id": str(n.task_id) if n.task_id else None,
+                "project_id": str(n.project_id) if n.project_id else None,
+                "is_read": n.is_read,
+                "created_at": n.created_at,
+            }
+            for n in rows
+        ],
+        "total": total,
+        "unread": unread or 0,
+    }
+
+
+@router.post("/{notification_id}/read", dependencies=[Depends(verify_csrf)])
+async def mark_read(
+    notification_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    n = await db.get(Notification, notification_id)
+    if not n or n.user_id != user.id:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
+    n.is_read = True
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/read-all", dependencies=[Depends(verify_csrf)])
+async def mark_all_read(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user.id, Notification.is_read.is_(False))
+        .values(is_read=True)
+    )
+    await db.commit()
+    return {"ok": True}
+
+
+async def notify_users(
+    db: AsyncSession,
+    *,
+    user_ids: list[uuid.UUID],
+    actor_id: uuid.UUID | None,
+    kind: str,
+    title: str,
+    body: str | None = None,
+    task_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
+) -> None:
+    now = datetime.now(UTC)
+    for uid in set(user_ids):
+        if actor_id and uid == actor_id:
+            continue
+        db.add(
+            Notification(
+                user_id=uid,
+                actor_id=actor_id,
+                kind=kind,
+                title=title,
+                body=body,
+                task_id=task_id,
+                project_id=project_id,
+                is_read=False,
+                created_at=now,
+            )
+        )

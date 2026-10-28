@@ -1,4 +1,6 @@
 from app.models.auth import RefreshToken
+from app.models.notification import Notification
+from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.task import (
     ActivityLog,
     AdminAuditLog,
@@ -28,4 +30,8 @@ __all__ = [
     "Attachment",
     "ActivityLog",
     "AdminAuditLog",
+    "Project",
+    "ProjectMember",
+    "ProjectMemberRole",
+    "Notification",
 ]

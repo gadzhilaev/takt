@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,8 +21,11 @@ from app.services.bootstrap import bootstrap_db
 
 def run_migrations() -> None:
     backend_dir = Path(__file__).resolve().parent.parent
+    # Prefer venv alembic next to the running interpreter (works without activate).
+    alembic_bin = Path(sys.executable).resolve().parent / "alembic"
+    alembic_cmd = str(alembic_bin) if alembic_bin.exists() else "alembic"
     result = subprocess.run(
-        ["alembic", "upgrade", "head"],
+        [alembic_cmd, "upgrade", "head"],
         cwd=backend_dir,
         capture_output=True,
         text=True,

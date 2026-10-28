@@ -9,6 +9,7 @@ from app.api.deps import get_current_user, require_admin, verify_csrf
 from app.db.session import get_db
 from app.models.team import TaskStatus, TeamSettings
 from app.models.user import User
+from app.api.serializers import status_to_out
 from app.schemas.task import StatusOut
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -47,9 +48,13 @@ async def update_team(
 async def list_statuses(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    project_id: uuid.UUID | None = None,
 ):
-    rows = (await db.execute(select(TaskStatus).order_by(TaskStatus.position))).scalars().all()
-    return {"items": [StatusOut.model_validate(s) for s in rows]}
+    q = select(TaskStatus).order_by(TaskStatus.position)
+    if project_id:
+        q = q.where(TaskStatus.project_id == project_id)
+    rows = (await db.execute(q)).scalars().all()
+    return {"items": [status_to_out(s) for s in rows]}
 
 
 @router.post("/statuses", dependencies=[Depends(verify_csrf)])
@@ -58,16 +63,21 @@ async def create_status(
     admin: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    max_pos = await db.scalar(select(TaskStatus.position).order_by(TaskStatus.position.desc()))
+    project_id = body.get("project_id")
+    q = select(TaskStatus.position).order_by(TaskStatus.position.desc())
+    if project_id:
+        q = q.where(TaskStatus.project_id == uuid.UUID(str(project_id)))
+    max_pos = await db.scalar(q)
     status = TaskStatus(
         name=body["name"],
         color=body.get("color", "#6366f1"),
         position=float(body.get("position", (max_pos or 0) + 1)),
         is_done=bool(body.get("is_done", False)),
+        project_id=uuid.UUID(str(project_id)) if project_id else None,
     )
     db.add(status)
     await db.commit()
-    return {"status": StatusOut.model_validate(status)}
+    return {"status": status_to_out(status)}
 
 
 @router.patch("/statuses/{status_id}", dependencies=[Depends(verify_csrf)])
@@ -84,7 +94,7 @@ async def update_status(
         if key in body:
             setattr(status, key, body[key] if key != "position" else float(body[key]))
     await db.commit()
-    return {"status": StatusOut.model_validate(status)}
+    return {"status": status_to_out(status)}
 
 
 @router.delete("/statuses/{status_id}", dependencies=[Depends(verify_csrf)])

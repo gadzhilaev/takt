@@ -39,6 +39,18 @@ async def create_admin(email: str | None, password: str | None, name: str | None
         await db.commit()
 
 
+async def seed_demo() -> None:
+    settings = get_settings()
+    if settings.ENV not in ("development", "test", "local") and not settings.DEBUG:
+        raise SystemExit("seed-demo разрешён только в development/test/local или DEBUG=true")
+    from app.services.demo_seed import seed_demo_content
+
+    async with AsyncSessionLocal() as db:
+        await bootstrap_db(db, settings)
+        result = await seed_demo_content(db)
+        print("Demo seed OK:", result)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -46,9 +58,12 @@ def main() -> None:
     admin.add_argument("--email")
     admin.add_argument("--password")
     admin.add_argument("--name")
+    sub.add_parser("seed-demo", help="Идемпотентное демо-наполнение (только local/dev)")
     args = parser.parse_args()
     if args.command == "create-admin":
         asyncio.run(create_admin(args.email, args.password, args.name))
+    elif args.command == "seed-demo":
+        asyncio.run(seed_demo())
 
 
 if __name__ == "__main__":

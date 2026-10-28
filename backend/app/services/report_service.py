@@ -83,10 +83,12 @@ async def report_metrics(
         .where(Task.deleted_at.is_(None))
         .group_by(Task.status_id)
     )
-    by_status = [
-        (status_map[sid].name if sid in status_map else "?", cnt)
-        for sid, cnt in by_status_q.all()
-    ]
+    # Aggregate by display name — statuses are per-project with duplicate names.
+    by_status_agg: dict[str, int] = {}
+    for sid, cnt in by_status_q.all():
+        name = status_map[sid].name if sid in status_map else "?"
+        by_status_agg[name] = by_status_agg.get(name, 0) + int(cnt)
+    by_status = sorted(by_status_agg.items(), key=lambda x: (-x[1], x[0]))
     by_priority_q = await db.execute(
         select(Task.priority, func.count())
         .where(Task.deleted_at.is_(None))
@@ -98,7 +100,11 @@ async def report_metrics(
         "closed": closed or 0,
         "in_progress": in_progress,
         "overdue": overdue or 0,
-        "avg_days": round(float(avg_days or 0), 1),
+        "avg_days": (
+            round(float(avg_days), 1)
+            if avg_days is not None and (closed or 0) > 0
+            else None
+        ),
         "by_status": by_status,
         "by_priority": by_priority,
     }
@@ -107,16 +113,17 @@ async def report_metrics(
 async def closed_by_day(
     db: AsyncSession, start: datetime, end: datetime
 ) -> list[dict]:
+    day = func.date_trunc("day", Task.closed_at).label("day")
     rows = await db.execute(
-        select(func.date_trunc("day", Task.closed_at), func.count())
+        select(day, func.count())
         .where(
             Task.closed_at.isnot(None),
             Task.closed_at >= start,
             Task.closed_at <= end,
             Task.deleted_at.is_(None),
         )
-        .group_by(func.date_trunc("day", Task.closed_at))
-        .order_by(func.date_trunc("day", Task.closed_at))
+        .group_by(day)
+        .order_by(day)
     )
     return [{"date": d.isoformat() if d else None, "count": c} for d, c in rows.all()]
 
@@ -165,6 +172,20 @@ async def by_employee(db: AsyncSession, start: datetime, end: datetime) -> list[
                 Task.closed_at.is_(None),
             )
         )
+        # % в срок: среди закрытых в периоде задач СО сроком — доля закрытых не позже due_date.
+        closed_with_due = await db.scalar(
+            select(func.count())
+            .select_from(TaskAssignee)
+            .join(Task)
+            .where(
+                TaskAssignee.user_id == u.id,
+                Task.closed_at.isnot(None),
+                Task.closed_at >= start,
+                Task.closed_at <= end,
+                Task.due_date.isnot(None),
+                Task.deleted_at.is_(None),
+            )
+        )
         on_time = await db.scalar(
             select(func.count())
             .select_from(TaskAssignee)
@@ -172,12 +193,16 @@ async def by_employee(db: AsyncSession, start: datetime, end: datetime) -> list[
             .where(
                 TaskAssignee.user_id == u.id,
                 Task.closed_at.isnot(None),
+                Task.closed_at >= start,
+                Task.closed_at <= end,
                 Task.due_date.isnot(None),
                 Task.closed_at <= Task.due_date,
+                Task.deleted_at.is_(None),
             )
         )
         closed_total = closed or 0
-        pct = round(100.0 * (on_time or 0) / closed_total, 1) if closed_total else 0
+        due_n = closed_with_due or 0
+        pct = round(100.0 * (on_time or 0) / due_n, 1) if due_n else None
         result.append(
             {
                 "user_id": str(u.id),

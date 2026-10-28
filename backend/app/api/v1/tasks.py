@@ -30,10 +30,23 @@ from app.schemas.task import (
     TaskMove,
     TaskUpdate,
 )
+from app.models.project import ProjectMemberRole
 from app.services import task_service
 from app.services.websocket_hub import ws_manager
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+async def _task_out(db: AsyncSession, task: Task):
+    comments = await task_service.comment_counts_for(db, [task.id])
+    substats = await task_service.subtask_stats_for(db, [task.id])
+    total_sub, done_sub = substats.get(task.id, (0, 0))
+    return task_to_out(
+        task,
+        comment_count=comments.get(task.id, 0),
+        subtask_total=total_sub,
+        subtask_done=done_sub,
+    )
 
 
 @router.get("")
@@ -45,10 +58,23 @@ async def list_tasks_route(
     priority: TaskPriority | None = None,
     assignee_id: uuid.UUID | None = None,
     label_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
+    parent_id: uuid.UUID | None = None,
     mine: bool = False,
+    include_archived: bool = False,
     page: int = 1,
     page_size: int = 500,
 ):
+    from app.services import project_service
+
+    if project_id:
+        try:
+            await project_service.ensure_project_access(db, user, project_id)
+        except PermissionError:
+            raise HTTPException(
+                status_code=403,
+                detail={"error": {"code": "forbidden", "message": "Нет доступа к проекту"}},
+            )
     tasks, total = await task_service.list_tasks(
         db,
         search=search,
@@ -56,11 +82,29 @@ async def list_tasks_route(
         priority=priority,
         assignee_id=assignee_id,
         label_id=label_id,
+        project_id=project_id,
+        parent_id=parent_id,
+        roots_only=parent_id is None,
+        include_archived=include_archived,
         mine_user_id=user.id if mine else None,
         page=page,
-        page_size=page_size,
+        page_size=min(page_size, 1000),
     )
-    return {"items": [task_to_out(t) for t in tasks], "total": total, "page": page, "page_size": page_size}
+    ids = [t.id for t in tasks]
+    comments = await task_service.comment_counts_for(db, ids)
+    substats = await task_service.subtask_stats_for(db, ids)
+    items = []
+    for t in tasks:
+        total_sub, done_sub = substats.get(t.id, (0, 0))
+        items.append(
+            task_to_out(
+                t,
+                comment_count=comments.get(t.id, 0),
+                subtask_total=total_sub,
+                subtask_done=done_sub,
+            )
+        )
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("", dependencies=[Depends(verify_csrf)])
@@ -69,14 +113,29 @@ async def create_task(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    from app.services import project_service
+
     status = await task_service.get_status(db, body.status_id)
     if not status:
         raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
+    project_id = body.project_id or status.project_id
+    if not project_id:
+        raise HTTPException(status_code=400, detail={"error": {"code": "no_project", "message": "Укажите проект"}})
+    try:
+        await project_service.ensure_project_access(
+            db, user, project_id, min_role=ProjectMemberRole.member
+        )
+    except PermissionError:
+        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав на создание"}})
+    if status.project_id and status.project_id != project_id:
+        raise HTTPException(status_code=400, detail={"error": {"code": "status_mismatch", "message": "Статус из другого проекта"}})
     pos = await task_service.next_position(db, body.status_id)
     task = Task(
         title=body.title,
         description=body.description,
         status_id=body.status_id,
+        project_id=project_id,
+        parent_id=body.parent_id,
         priority=body.priority,
         author_id=user.id,
         due_date=body.due_date,
@@ -94,7 +153,7 @@ async def create_task(
     await task_service.log_activity(db, task.id, user.id, "created")
     await db.commit()
     task = await task_service.get_task(db, task.id)
-    out = task_to_out(task)  # type: ignore[arg-type]
+    out = await _task_out(db, task)  # type: ignore[arg-type]
     await ws_manager.broadcast("task.created", {"task": out.model_dump(mode="json")})
     return {"task": out}
 
@@ -108,7 +167,7 @@ async def get_task_route(
     task = await task_service.get_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
-    return {"task": task_to_out(task)}
+    return {"task": await _task_out(db, task)}
 
 
 @router.patch("/{task_id}", dependencies=[Depends(verify_csrf)])
@@ -147,17 +206,25 @@ async def update_task(
         await task_service.log_activity(db, task.id, user.id, "status_changed", "status_id", old, str(status.id))
     if body.assignee_ids is not None:
         await db.execute(delete(TaskAssignee).where(TaskAssignee.task_id == task.id))
+        await db.flush()
         for uid in body.assignee_ids:
             db.add(TaskAssignee(task_id=task.id, user_id=uid))
         await task_service.log_activity(db, task.id, user.id, "assignees_changed")
     if body.label_names is not None:
         await db.execute(delete(TaskLabel).where(TaskLabel.task_id == task.id))
+        await db.flush()
         for name in body.label_names:
             label = await task_service.get_or_create_label(db, name.strip())
             db.add(TaskLabel(task_id=task.id, label_id=label.id))
+    if body.archived is True and task.archived_at is None:
+        task.archived_at = datetime.now(UTC)
+        await task_service.log_activity(db, task.id, user.id, "archived")
+    if body.archived is False and task.archived_at is not None:
+        task.archived_at = None
+        await task_service.log_activity(db, task.id, user.id, "unarchived")
     await db.commit()
     task = await task_service.get_task(db, task.id)
-    out = task_to_out(task)  # type: ignore[arg-type]
+    out = await _task_out(db, task)  # type: ignore[arg-type]
     await ws_manager.broadcast("task.updated", {"task": out.model_dump(mode="json")})
     return {"task": out}
 
@@ -180,7 +247,7 @@ async def move_task(
     await task_service.log_activity(db, task.id, user.id, "moved", "status_id", None, str(status.id))
     await db.commit()
     task = await task_service.get_task(db, task.id)
-    out = task_to_out(task)  # type: ignore[arg-type]
+    out = await _task_out(db, task)  # type: ignore[arg-type]
     await ws_manager.broadcast("task.moved", {"task": out.model_dump(mode="json")})
     return {"task": out}
 
@@ -200,6 +267,72 @@ async def delete_task(
     await db.commit()
     await ws_manager.broadcast("task.deleted", {"task_id": str(task_id)})
     return {"ok": True}
+
+
+@router.post("/{task_id}/restore", dependencies=[Depends(verify_csrf)])
+async def restore_task(
+    task_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    q = select(Task).where(Task.id == task_id)
+    task = (await db.execute(q)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    if not task_service.can_delete_task(user, task):
+        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Недостаточно прав"}})
+    task.deleted_at = None
+    task.archived_at = None
+    await task_service.log_activity(db, task.id, user.id, "restored")
+    await db.commit()
+    task = await task_service.get_task(db, task.id)
+    out = await _task_out(db, task)  # type: ignore[arg-type]
+    await ws_manager.broadcast("task.updated", {"task": out.model_dump(mode="json")})
+    return {"task": out}
+
+
+@router.post("/{task_id}/duplicate", dependencies=[Depends(verify_csrf)])
+async def duplicate_task(
+    task_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    source = await task_service.get_task(db, task_id)
+    if not source:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    pos = await task_service.next_position(db, source.status_id)
+    clone = Task(
+        title=f"{source.title} (копия)",
+        description=source.description,
+        status_id=source.status_id,
+        project_id=source.project_id,
+        parent_id=source.parent_id,
+        priority=source.priority,
+        author_id=user.id,
+        due_date=source.due_date,
+        position=pos,
+    )
+    db.add(clone)
+    await db.flush()
+    for a in source.assignees or []:
+        db.add(TaskAssignee(task_id=clone.id, user_id=a.user_id))
+    for tl in source.labels or []:
+        db.add(TaskLabel(task_id=clone.id, label_id=tl.label_id))
+    for item in source.checklist_items or []:
+        db.add(
+            ChecklistItem(
+                task_id=clone.id,
+                title=item.title,
+                is_done=False,
+                position=item.position,
+            )
+        )
+    await task_service.log_activity(db, clone.id, user.id, "created")
+    await db.commit()
+    task = await task_service.get_task(db, clone.id)
+    out = await _task_out(db, task)  # type: ignore[arg-type]
+    await ws_manager.broadcast("task.created", {"task": out.model_dump(mode="json")})
+    return {"task": out}
 
 
 @router.get("/{task_id}/comments")
@@ -247,6 +380,19 @@ async def add_comment(
         mentions=json.dumps([str(x) for x in body.mention_user_ids]),
     )
     db.add(comment)
+    from app.api.v1.notifications import notify_users
+
+    mention_ids = list(body.mention_user_ids)
+    await notify_users(
+        db,
+        user_ids=mention_ids,
+        actor_id=user.id,
+        kind="mention",
+        title=f"Вас упомянули в «{task.title}»",
+        body=body.body[:200],
+        task_id=task_id,
+        project_id=task.project_id,
+    )
     await db.commit()
     await db.refresh(comment, ["author"])
     out = CommentOut(

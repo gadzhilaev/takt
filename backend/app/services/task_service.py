@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models.task import (
     ActivityLog,
     ChecklistItem,
+    Comment,
     Label,
     Task,
     TaskAssignee,
@@ -46,6 +47,9 @@ async def log_activity(
 
 async def apply_status_change(db: AsyncSession, task: Task, new_status: TaskStatus) -> None:
     task.status_id = new_status.id
+    # Keep loaded relationship in sync — otherwise serializers return a stale nested status
+    # until the identity map is expired/refetched.
+    task.status = new_status
     if new_status.is_done:
         task.closed_at = datetime.now(UTC)
     else:
@@ -73,10 +77,22 @@ async def list_tasks(
     due_before: datetime | None = None,
     due_after: datetime | None = None,
     mine_user_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
+    parent_id: uuid.UUID | None = None,
+    include_archived: bool = False,
+    roots_only: bool = True,
     page: int = 1,
     page_size: int = 500,
 ) -> tuple[list[Task], int]:
     q = task_query_base()
+    if not include_archived:
+        q = q.where(Task.archived_at.is_(None))
+    if roots_only and parent_id is None:
+        q = q.where(Task.parent_id.is_(None))
+    if parent_id is not None:
+        q = q.where(Task.parent_id == parent_id)
+    if project_id:
+        q = q.where(Task.project_id == project_id)
     if search:
         like = f"%{search}%"
         q = q.where(or_(Task.title.ilike(like), Task.description.ilike(like)))
@@ -104,9 +120,44 @@ async def list_tasks(
 
 
 async def get_task(db: AsyncSession, task_id: uuid.UUID) -> Task | None:
-    q = task_query_base().where(Task.id == task_id)
+    # populate_existing: after delete/replace of assignees/labels in the same session,
+    # selectinload would otherwise reuse a stale empty collection from the identity map.
+    q = (
+        task_query_base()
+        .where(Task.id == task_id)
+        .execution_options(populate_existing=True)
+    )
     result = await db.execute(q)
     return result.scalar_one_or_none()
+
+
+async def comment_counts_for(db: AsyncSession, task_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    if not task_ids:
+        return {}
+    rows = await db.execute(
+        select(Comment.task_id, func.count())
+        .where(Comment.task_id.in_(task_ids))
+        .group_by(Comment.task_id)
+    )
+    return {tid: int(cnt) for tid, cnt in rows.all()}
+
+
+async def subtask_stats_for(
+    db: AsyncSession, task_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """Return {parent_id: (total, done)} for open (non-deleted) children."""
+    if not task_ids:
+        return {}
+    rows = await db.execute(
+        select(
+            Task.parent_id,
+            func.count(),
+            func.count().filter(Task.closed_at.isnot(None)),
+        )
+        .where(Task.parent_id.in_(task_ids), Task.deleted_at.is_(None))
+        .group_by(Task.parent_id)
+    )
+    return {pid: (int(total), int(done or 0)) for pid, total, done in rows.all()}
 
 
 async def next_position(db: AsyncSession, status_id: uuid.UUID) -> float:

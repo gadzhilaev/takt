@@ -13,7 +13,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    APP_NAME: str = "Трекер задач"
+    APP_NAME: str = "Takt"
     ENV: str = "development"
     DEBUG: bool = False
 

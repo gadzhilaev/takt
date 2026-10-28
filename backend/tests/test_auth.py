@@ -49,3 +49,14 @@ async def test_member_cannot_admin(client: AsyncClient):
     csrf2 = client.cookies.get("csrf_token")
     r = await client.get("/api/v1/admin/users", headers={"X-CSRF-Token": csrf2 or ""})
     assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_tasks_denied(client: AsyncClient):
+    r = await client.get("/api/v1/tasks")
+    assert r.status_code == 401
+    fake = "00000000-0000-0000-0000-000000000001"
+    r2 = await client.get(f"/api/v1/tasks/{fake}")
+    assert r2.status_code == 401
+    r3 = await client.post("/api/v1/tasks", json={"title": "x", "status_id": fake})
+    assert r3.status_code == 401

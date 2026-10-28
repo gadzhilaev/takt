@@ -1,19 +1,32 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.task import TaskPriority
 
 
+def _as_str(value: Any) -> str:
+    return str(value) if value is not None else value
+
+
 class StatusOut(BaseModel):
-    id: str  # UUID from ORM
+    id: str
     name: str
     color: str
     position: float
     is_done: bool
+    project_id: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @field_validator("id", "project_id", mode="before")
+    @classmethod
+    def coerce_id(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        return _as_str(value)
 
 
 class LabelOut(BaseModel):
@@ -22,6 +35,11 @@ class LabelOut(BaseModel):
     color: str
 
     model_config = {"from_attributes": True}
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def coerce_id(cls, value: Any) -> str:
+        return _as_str(value)
 
 
 class UserBrief(BaseModel):
@@ -38,9 +56,16 @@ class ChecklistItemOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("id", mode="before")
+    @classmethod
+    def coerce_id(cls, value: Any) -> str:
+        return _as_str(value)
+
 
 class TaskOut(BaseModel):
     id: str
+    project_id: str | None = None
+    parent_id: str | None = None
     title: str
     description: str | None
     status_id: str
@@ -50,6 +75,7 @@ class TaskOut(BaseModel):
     author: UserBrief | None = None
     due_date: datetime | None
     closed_at: datetime | None
+    archived_at: datetime | None = None
     position: float
     created_at: datetime
     updated_at: datetime
@@ -58,11 +84,16 @@ class TaskOut(BaseModel):
     checklist_items: list[ChecklistItemOut] = []
     checklist_done: int = 0
     checklist_total: int = 0
+    comment_count: int = 0
+    subtask_total: int = 0
+    subtask_done: int = 0
 
 
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     status_id: UUID
+    project_id: UUID | None = None
+    parent_id: UUID | None = None
     priority: TaskPriority = TaskPriority.medium
     description: str | None = None
     due_date: datetime | None = None
@@ -79,6 +110,9 @@ class TaskUpdate(BaseModel):
     position: float | None = None
     assignee_ids: list[UUID] | None = None
     label_names: list[str] | None = None
+    project_id: UUID | None = None
+    parent_id: UUID | None = None
+    archived: bool | None = None
 
 
 class TaskMove(BaseModel):

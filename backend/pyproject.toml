@@ -1,5 +1,5 @@
 [project]
-name = "track-backend"
+name = "takt-backend"
 version = "1.0.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -29,6 +29,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100

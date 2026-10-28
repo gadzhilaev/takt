@@ -130,7 +130,8 @@ def build_report_workbook(
         wu.write(r, 2, u.get("closed", 0), fmt)
         wu.write(r, 3, u.get("in_progress", 0), fmt)
         wu.write(r, 4, u.get("overdue", 0), fmt)
-        wu.write(r, 5, u.get("on_time_pct", 0), fmt)
+        pct = u.get("on_time_pct")
+        wu.write(r, 5, "—" if pct is None else pct, fmt)
     total_row = len(by_user) + 1
     wu.write(total_row, 0, "Итого", header_fmt)
     for c in range(1, 5):
