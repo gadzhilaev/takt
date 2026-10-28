@@ -1,30 +1,25 @@
 "use client";
 
-import { KanbanBoard } from "@/components/kanban-board";
-import { Button } from "@/components/ui/button";
-export default function BoardPage() {
-  async function exportTasks() {
-    const res = await fetch("/api/v1/reports/export", { credentials: "include" });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "export.xlsx";
-    a.click();
-  }
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { api } from "@/lib/api";
+import type { Project } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Доска</h1>
-          <p className="text-sm text-slate-500">Перетаскивайте карточки или меняйте статус в задаче</p>
-        </div>
-        <Button variant="secondary" onClick={exportTasks}>
-          Экспорт задач
-        </Button>
-      </div>
-      <KanbanBoard />
-    </div>
-  );
+export default function BoardRedirectPage() {
+  const router = useRouter();
+  const { data } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api<{ items: Project[] }>("/api/v1/projects"),
+  });
+
+  useEffect(() => {
+    const items = data?.items ?? [];
+    if (!items.length) return;
+    const def = items.find((p) => p.is_default) ?? items[0];
+    router.replace(`/projects/${def.id}`);
+  }, [data, router]);
+
+  return <Skeleton className="h-40 w-full" />;
 }
