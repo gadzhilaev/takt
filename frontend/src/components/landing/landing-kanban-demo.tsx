@@ -68,13 +68,13 @@ export function LandingKanbanDemo({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[#E9EDF2] shadow-[0_12px_40px_rgba(32,41,56,0.08)]",
+        "overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--kanban-board-bg)] shadow-[0_12px_40px_rgba(32,41,56,0.08)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
         className
       )}
       role="img"
       aria-label="Пример доски Takt: четыре столбца с задачами"
     >
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-white px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
         <div>
           <p className="text-[13px] font-semibold text-[var(--foreground)]">Команда продукта</p>
           <p className="text-[12px] text-muted">Демонстрационная доска</p>
@@ -99,7 +99,7 @@ export function LandingKanbanDemo({ className }: { className?: string }) {
               {col.tasks.map((task) => (
                 <li
                   key={task.title}
-                  className="rounded-[var(--radius-sm)] border border-[var(--kanban-card-border)] bg-white p-2.5 shadow-[var(--kanban-card-shadow)]"
+                  className="rounded-[var(--radius-sm)] border border-[var(--kanban-card-border)] bg-[var(--kanban-card-bg)] p-2.5 shadow-[var(--kanban-card-shadow)]"
                 >
                   <p
                     className={cn(
@@ -115,7 +115,7 @@ export function LandingKanbanDemo({ className }: { className?: string }) {
                       {task.assignees.map((a) => (
                         <span
                           key={a}
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white bg-[var(--accent-soft)] text-[9px] font-semibold text-[var(--accent)]"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--surface)] bg-[var(--accent-soft)] text-[9px] font-semibold text-[var(--accent)]"
                         >
                           {a}
                         </span>

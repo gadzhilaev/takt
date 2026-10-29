@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand-mark";
 import { AppIcon } from "@/components/ui/app-icon";
 import { LandingKanbanDemo } from "@/components/landing/landing-kanban-demo";
+import { LandingThemeToggle } from "@/components/landing/landing-theme-toggle";
 import { paths } from "@/lib/paths";
 
 const FEATURES = [
@@ -70,8 +71,8 @@ const FAQ = [
 
 export function LandingPage() {
   return (
-    <div className="takt-landing min-h-screen bg-[#F7F8FA] text-[var(--foreground)]">
-      <header className="sticky top-0 z-40 border-b border-[var(--border)]/80 bg-[#F7F8FA]/90 backdrop-blur-md">
+    <div className="takt-landing min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)]/80 bg-[var(--background)]/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link href={paths.home} className="inline-flex min-w-0" aria-label="Takt — на главную">
             <BrandLogo className="h-7 w-auto max-w-[9.5rem]" />
@@ -87,16 +88,17 @@ export function LandingPage() {
               FAQ
             </a>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <LandingThemeToggle />
             <Link
               href={paths.login}
-              className="hidden h-9 items-center rounded-[var(--radius)] px-3 text-[13px] font-semibold text-foreground hover:bg-black/[0.04] sm:inline-flex"
+              className="hidden h-9 items-center rounded-full px-3 text-[13px] font-semibold text-foreground hover:bg-[var(--surface-2)] sm:inline-flex"
             >
               Войти
             </Link>
             <Link
               href={paths.register}
-              className="inline-flex h-9 items-center rounded-[var(--radius)] bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white hover:brightness-[0.96]"
+              className="inline-flex h-9 items-center rounded-full bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white hover:brightness-[0.96]"
             >
               Начать бесплатно
             </Link>
@@ -125,13 +127,13 @@ export function LandingPage() {
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <Link
                   href={paths.register}
-                  className="inline-flex h-11 items-center justify-center rounded-[var(--radius)] bg-[var(--accent)] px-5 text-[14px] font-semibold text-white hover:brightness-[0.96]"
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-5 text-[14px] font-semibold text-white hover:brightness-[0.96]"
                 >
                   Начать бесплатно
                 </Link>
                 <Link
                   href={paths.login}
-                  className="inline-flex h-11 items-center justify-center rounded-[var(--radius)] border border-[var(--border-strong)] bg-white px-5 text-[14px] font-semibold text-foreground hover:bg-[var(--surface-2)]"
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-[14px] font-semibold text-foreground hover:bg-[var(--surface-2)]"
                 >
                   Войти
                 </Link>
@@ -151,7 +153,7 @@ export function LandingPage() {
             </div>
             <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {FEATURES.map((f) => (
-                <li key={f.title} className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-5">
+                <li key={f.title} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--accent-soft)] text-[var(--accent)]">
                     <AppIcon name={f.icon} size={18} />
                   </span>
@@ -163,7 +165,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="how" className="scroll-mt-20 border-b border-[var(--border)] bg-white py-16 sm:py-20">
+        <section id="how" className="scroll-mt-20 border-b border-[var(--border)] bg-[var(--surface)] py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="max-w-2xl">
               <h2 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem]">Как работает Takt</h2>
@@ -204,15 +206,15 @@ export function LandingPage() {
                 </li>
               </ul>
             </div>
-            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-6 sm:p-8">
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
               <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">Платформы</p>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[#F7F8FA] p-4">
+                <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
                   <AppIcon name="monitor" size={20} className="text-[var(--accent)]" />
                   <p className="mt-3 text-[15px] font-semibold">Web</p>
                   <p className="mt-1 text-[13px] text-muted">Работает в современном браузере, один домен для входа и доски.</p>
                 </div>
-                <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[#F7F8FA] p-4">
+                <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
                   <AppIcon name="profile" size={20} className="text-[var(--accent)]" />
                   <p className="mt-3 text-[15px] font-semibold">iOS и Android</p>
                   <p className="mt-1 text-[13px] text-muted">
@@ -224,7 +226,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="faq" className="scroll-mt-20 border-b border-[var(--border)] bg-white py-16 sm:py-20">
+        <section id="faq" className="scroll-mt-20 border-b border-[var(--border)] bg-[var(--surface)] py-16 sm:py-20">
           <div className="mx-auto max-w-3xl px-4 sm:px-6">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem]">Частые вопросы</h2>
             <div className="mt-8 divide-y divide-[var(--border)] border-y border-[var(--border)]">
@@ -256,13 +258,13 @@ export function LandingPage() {
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href={paths.register}
-                className="inline-flex h-11 items-center rounded-[var(--radius)] bg-[var(--accent)] px-5 text-[14px] font-semibold text-white hover:brightness-[0.96]"
+                className="inline-flex h-11 items-center rounded-full bg-[var(--accent)] px-5 text-[14px] font-semibold text-white hover:brightness-[0.96]"
               >
                 Начать бесплатно
               </Link>
               <Link
                 href={paths.login}
-                className="inline-flex h-11 items-center rounded-[var(--radius)] border border-[var(--border-strong)] bg-white px-5 text-[14px] font-semibold hover:bg-[var(--surface-2)]"
+                className="inline-flex h-11 items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-[14px] font-semibold hover:bg-[var(--surface-2)]"
               >
                 Войти
               </Link>
@@ -271,7 +273,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-[var(--border)] bg-white">
+      <footer className="border-t border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 md:flex-row md:justify-between">
           <div>
             <BrandLogo className="h-6 w-auto max-w-[8rem]" />
