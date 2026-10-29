@@ -81,6 +81,7 @@ async def list_tasks(
     due_after: datetime | None = None,
     mine_user_id: uuid.UUID | None = None,
     project_id: uuid.UUID | None = None,
+    project_ids: list[uuid.UUID] | None = None,
     parent_id: uuid.UUID | None = None,
     include_archived: bool = False,
     roots_only: bool = True,
@@ -96,6 +97,10 @@ async def list_tasks(
         q = q.where(Task.parent_id == parent_id)
     if project_id:
         q = q.where(Task.project_id == project_id)
+    elif project_ids is not None:
+        if not project_ids:
+            return [], 0
+        q = q.where(Task.project_id.in_(project_ids))
     if search:
         like = f"%{search}%"
         q = q.where(or_(Task.title.ilike(like), Task.description.ilike(like)))

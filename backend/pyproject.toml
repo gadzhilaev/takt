@@ -37,3 +37,8 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Forward refs в relationship() — строки-имена моделей без локального импорта.
+"app/models/**/*.py" = ["F821"]
+"app/models/*.py" = ["F821"]

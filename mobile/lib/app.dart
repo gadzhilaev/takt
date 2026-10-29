@@ -14,6 +14,7 @@ import 'core/theme_scope.dart';
 import 'core/token_storage.dart';
 import 'features/auth/cubit/auth_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/auth/data/oauth_repository.dart';
 import 'features/board/cubit/board_cubit.dart';
 import 'features/board/data/board_repository.dart';
 import 'features/notifications/data/notifications_repository.dart';
@@ -47,6 +48,9 @@ class TaktApp extends StatefulWidget {
 class _TaktAppState extends State<TaktApp> {
   late final WidgetSync _widgetSync;
   late final AuthRepository _authRepo;
+  late final ProjectsRepository _projects;
+  late final BoardRepository _board;
+  late final OAuthRepository _oauth;
   late final AuthCubit _authCubit;
   late final BoardCubit _boardCubit;
   late final NotificationsRepository _notifications;
@@ -59,6 +63,9 @@ class _TaktAppState extends State<TaktApp> {
     _widgetSync = WidgetSync();
     _themeController = ThemeController()..load();
     _authRepo = AuthRepository(api: widget.api, tokens: widget.tokens);
+    _projects = ProjectsRepository(widget.api);
+    _board = BoardRepository(widget.api);
+    _oauth = OAuthRepository(widget.api);
     _notifications = NotificationsRepository(widget.api);
     _authCubit = AuthCubit(
       auth: _authRepo,
@@ -66,10 +73,9 @@ class _TaktAppState extends State<TaktApp> {
       widgetSync: _widgetSync,
       fcm: widget.fcm,
     )..bootstrap();
-    final projects = ProjectsRepository(widget.api);
     _boardCubit = BoardCubit(
-      board: BoardRepository(widget.api),
-      projects: projects,
+      board: _board,
+      projects: _projects,
       api: widget.api,
       widgetSync: _widgetSync,
     );
@@ -116,8 +122,9 @@ class _TaktAppState extends State<TaktApp> {
       providers: [
         RepositoryProvider.value(value: widget.api),
         RepositoryProvider.value(value: _authRepo),
-        RepositoryProvider.value(value: ProjectsRepository(widget.api)),
-        RepositoryProvider.value(value: BoardRepository(widget.api)),
+        RepositoryProvider.value(value: _projects),
+        RepositoryProvider.value(value: _board),
+        RepositoryProvider.value(value: _oauth),
         RepositoryProvider.value(value: _notifications),
         RepositoryProvider.value(value: ProfileRepository(widget.api)),
         RepositoryProvider.value(value: _widgetSync),

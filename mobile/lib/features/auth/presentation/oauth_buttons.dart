@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../core/api_client.dart';
 import '../data/oauth_repository.dart';
 
 /// Shows enabled OAuth providers from backend policy (env + admin toggles).
@@ -17,7 +16,6 @@ class OAuthButtons extends StatefulWidget {
 }
 
 class _OAuthButtonsState extends State<OAuthButtons> {
-  OAuthRepository? _repo;
   Map<String, dynamic>? _providers;
   String? _error;
   String? _busy;
@@ -29,10 +27,11 @@ class _OAuthButtonsState extends State<OAuthButtons> {
     'apple': 'assets/brand/oauth/oauth-apple.svg',
   };
 
+  OAuthRepository get _repo => context.read<OAuthRepository>();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _repo ??= OAuthRepository(context.read<ApiClient>());
     if (!_loaded) {
       _loaded = true;
       _load();
@@ -41,7 +40,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
 
   Future<void> _load() async {
     try {
-      final data = await _repo!.providers();
+      final data = await _repo.providers();
       if (!mounted) return;
       setState(() => _providers = data['providers'] as Map<String, dynamic>?);
     } catch (_) {
@@ -56,7 +55,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
       _error = null;
     });
     try {
-      await _repo!.startWebOAuth(id, link: widget.link);
+      await _repo.startWebOAuth(id, link: widget.link);
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Не удалось открыть $label');

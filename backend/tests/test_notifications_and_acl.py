@@ -148,6 +148,39 @@ async def test_delete_column_moves_tasks(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_task_endpoints_require_project_membership(client: AsyncClient):
+    """Пользователь без членства не читает и не меняет чужие задачи (IDOR)."""
+    await _register(client, "Owner ACL", "owner-acl@example.com")
+    await client.post("/api/v1/auth/logout")
+    await _register(client, "Stranger ACL", "stranger-acl@example.com")
+    await client.post("/api/v1/auth/logout")
+
+    await _login(client, "owner-acl@example.com", "SecurePass123!")
+    proj = await client.post(
+        "/api/v1/projects",
+        json={"name": "Private ACL", "description": None, "color": "#315F72"},
+    )
+    assert proj.status_code == 200, proj.text
+    pid = proj.json()["project"]["id"]
+    statuses = (await client.get(f"/api/v1/settings/statuses?project_id={pid}")).json()["items"]
+    created = await client.post(
+        "/api/v1/tasks",
+        json={"title": "Secret", "status_id": statuses[0]["id"], "project_id": pid},
+    )
+    task_id = created.json()["task"]["id"]
+
+    await _login(client, "stranger-acl@example.com", "SecurePass123!")
+    assert (await client.get(f"/api/v1/tasks/{task_id}")).status_code == 403
+    assert (await client.get(f"/api/v1/tasks/{task_id}/comments")).status_code == 403
+    listed = await client.get("/api/v1/tasks")
+    assert listed.status_code == 200
+    assert all(t["id"] != task_id for t in listed.json()["items"])
+    assert (
+        await client.patch(f"/api/v1/tasks/{task_id}", json={"title": "Hacked"})
+    ).status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_ru_assignment_copy():
     from app.services.ru_names import format_assignment_title, format_completed_title
 

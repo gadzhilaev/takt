@@ -8,11 +8,11 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth_cookies import set_auth_cookies, user_public
 from app.api.deps import get_current_user, get_current_user_optional, verify_csrf
-from app.api.v1.auth import _set_auth_cookies, _user_public
 from app.core.config import get_settings
 from app.core.limiter import limiter
 from app.db.session import get_db
@@ -113,7 +113,7 @@ async def _finish_web(
 
     # New OAuth users land in workspace the same as email registration.
     redirect = RedirectResponse(f"{settings.APP_PUBLIC_URL}/app/projects", status_code=302)
-    _set_auth_cookies(redirect, access, refresh)
+    set_auth_cookies(redirect, access, refresh)
     return redirect
 
 
@@ -211,9 +211,9 @@ async def oauth_mobile(
         raise _oauth_http(e)
 
     # Mobile prefers tokens in JSON; also set cookies for hybrid webviews.
-    _set_auth_cookies(response, access, refresh)
+    set_auth_cookies(response, access, refresh)
     return {
-        "user": _user_public(u),
+        "user": user_public(u),
         "access_token": access,
         "refresh_token": refresh,
         "created": created,

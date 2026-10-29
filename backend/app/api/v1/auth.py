@@ -4,10 +4,10 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth_cookies import set_auth_cookies, user_public
 from app.api.deps import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user, verify_csrf
-from app.api.serializers import avatar_url
 from app.core.config import get_settings
-from app.core.csrf import CSRF_COOKIE, generate_csrf_token
+from app.core.csrf import CSRF_COOKIE
 from app.core.limiter import limiter
 from app.core.security import decode_token, hash_password, verify_password
 from app.db.session import get_db
@@ -20,60 +20,15 @@ from app.schemas.auth import (
     LoginRequest,
     RegisterConfirmRequest,
     RegisterRequest,
-    UserPublic,
 )
 from app.services import auth_service, invite_service
 from app.services.email_code_service import EmailCodeError, consume_code, create_and_send_code
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-
-def _set_auth_cookies(response: Response, access: str, refresh: str) -> None:
-    settings = get_settings()
-    common: dict = {
-        "httponly": True,
-        "secure": settings.COOKIE_SECURE,
-        "samesite": "lax",
-        "path": "/",
-    }
-    if settings.COOKIE_DOMAIN:
-        common["domain"] = settings.COOKIE_DOMAIN
-    response.set_cookie(
-        ACCESS_COOKIE,
-        access,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        **common,
-    )
-    response.set_cookie(
-        REFRESH_COOKIE,
-        refresh,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
-        **common,
-    )
-    csrf = generate_csrf_token()
-    response.set_cookie(
-        CSRF_COOKIE,
-        csrf,
-        max_age=86400 * 7,
-        httponly=False,
-        secure=settings.COOKIE_SECURE,
-        samesite="lax",
-        path="/",
-    )
-
-
-def _user_public(user: User) -> UserPublic:
-    from app.api.deps import effective_platform_role
-
-    return UserPublic(
-        id=str(user.id),
-        email=user.email,
-        name=user.name,
-        role=user.role.value,
-        platform_role=effective_platform_role(user).value,
-        avatar_url=avatar_url(user),
-        must_change_password=user.must_change_password,
-    )
+# Back-compat aliases for older imports / tests
+_set_auth_cookies = set_auth_cookies
+_user_public = user_public
 
 
 def _http_from_email_code(e: EmailCodeError) -> HTTPException:
@@ -167,9 +122,9 @@ async def register_confirm(
     await invite_service.link_pending_invites_to_user(db, user)
     access, refresh, _ = await auth_service.create_token_pair(db, user)
     await db.commit()
-    _set_auth_cookies(response, access, refresh)
+    set_auth_cookies(response, access, refresh)
     return {
-        "user": _user_public(user),
+        "user": user_public(user),
         "access_token": access,
         "refresh_token": refresh,
         "token_type": "bearer",
@@ -220,9 +175,9 @@ async def login(
         )
     access, refresh, _ = await auth_service.create_token_pair(db, user)
     await db.commit()
-    _set_auth_cookies(response, access, refresh)
+    set_auth_cookies(response, access, refresh)
     return {
-        "user": _user_public(user),
+        "user": user_public(user),
         "access_token": access,
         "refresh_token": refresh,
         "token_type": "bearer",
@@ -248,7 +203,7 @@ async def logout(
 
 @router.get("/me")
 async def me(user: Annotated[User, Depends(get_current_user)]):
-    return {"user": _user_public(user)}
+    return {"user": user_public(user)}
 
 
 @router.post("/refresh")
@@ -279,9 +234,9 @@ async def refresh(
     except auth_service.AuthError as e:
         raise HTTPException(status_code=401, detail={"error": {"code": e.code, "message": e.message}})
     await db.commit()
-    _set_auth_cookies(response, access, new_refresh)
+    set_auth_cookies(response, access, new_refresh)
     return {
-        "user": _user_public(user),
+        "user": user_public(user),
         "access_token": access,
         "refresh_token": new_refresh,
         "token_type": "bearer",

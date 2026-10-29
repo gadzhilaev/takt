@@ -37,6 +37,30 @@ from app.services.websocket_hub import ws_manager
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
+async def _require_task_project_access(
+    db: AsyncSession,
+    user: User,
+    task: Task,
+    *,
+    min_role: ProjectMemberRole = ProjectMemberRole.viewer,
+) -> None:
+    """Задача доступна только участникам её проекта (RBAC на стороне API)."""
+    from app.services import project_service
+
+    if not task.project_id:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "forbidden", "message": "Нет доступа к задаче"}},
+        )
+    try:
+        await project_service.ensure_project_access(db, user, task.project_id, min_role=min_role)
+    except PermissionError:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "forbidden", "message": "Нет доступа к проекту"}},
+        )
+
+
 async def _user_names(db: AsyncSession, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
     if not user_ids:
         return {}
@@ -103,6 +127,7 @@ async def list_tasks_route(
 ):
     from app.services import project_service
 
+    scoped_project_ids: list[uuid.UUID] | None = None
     if project_id:
         try:
             await project_service.ensure_project_access(db, user, project_id)
@@ -111,6 +136,10 @@ async def list_tasks_route(
                 status_code=403,
                 detail={"error": {"code": "forbidden", "message": "Нет доступа к проекту"}},
             )
+    else:
+        # Без project_id не отдаём чужие проекты — только доступные пользователю.
+        accessible = await project_service.list_projects_for_user(db, user)
+        scoped_project_ids = [p.id for p in accessible]
     tasks, total = await task_service.list_tasks(
         db,
         search=search,
@@ -119,6 +148,7 @@ async def list_tasks_route(
         assignee_id=assignee_id,
         label_id=label_id,
         project_id=project_id,
+        project_ids=scoped_project_ids,
         parent_id=parent_id,
         roots_only=parent_id is None,
         include_archived=include_archived,
@@ -215,6 +245,7 @@ async def get_task_route(
     task = await task_service.get_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task)
     return {"task": await _task_out(db, task)}
 
 
@@ -228,6 +259,7 @@ async def update_task(
     task = await task_service.get_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     if body.title is not None:
         await task_service.log_activity(db, task.id, user.id, "updated", "title", task.title, body.title)
         task.title = body.title
@@ -303,6 +335,7 @@ async def move_task(
     task = await task_service.get_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     status = await task_service.get_status(db, body.status_id)
     if not status:
         raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
@@ -327,6 +360,7 @@ async def delete_task(
     task = await task_service.get_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     if not task_service.can_delete_task(user, task):
         raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Можно удалять только свои задачи"}})
     await task_service.soft_delete_task(db, task)
@@ -345,6 +379,7 @@ async def restore_task(
     task = (await db.execute(q)).scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     if not task_service.can_delete_task(user, task):
         raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Недостаточно прав"}})
     task.deleted_at = None
@@ -366,6 +401,7 @@ async def duplicate_task(
     source = await task_service.get_task(db, task_id)
     if not source:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, source, min_role=ProjectMemberRole.member)
     pos = await task_service.next_position(db, source.status_id)
     clone = Task(
         title=f"{source.title} (копия)",
@@ -407,6 +443,10 @@ async def list_comments(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task)
     q = (
         select(Comment)
         .options(selectinload(Comment.author))
@@ -439,6 +479,7 @@ async def add_comment(
     task = await db.get(Task, task_id)
     if not task or task.deleted_at:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     comment = Comment(
         task_id=task_id,
         author_id=user.id,
@@ -478,6 +519,10 @@ async def activity(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task)
     q = (
         select(ActivityLog)
         .options(selectinload(ActivityLog.user))
@@ -508,6 +553,10 @@ async def add_checklist(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     max_pos = await db.scalar(
         select(ChecklistItem.position).where(ChecklistItem.task_id == task_id).order_by(ChecklistItem.position.desc())
     )
@@ -525,6 +574,10 @@ async def update_checklist(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     item = await db.get(ChecklistItem, item_id)
     if not item or item.task_id != task_id:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
