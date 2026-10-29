@@ -40,7 +40,7 @@ export async function loginUi(page: Page) {
   await page.locator("#login-email").fill(E2E_USER.email);
   await page.locator("#login-password").fill(E2E_USER.password);
   await page.getByRole("button", { name: /войти/i }).click();
-  await expect(page).toHaveURL(/\/projects/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/app\/projects/, { timeout: 15_000 });
 }
 
 function csrfFromLogin(login: { headersArray: () => { name: string; value: string }[] }) {

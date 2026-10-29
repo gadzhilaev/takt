@@ -21,6 +21,14 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasProject = context.watch<BoardCubit>().state.project != null;
+    // Shell с «Мои задачи» только когда проект выбран; иначе — на хаб.
+    if (!hasProject && navigationShell.currentIndex == 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/projects');
+      });
+    }
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: TaktBottomNav(
@@ -30,7 +38,6 @@ class AppShell extends StatelessWidget {
             icon: AppIcons.home,
             selected: navigationShell.currentIndex == 0,
             onTap: () {
-              final hasProject = context.read<BoardCubit>().state.project != null;
               if (hasProject) {
                 _goBranch(0);
               } else {
@@ -38,12 +45,13 @@ class AppShell extends StatelessWidget {
               }
             },
           ),
-          TaktBottomNavItem(
-            label: 'Мои задачи',
-            icon: AppIcons.myTasks,
-            selected: navigationShell.currentIndex == 1,
-            onTap: () => _goBranch(1),
-          ),
+          if (hasProject)
+            TaktBottomNavItem(
+              label: 'Мои задачи',
+              icon: AppIcons.myTasks,
+              selected: navigationShell.currentIndex == 1,
+              onTap: () => _goBranch(1),
+            ),
           TaktBottomNavItem(
             label: 'Профиль',
             icon: AppIcons.profile,

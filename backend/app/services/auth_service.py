@@ -66,11 +66,13 @@ async def authenticate_user(
     check_login_lockout(email, ip, max_attempts, lock_minutes)
     result = await db.execute(select(User).where(User.email == email.lower()))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(user.password_hash, password):
+    if not user or not user.password_hash or not verify_password(user.password_hash, password):
         record_failed_login(email, ip, max_attempts, lock_minutes)
         raise AuthError("invalid_credentials", "Неверный email или пароль")
     if not user.is_active:
         raise AuthError("inactive", "Учётная запись отключена")
+    if user.blocked_until and user.blocked_until > datetime.now(UTC):
+        raise AuthError("blocked", "Учётная запись временно ограничена")
     # Demo staff profiles (is_demo) cannot log in — except the dedicated DEMO_USER_EMAIL viewer.
     from app.core.config import get_settings
 

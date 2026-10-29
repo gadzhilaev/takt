@@ -43,8 +43,8 @@ cd mobile && flutter analyze && flutter test
 
 ## Статус (обновлено 2026-10-29)
 
-**Prod:** https://taktapp.ru на VPS `5.129.221.12` (`/opt/takt`, edge nginx + LE). Секреты: `.env` (VAPID, SMTP.BZ API, admin), `secrets/firebase-adminsdk.json`. Mobile API default → `https://taktapp.ru`.
+**Web routes:** `/` landing; `/login` `/register`; workspace `/app/*`; **платформенная админка** `/admin` (не project_admin). Миграция `012`: `platform_role`, OAuth identities, moderation, activity events.
 
-**Auth email OTP:** регистрация и смена пароля — код на почту (`011` `email_codes`, smtp.bz HTTP API; на VPS SMTP-порты закрыты). FROM пока `noreply@tarazpay.am` → после верификации `taktapp.ru` в smtp.bz сменить на `noreply@taktapp.ru`.
+**OAuth:** Apple / VK ID / Яндекс ID — каркас API + UI; credentials в `.env` (см. `docs/OAUTH_SETUP.md`). По умолчанию выключены; для оператора РФ Apple блокируется политикой до юр. решения (149-ФЗ). Реальный вход провайдеров **не** помечать готовым без smoke-теста.
 
-Иконки Lucide; leave-request `010`; notifications drawer; VAPID. Commit/push только по разрешению.
+**Prod:** https://taktapp.ru. Commit/push/deploy только по разрешению.

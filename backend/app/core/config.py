@@ -67,9 +67,40 @@ class Settings(BaseSettings):
     EMAIL_CODE_RESEND_SECONDS: int = 60
     EMAIL_CODE_MAX_ATTEMPTS: int = 5
 
+    # OAuth / OIDC — secrets stay server-side only. Empty = provider disabled.
+    OAUTH_WEB_REDIRECT_URI: str = "http://localhost:3000/api/v1/auth/oauth/callback"
+    OAUTH_MOBILE_REDIRECT_URI: str = "takt://oauth/callback"
+    OAUTH_ALLOWED_REDIRECT_URIS: str = (
+        "http://localhost:3000/api/v1/auth/oauth/callback,"
+        "https://taktapp.ru/api/v1/auth/oauth/callback,"
+        "takt://oauth/callback"
+    )
+    # Operator jurisdiction hint for auth-method policy (ru | global | unset).
+    # Does NOT geo-block users by IP. Legal review required before enabling Apple for RU audience.
+    OAUTH_OPERATOR_REGION: str = "unset"
+    OAUTH_APPLE_ENABLED: bool = False
+    OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR: bool = False  # safe default under 149-FZ considerations
+    OAUTH_APPLE_CLIENT_ID: str = ""  # Services ID (web) / bundle id handled separately for native
+    OAUTH_APPLE_TEAM_ID: str = ""
+    OAUTH_APPLE_KEY_ID: str = ""
+    OAUTH_APPLE_PRIVATE_KEY: str = ""  # PEM contents or path — never commit real key
+    OAUTH_APPLE_PRIVATE_KEY_FILE: str = ""
+    OAUTH_VK_ENABLED: bool = False
+    OAUTH_VK_CLIENT_ID: str = ""
+    OAUTH_VK_CLIENT_SECRET: str = ""
+    OAUTH_YANDEX_ENABLED: bool = False
+    OAUTH_YANDEX_CLIENT_ID: str = ""
+    OAUTH_YANDEX_CLIENT_SECRET: str = ""
+    # Encrypt MFA secrets at rest (Fernet key or derived from SECRET_KEY)
+    MFA_FERNET_KEY: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def oauth_redirect_allowlist(self) -> list[str]:
+        return [u.strip() for u in self.OAUTH_ALLOWED_REDIRECT_URIS.split(",") if u.strip()]
 
 
 @lru_cache

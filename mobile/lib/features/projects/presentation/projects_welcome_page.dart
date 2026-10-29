@@ -14,7 +14,7 @@ import '../../board/cubit/board_cubit.dart';
 import '../../notifications/data/notifications_repository.dart';
 import '../../shell/takt_bottom_nav.dart';
 
-/// Welcome / project picker — has its own bottom nav (Главная / Профиль).
+/// Welcome / project picker. Full shell nav (with «Мои задачи») only after a project is open.
 class ProjectsWelcomePage extends StatefulWidget {
   const ProjectsWelcomePage({super.key});
 
@@ -158,6 +158,7 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                       onCreateProject: _createProject,
                       onProjectsChanged: () => context.read<BoardCubit>().refreshProjects(),
                     ),
+          // Без «Мои задачи», пока проект не выбран — только Главная / Профиль.
           bottomNavigationBar: TaktBottomNav(
             items: [
               TaktBottomNavItem(
@@ -165,12 +166,6 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                 icon: AppIcons.home,
                 selected: true,
                 onTap: () {},
-              ),
-              TaktBottomNavItem(
-                label: 'Мои задачи',
-                icon: AppIcons.myTasks,
-                selected: false,
-                onTap: () => context.go('/my-tasks'),
               ),
               TaktBottomNavItem(
                 label: 'Профиль',

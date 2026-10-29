@@ -49,6 +49,7 @@ class UserPublic(BaseModel):
     email: str
     name: str
     role: str
+    platform_role: str = "none"
     avatar_url: str | None
     must_change_password: bool
 

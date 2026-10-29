@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
 import { disableWebPush, enableWebPush, getPushStatus } from "@/lib/web-push";
+import { OAuthButtons } from "@/components/oauth/oauth-buttons";
 
 export function ProfileDrawer({
   open,
@@ -135,7 +136,7 @@ export function ProfileDrawer({
 
   async function logout() {
     await api("/api/v1/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push("/");
   }
 
   if (!open) return null;
@@ -227,7 +228,7 @@ export function ProfileDrawer({
                   if (onOpenNotifications) onOpenNotifications();
                   else {
                     onClose();
-                    router.push("/inbox");
+                    router.push("/app/inbox");
                   }
                 }}
               >
@@ -359,6 +360,8 @@ export function ProfileDrawer({
             )}
           </div>
 
+          <LinkedAccountsSection />
+
           {msg && <p className="text-sm text-[var(--success)]">{msg}</p>}
           {err && <p className="text-sm text-[var(--danger)]">{err}</p>}
         </div>
@@ -369,6 +372,53 @@ export function ProfileDrawer({
           </Button>
         </div>
       </aside>
+    </div>
+  );
+}
+
+function LinkedAccountsSection() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["oauth-identities"],
+    queryFn: () =>
+      api<{ items: { id: string; provider: string; email: string | null }[]; has_password: boolean }>(
+        "/api/v1/auth/oauth/identities"
+      ),
+  });
+  const unlink = useMutation({
+    mutationFn: (id: string) => api(`/api/v1/auth/oauth/identities/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["oauth-identities"] }),
+  });
+
+  return (
+    <div className="space-y-2 border-t border-hairline pt-4">
+      <p className="text-[13px] font-semibold">Связанные аккаунты</p>
+      <ul className="space-y-1 text-[13px]">
+        {(data?.items ?? []).map((i) => (
+          <li key={i.id} className="flex items-center justify-between gap-2">
+            <span>
+              {i.provider}
+              {i.email ? ` · ${i.email}` : ""}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={unlink.isPending}
+              onClick={() => {
+                if (window.confirm(`Отвязать ${i.provider}?`)) unlink.mutate(i.id);
+              }}
+            >
+              Отвязать
+            </Button>
+          </li>
+        ))}
+        {(data?.items ?? []).length === 0 && <li className="text-muted">Пока нет OAuth-привязок</li>}
+      </ul>
+      {!data?.has_password && (
+        <p className="text-[11px] text-muted">Задайте пароль, прежде чем отвязывать последний способ входа.</p>
+      )}
+      <OAuthButtons mode="link" />
     </div>
   );
 }

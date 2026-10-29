@@ -1,6 +1,6 @@
 /* Takt service worker — Web Push + notification click */
 self.addEventListener("push", (event) => {
-  let data = { title: "Takt", body: "", url: "/projects", tag: "takt" };
+  let data = { title: "Takt", body: "", url: "/app/projects", tag: "takt" };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch (_) {
@@ -10,7 +10,7 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "Takt", {
       body: data.body || "",
       tag: data.tag || "takt",
-      data: { url: data.url || "/projects" },
+      data: { url: data.url || "/app/projects" },
       icon: "/favicon.svg",
       badge: "/favicon.svg",
     })
@@ -19,7 +19,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/projects";
+  const url = (event.notification.data && event.notification.data.url) || "/app/projects";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {

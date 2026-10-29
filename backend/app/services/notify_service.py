@@ -41,8 +41,8 @@ async def create_in_app(
 
 def task_deep_link(project_id: uuid.UUID | None, task_id: uuid.UUID) -> str:
     if project_id:
-        return f"/projects/{project_id}?task={task_id}"
-    return f"/tasks/{task_id}"
+        return f"/app/projects/{project_id}?task={task_id}"
+    return f"/app/tasks/{task_id}"
 
 
 async def notify_assignees(

@@ -68,8 +68,8 @@ export function NotificationsDrawer({
       qc.invalidateQueries({ queryKey: ["notifications"] });
     }
     onClose();
-    if (n.project_id && n.task_id) router.push(`/projects/${n.project_id}?task=${n.task_id}`);
-    else if (n.project_id) router.push(`/projects/${n.project_id}`);
+    if (n.project_id && n.task_id) router.push(`/app/projects/${n.project_id}?task=${n.task_id}`);
+    else if (n.project_id) router.push(`/app/projects/${n.project_id}`);
   }
 
   return (

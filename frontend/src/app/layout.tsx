@@ -10,10 +10,17 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Takt: задачи команды",
-  description: "Командный трекер задач Takt",
+  title: {
+    default: "Takt — работа команды в одном ритме",
+    template: "%s · Takt",
+  },
+  description: "Простой Kanban-менеджер проектов и задач для команды",
+  metadataBase: new URL(process.env.APP_PUBLIC_URL || "https://taktapp.ru"),
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
     apple: [{ url: "/brand/takt-symbol.svg", type: "image/svg+xml" }],
   },
 };

@@ -63,11 +63,14 @@ def _set_auth_cookies(response: Response, access: str, refresh: str) -> None:
 
 
 def _user_public(user: User) -> UserPublic:
+    from app.api.deps import effective_platform_role
+
     return UserPublic(
         id=str(user.id),
         email=user.email,
         name=user.name,
         role=user.role.value,
+        platform_role=effective_platform_role(user).value,
         avatar_url=avatar_url(user),
         must_change_password=user.must_change_password,
     )

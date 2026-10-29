@@ -9,12 +9,18 @@ from app.models.base import Base
 from app.models import (  # noqa: F401
     ActivityLog,
     AdminAuditLog,
+    AdminMfaSecret,
     Attachment,
     ChecklistItem,
     Comment,
+    EmailCode,
     Label,
+    ModerationReport,
+    OAuthLoginState,
+    PlatformSetting,
     ProjectLeaveRequest,
     ProjectLeaveRequestStatus,
+    ProjectRestriction,
     RefreshToken,
     Task,
     TaskAssignee,
@@ -22,6 +28,9 @@ from app.models import (  # noqa: F401
     TaskStatus,
     TeamSettings,
     User,
+    UserActivityEvent,
+    UserBlock,
+    UserIdentity,
 )
 
 config = context.config

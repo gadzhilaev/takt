@@ -4,9 +4,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme.dart';
-import '../../../shared/widgets/takt_app_bar.dart';
 import '../cubit/auth_cubit.dart';
 import '../../../shared/widgets/app_icon.dart';
+import 'oauth_buttons.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -45,8 +45,8 @@ class _LoginPageState extends State<LoginPage> {
       onTap: () => FocusScope.of(context).unfocus(),
       behavior: HitTestBehavior.opaque,
       child: Scaffold(
+        appBar: null,
         backgroundColor: dark ? const Color(0xFF171C22) : const Color(0xFFF4F7F8),
-        appBar: const TaktAppBar(title: 'Вход'),
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -57,7 +57,8 @@ class _LoginPageState extends State<LoginPage> {
                   : const [Color(0xFFE9F1F3), Color(0xFFF4F7F8), Color(0xFFE9EDF2)],
             ),
           ),
-          child: BlocConsumer<AuthCubit, AuthState>(
+          child: SafeArea(
+            child: BlocConsumer<AuthCubit, AuthState>(
               listener: (context, state) {
                 if (state is AuthAuthenticated) context.go('/enable-notifications');
                 if (state is AuthFailure) setState(() => _localError = state.message);
@@ -203,6 +204,7 @@ class _LoginPageState extends State<LoginPage> {
                                                   )
                                                 : const Text('Войти'),
                                           ),
+                                          const OAuthButtons(),
                                         ],
                                       ),
                                     ),
@@ -238,6 +240,7 @@ class _LoginPageState extends State<LoginPage> {
                 );
               },
             ),
+          ),
         ),
       ),
     );

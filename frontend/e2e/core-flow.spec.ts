@@ -7,7 +7,7 @@ test.describe("simple kanban flow", () => {
     const createdIds: string[] = [];
 
     await loginUi(page);
-    await page.goto(`/projects/${projectId}`);
+    await page.goto(`/app/projects/${projectId}`);
     await expect(page).toHaveURL(new RegExp(`projects/${projectId}`), { timeout: 15_000 });
 
     const title = `E2E задача ${Date.now()}`;
@@ -41,7 +41,7 @@ test.describe("simple kanban flow", () => {
     const { projectId, headers } = await ensureE2EProject(request);
     await page.setViewportSize({ width: 390, height: 844 });
     await loginUi(page);
-    await page.goto(`/projects/${projectId}`);
+    await page.goto(`/app/projects/${projectId}`);
     await expect(page.getByRole("tablist", { name: /столбцы/i })).toBeVisible({ timeout: 15_000 });
 
     const title = `Mobile ${Date.now()}`;

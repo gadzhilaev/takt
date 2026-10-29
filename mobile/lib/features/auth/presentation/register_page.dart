@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme.dart';
 import '../../../shared/widgets/app_icon.dart';
-import '../../../shared/widgets/takt_app_bar.dart';
 import '../cubit/auth_cubit.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -89,24 +88,6 @@ class _RegisterPageState extends State<RegisterPage> {
       behavior: HitTestBehavior.opaque,
       child: Scaffold(
         backgroundColor: dark ? const Color(0xFF171C22) : const Color(0xFFF4F7F8),
-        appBar: TaktAppBar(
-          title: _awaitingCode ? 'Код из письма' : 'Регистрация',
-          onBack: () {
-            FocusScope.of(context).unfocus();
-            if (_awaitingCode) {
-              setState(() {
-                _awaitingCode = false;
-                _error = null;
-              });
-              return;
-            }
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/login');
-            }
-          },
-        ),
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -138,6 +119,29 @@ class _RegisterPageState extends State<RegisterPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () {
+                                    FocusScope.of(context).unfocus();
+                                    if (_awaitingCode) {
+                                      setState(() {
+                                        _awaitingCode = false;
+                                        _error = null;
+                                      });
+                                      return;
+                                    }
+                                    if (context.canPop()) {
+                                      context.pop();
+                                    } else {
+                                      context.go('/login');
+                                    }
+                                  },
+                                  icon: const AppIcon(AppIcons.chevronLeft, size: 18),
+                                  label: Text(_awaitingCode ? 'Назад к форме' : 'Ко входу'),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
                               Center(
                                 child: SvgPicture.asset(
                                   dark ? 'assets/brand/takt-logo-on-dark.svg' : 'assets/brand/takt-logo.svg',

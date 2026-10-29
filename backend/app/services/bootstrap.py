@@ -7,7 +7,7 @@ from app.core.config import Settings
 from app.core.security import hash_password
 from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.team import TaskStatus, TeamSettings
-from app.models.user import User, UserRole
+from app.models.user import PlatformRole, User, UserRole
 
 DEFAULT_STATUSES = [
     ("К выполнению", "#607FA4", 0, False),
@@ -78,17 +78,22 @@ async def ensure_admin_user(db: AsyncSession, settings: Settings) -> User | None
     )
     if admin_count and admin_count > 0:
         result = await db.execute(select(User).where(User.role == UserRole.admin).limit(1))
-        return result.scalar_one_or_none()
+        user = result.scalar_one_or_none()
+        if user and user.platform_role == PlatformRole.none:
+            user.platform_role = PlatformRole.super_admin
+        return user
     existing = await db.scalar(select(User).where(User.email == settings.ADMIN_EMAIL.lower()))
     if existing:
         if existing.role != UserRole.admin:
             existing.role = UserRole.admin
+        existing.platform_role = PlatformRole.super_admin
         return existing
     user = User(
         email=settings.ADMIN_EMAIL.lower(),
         password_hash=hash_password(settings.ADMIN_PASSWORD),
         name=settings.ADMIN_NAME,
         role=UserRole.admin,
+        platform_role=PlatformRole.super_admin,
         is_active=True,
         must_change_password=False,
     )

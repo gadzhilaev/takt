@@ -16,6 +16,7 @@ import '../../../shared/widgets/takt_ui.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../auth/presentation/oauth_buttons.dart';
 import '../../board/cubit/board_cubit.dart';
 import '../../projects/data/projects_repository.dart';
 import '../data/profile_repository.dart';
@@ -146,7 +147,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       leading: AppIcon(AppIcons.lock, size: 20, color: muted),
                       title: 'Сменить пароль',
                       trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
-                      onTap: () => _changePassword(context),
+                      onTap: _changePassword,
                     ),
                   ],
                 ),
@@ -253,6 +254,20 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Связанные аккаунты',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const OAuthButtons(link: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextButton.icon(
@@ -428,7 +443,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _changePassword(BuildContext context) async {
+  Future<void> _changePassword() async {
     final current = TextEditingController();
     final next = TextEditingController();
     final confirm = TextEditingController();
@@ -447,9 +462,10 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
-    if (ok != true || !context.mounted) return;
+    if (ok != true || !mounted) return;
     final authRepo = context.read<AuthRepository>();
     final api = context.read<ApiClient>();
+    final authCubit = context.read<AuthCubit>();
     try {
       await authRepo.sendChangePasswordCode(
         currentPassword: current.text,
@@ -461,7 +477,7 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() => _message = api.messageFromError(e));
       return;
     }
-    if (!context.mounted) return;
+    if (!mounted) return;
     final codeCtrl = TextEditingController();
     final confirmed = await showTaktSheet(
       context: context,
@@ -473,13 +489,14 @@ class _ProfilePageState extends State<ProfilePage> {
         keyboardType: TextInputType.number,
       ),
     );
-    if (confirmed != true || !context.mounted) return;
+    if (confirmed != true || !mounted) return;
     try {
       await authRepo.confirmChangePassword(code: codeCtrl.text);
       if (!mounted) return;
       setState(() => _message = 'Пароль обновлён — войдите снова');
-      await context.read<AuthCubit>().logout();
-      if (context.mounted) context.go('/login');
+      await authCubit.logout();
+      if (!mounted) return;
+      context.go('/login');
     } catch (e) {
       if (!mounted) return;
       setState(() => _message = api.messageFromError(e));

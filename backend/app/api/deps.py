@@ -9,10 +9,22 @@ from app.core.config import get_settings
 from app.core.csrf import CSRF_HEADER, validate_csrf_token
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.models.user import User, UserRole
+from app.models.user import PLATFORM_ROLE_RANK, PlatformRole, User, UserRole
 
 ACCESS_COOKIE = "access_token"
 REFRESH_COOKIE = "refresh_token"
+
+
+def effective_platform_role(user: User) -> PlatformRole:
+    """Legacy UserRole.admin maps to at least platform admin."""
+    role = user.platform_role or PlatformRole.none
+    if user.role == UserRole.admin and PLATFORM_ROLE_RANK[role] < PLATFORM_ROLE_RANK[PlatformRole.admin]:
+        return PlatformRole.super_admin if role == PlatformRole.none else role
+    return role
+
+
+def has_platform_role(user: User, minimum: PlatformRole) -> bool:
+    return PLATFORM_ROLE_RANK[effective_platform_role(user)] >= PLATFORM_ROLE_RANK[minimum]
 
 
 def _token_from_auth_header(authorization: str | None) -> str | None:
@@ -58,10 +70,55 @@ async def get_current_user(
 
 
 async def require_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
-    if user.role != UserRole.admin:
+    """Legacy team admin API — UserRole.admin or platform admin+."""
+    if user.role != UserRole.admin and not has_platform_role(user, PlatformRole.admin):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": {"code": "forbidden", "message": "Доступ только для администратора"}},
+        )
+    return user
+
+
+def require_platform_role(minimum: PlatformRole):
+    async def _dep(user: Annotated[User, Depends(get_current_user)]) -> User:
+        if not has_platform_role(user, minimum):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": {
+                        "code": "forbidden",
+                        "message": "Недостаточно прав платформенного администратора",
+                    }
+                },
+            )
+        return user
+
+    return _dep
+
+
+async def require_platform_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
+    if not has_platform_role(user, PlatformRole.admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "Требуется platform admin"}},
+        )
+    return user
+
+
+async def require_platform_moderator(user: Annotated[User, Depends(get_current_user)]) -> User:
+    if not has_platform_role(user, PlatformRole.moderator):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "Требуется platform moderator"}},
+        )
+    return user
+
+
+async def require_super_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
+    if not has_platform_role(user, PlatformRole.super_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "Требуется super_admin"}},
         )
     return user
 

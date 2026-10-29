@@ -1,0 +1,101 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { BrandLogo } from "@/components/brand-mark";
+import { cn } from "@/lib/utils";
+
+const NAV = [
+  { href: "/admin", label: "Dashboard", exact: true },
+  { href: "/admin/users", label: "Пользователи" },
+  { href: "/admin/projects", label: "Проекты" },
+  { href: "/admin/moderation", label: "Модерация" },
+  { href: "/admin/system", label: "Система" },
+  { href: "/admin/analytics", label: "Аналитика" },
+  { href: "/admin/security", label: "Безопасность" },
+  { href: "/admin/settings", label: "Настройки" },
+];
+
+export default function PlatformAdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const me = useQuery({
+    queryKey: ["platform-me"],
+    queryFn: () =>
+      api<{ platform_role: string; name: string; email: string }>("/api/v1/platform/me"),
+    retry: false,
+  });
+
+  if (me.isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F8FA] text-sm text-muted">
+        Проверка доступа…
+      </div>
+    );
+  }
+
+  if (me.isError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F7F8FA] px-4 text-center">
+        <p className="text-sm text-muted">Нет доступа к панели платформы Takt.</p>
+        <button
+          type="button"
+          className="text-sm font-semibold text-[var(--accent)]"
+          onClick={() => router.push("/app/projects")}
+        >
+          В рабочее пространство
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F7F8FA] text-[var(--foreground)]">
+      <header className="border-b border-[var(--border)] bg-white">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
+          <div className="flex items-center gap-3">
+            <Link href="/admin" aria-label="Takt Admin">
+              <BrandLogo className="h-7 w-auto max-w-[8rem]" />
+            </Link>
+            <span className="rounded bg-[#202938] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              Admin
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-[13px] text-muted">
+            <span className="hidden sm:inline">
+              {me.data?.name} · {me.data?.platform_role}
+            </span>
+            <Link href="/app/projects" className="font-medium text-[var(--accent)]">
+              К доскам
+            </Link>
+          </div>
+        </div>
+      </header>
+      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
+        <nav className="hidden w-48 shrink-0 md:block" aria-label="Разделы админки">
+          <ul className="space-y-1">
+            {NAV.map((item) => {
+              const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "block rounded-[var(--radius)] px-3 py-2 text-[13px] font-medium",
+                      active ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-muted hover:bg-white"
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
+    </div>
+  );
+}

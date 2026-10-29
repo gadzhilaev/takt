@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const unreadCount = notifMeta?.unread ?? 0;
 
   const currentProjectId = useMemo(() => {
-    const m = pathname.match(/^\/projects\/([^/?#]+)/);
+    const m = pathname.match(/^\/app\/projects\/([^/?#]+)/);
     return m?.[1] ?? null;
   }, [pathname]);
 
@@ -91,11 +91,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [currentProjectId]);
 
   useEffect(() => {
-    if (!pathname.startsWith("/inbox")) return;
+    if (!pathname.startsWith("/app/inbox")) return;
     setNotificationsOpen(true);
     setMobileOpen(false);
     const fallback = getLastProjectId();
-    router.replace(fallback ? `/projects/${fallback}` : "/projects");
+    router.replace(fallback ? `/app/projects/${fallback}` : "/app/projects");
   }, [pathname, router]);
 
   const createProject = useMutation({
@@ -117,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setProjectDesc("");
       setLastProjectId(res.project.id);
       setMobileOpen(false);
-      router.push(`/projects/${res.project.id}`);
+      router.push(`/app/projects/${res.project.id}`);
     },
   });
 
@@ -159,7 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   function openProject(id: string) {
     setLastProjectId(id);
     setMobileOpen(false);
-    router.push(`/projects/${id}`);
+    router.push(`/app/projects/${id}`);
   }
 
   async function removeMember(projectId: string, member: Project["members"][number]) {
@@ -189,7 +189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const Sidebar = (
     <aside className="flex h-full w-[15.5rem] shrink-0 flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
       <div className="flex shrink-0 items-center justify-between gap-2 px-3.5 py-4">
-        <Link href="/projects" className="inline-flex min-w-0" aria-label="Takt">
+        <Link href="/app/projects" className="inline-flex min-w-0" aria-label="Takt">
           <BrandLogo className="h-6" />
         </Link>
         <div className="flex items-center gap-0.5">

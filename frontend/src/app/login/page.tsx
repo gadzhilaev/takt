@@ -1,8 +1,8 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/app-icon";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,16 +11,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-mark";
+import { OAuthButtons } from "@/components/oauth/oauth-buttons";
+import { paths } from "@/lib/paths";
 
 const schema = z.object({
   email: z.string().email("Введите корректный email"),
   password: z.string().min(1, "Введите пароль"),
 });
 
-export default function LoginPage() {
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return paths.projects;
+  if (raw.startsWith("/login") || raw.startsWith("/register")) return paths.projects;
+  return raw;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [show, setShow] = useState(false);
-  const [error, setError] = useState("");
+  const oauthErr = searchParams.get("message") || searchParams.get("oauth_error");
+  const [error, setError] = useState(oauthErr ? String(oauthErr) : "");
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
 
   async function onSubmit(values: z.infer<typeof schema>) {
@@ -30,8 +40,8 @@ export default function LoginPage() {
         method: "POST",
         json: values,
       });
-      if (res.user.must_change_password) router.push("/change-password");
-      else router.push("/projects");
+      if (res.user.must_change_password) router.push(paths.changePassword);
+      else router.push(safeNext(searchParams.get("next")));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка входа");
     }
@@ -45,7 +55,9 @@ export default function LoginPage() {
       />
       <div className="relative w-full max-w-sm">
         <div className="mb-7 px-1">
-          <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
+          <Link href={paths.home} className="inline-flex" aria-label="Takt на главную">
+            <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
+          </Link>
         </div>
         <div className="surface-panel p-6 sm:p-7">
           <div className="mb-6">
@@ -91,14 +103,23 @@ export default function LoginPage() {
               {form.formState.isSubmitting ? "Входим…" : "Войти"}
             </Button>
           </form>
+          <OAuthButtons mode="login" />
           <p className="mt-5 text-center text-sm text-muted">
             Нет аккаунта?{" "}
-            <Link href="/register" className="font-medium text-[var(--accent)]">
+            <Link href={paths.register} className="font-medium text-[var(--accent)]">
               Регистрация
             </Link>
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

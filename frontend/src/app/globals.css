@@ -83,6 +83,36 @@ html.dark {
   --kanban-done-desc: #8e99a6;
 }
 
+/* Public marketing page stays light even when html.dark is on. */
+.takt-landing {
+  color-scheme: light;
+  --background: #f7f8fa;
+  --foreground: #202938;
+  --surface: #ffffff;
+  --surface-2: #f1f3f5;
+  --muted: #667485;
+  --muted-fg: #667485;
+  --border: #dce2e7;
+  --border-strong: #c5ced6;
+  --accent: #315f72;
+  --accent-soft: #e8eef1;
+  --accent-fg: #ffffff;
+  --priority-low: #667485;
+  --priority-medium: #326e8b;
+  --priority-high: #c47a12;
+  --priority-urgent: #c63f3f;
+  --kanban-board-bg: #e9edf2;
+  --kanban-card-bg: #ffffff;
+  --kanban-card-border: #d5dde5;
+  --kanban-card-shadow: 0 1px 2px rgba(32, 41, 56, 0.05), 0 1px 1px rgba(32, 41, 56, 0.03);
+  --kanban-card-title: #1a2330;
+  --kanban-card-desc: #5a6878;
+  --kanban-done-title: #4a5564;
+  --kanban-done-desc: #6b7787;
+  color: var(--foreground);
+  background: #f7f8fa;
+}
+
 html {
   font-size: var(--font-size-base);
   scroll-padding-bottom: 5.5rem;

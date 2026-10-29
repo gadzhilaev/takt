@@ -26,20 +26,18 @@ class _MyTasksPageState extends State<MyTasksPage> {
   @override
   void initState() {
     super.initState();
-    _ensureBoard();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ensureBoard();
+    });
   }
 
   Future<void> _ensureBoard() async {
     final cubit = context.read<BoardCubit>();
     if (cubit.state.project == null) {
-      if (cubit.state.projects.isEmpty) {
-        await cubit.bootstrap();
-      }
+      // Без выбранного проекта «Мои задачи» недоступны — на хаб.
       if (!mounted) return;
-      if (cubit.state.project == null) {
-        context.go('/projects');
-        return;
-      }
+      context.go('/projects');
+      return;
     }
     if (!mounted) return;
     _bootstrapped = true;

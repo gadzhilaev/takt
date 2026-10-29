@@ -61,7 +61,7 @@ export default function RegisterPage() {
         method: "POST",
         json: { email: pending.email, code: code.trim() },
       });
-      router.push("/projects");
+      router.push("/app/projects"); // workspace after verified registration
     } catch (err) {
       setError(err instanceof Error ? err.message : "Неверный код");
     } finally {
@@ -90,7 +90,9 @@ export default function RegisterPage() {
       />
       <div className="relative w-full max-w-sm">
         <div className="mb-7 px-1">
-          <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
+          <Link href="/" className="inline-flex" aria-label="Takt на главную">
+            <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
+          </Link>
         </div>
         <div className="surface-panel p-6 sm:p-7">
           <div className="mb-6">

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
-from app.models.user import User, UserRole
+from app.models.user import PlatformRole, User, UserRole
 from app.services.bootstrap import bootstrap_db
 
 
@@ -21,6 +21,7 @@ async def create_admin(email: str | None, password: str | None, name: str | None
         if user:
             user.password_hash = hash_password(password)
             user.role = UserRole.admin
+            user.platform_role = PlatformRole.super_admin
             user.is_active = True
             user.name = name
             print(f"Обновлён администратор: {email}")
@@ -31,12 +32,27 @@ async def create_admin(email: str | None, password: str | None, name: str | None
                     password_hash=hash_password(password),
                     name=name,
                     role=UserRole.admin,
+                    platform_role=PlatformRole.super_admin,
                     is_active=True,
                     must_change_password=False,
                 )
             )
             print(f"Создан администратор: {email}")
         await db.commit()
+
+
+async def grant_super_admin(email: str) -> None:
+    """Managed promotion — never via public registration or OAuth provider trust."""
+    email = email.lower().strip()
+    async with AsyncSessionLocal() as db:
+        user = await db.scalar(select(User).where(User.email == email))
+        if not user:
+            raise SystemExit(f"Пользователь не найден: {email}")
+        user.platform_role = PlatformRole.super_admin
+        user.role = UserRole.admin
+        user.is_active = True
+        await db.commit()
+        print(f"Назначен platform super_admin: {email} ({user.id})")
 
 
 async def seed_demo() -> None:
@@ -58,10 +74,17 @@ def main() -> None:
     admin.add_argument("--email")
     admin.add_argument("--password")
     admin.add_argument("--name")
+    grant = sub.add_parser(
+        "grant-super-admin",
+        help="Назначить platform super_admin существующему пользователю (серверная команда)",
+    )
+    grant.add_argument("--email", required=True)
     sub.add_parser("seed-demo", help="Идемпотентное демо-наполнение (только local/dev)")
     args = parser.parse_args()
     if args.command == "create-admin":
         asyncio.run(create_admin(args.email, args.password, args.name))
+    elif args.command == "grant-super-admin":
+        asyncio.run(grant_super_admin(args.email))
     elif args.command == "seed-demo":
         asyncio.run(seed_demo())
 
