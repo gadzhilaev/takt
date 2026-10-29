@@ -1,5 +1,7 @@
 # Takt — визуальный ребрендинг
 
+> **Частично устарело.** Каталога `src/app/(app)` нет — канон `/app/*`. Актуальные docs: [`architecture/frontend.md`](architecture/frontend.md), [`archive/README.md`](archive/README.md).
+
 Дата: 2026-10-28.  
 База: `docs/TRACK_FINAL_POLISH.md` (функциональность не пересматривалась).  
 Commit / push / deploy **не** выполнялись.

@@ -1,5 +1,9 @@
 # План кроссплатформенных клиентов (Flutter)
 
+> **Устарело как план «ещё не начинать Flutter».** Клиент реализован в каталоге `mobile/`.  
+> Актуальная архитектура: [`architecture/mobile.md`](architecture/mobile.md), [`../mobile/docs/MOBILE_SETUP.md`](../mobile/docs/MOBILE_SETUP.md).  
+> Этот файл сохранён как исторический ADR-контекст (Bearer/CSRF dual-mode и т.д. — уже внедрены).
+
 Backend Takt остаётся **единым источником данных**. Клиенты: Web (текущий Next.js), затем Flutter iOS / Android / Windows / macOS.
 
 ## 1. Что уже подходит для клиентов
