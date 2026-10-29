@@ -409,15 +409,29 @@ docker compose exec backend python -m app.cli create-admin \
 
 ## 12. Обновление версии
 
+### Shared VPS (taktapp.ru, `/opt/takt`)
+
+Код только через git. Секреты (`.env`, `secrets/`) в git не входят.
+
 ```bash
-cd /opt/track
-git pull   # или залейте новый код
+cd /opt/takt
+./deploy/scripts/server-deploy.sh
+# без pull (уже на нужном commit):
+# ./deploy/scripts/server-deploy.sh --no-pull
+```
 
-docker compose build --no-cache
+Скрипт: `git pull --ff-only origin main` → `docker compose -f deploy/docker-compose.prod.yml build` → `up -d`.  
+Edge nginx / TLS — отдельно (`deploy/nginx/`, `/etc/takt/nginx/edge.conf`).  
+SSH deploy key: `~/.ssh/takt_deploy` (read-only deploy key репозитория).
+
+### Standalone (свой VPS + Caddy из compose)
+
+```bash
+cd /opt/takt
+git pull
+docker compose build
 docker compose up -d
-
 docker compose ps
-docker image prune -f   # по желанию, освободить место
 ```
 
 Миграции БД применяются при **старте backend** автоматически.

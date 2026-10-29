@@ -1,0 +1,11 @@
+# Mount into portfolio nginx stack on shared VPS:
+#   cd /opt/gadzhilaev
+#   docker compose -f docker-compose.prod.yml \
+#     -f docker-compose.smile-edge.yml \
+#     -f docker-compose.tarazpay-edge.yml \
+#     -f docker-compose.aspect-edge.yml \
+#     -f docker-compose.takt-edge.yml up -d nginx
+services:
+  nginx:
+    volumes:
+      - /etc/takt/nginx/edge.conf:/etc/nginx/conf.d/taktapp.conf:ro

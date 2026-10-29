@@ -1,0 +1,92 @@
+name: takt
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: takt-db
+    hostname: takt-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-track}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      POSTGRES_DB: ${POSTGRES_DB:-track}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-track} -d ${POSTGRES_DB:-track}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - takt_internal
+
+  backend:
+    container_name: takt-backend
+    image: takt-backend:prod
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-track}:${POSTGRES_PASSWORD}@takt-db:5432/${POSTGRES_DB:-track}
+      UPLOAD_DIR: /data/uploads
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-/secrets/firebase-adminsdk.json}
+    volumes:
+      - uploads:/data/uploads
+      - ${TAKT_SECRETS_DIR:-../secrets}:/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 25s
+    networks:
+      - takt_internal
+      - gadzhilaev_internal
+
+  frontend:
+    container_name: takt-frontend
+    image: takt-frontend:prod
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      BACKEND_INTERNAL_URL: http://takt-backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    networks:
+      - takt_internal
+      - gadzhilaev_internal
+
+volumes:
+  pgdata:
+  uploads:
+
+networks:
+  takt_internal:
+    driver: bridge
+  gadzhilaev_internal:
+    external: true
