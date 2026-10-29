@@ -47,6 +47,6 @@ cd mobile && flutter analyze && flutter test
 
 **OAuth:** Apple / VK ID / Яндекс ID — каркас API + UI; credentials в `.env` (см. `docs/OAUTH_SETUP.md`). По умолчанию выключены; для оператора РФ Apple блокируется политикой до юр. решения (149-ФЗ). Реальный вход провайдеров **не** помечать готовым без smoke-теста.
 
-**Auth UX:** кнопка регистрации — «Зарегистрироваться»; web/mobile парсят `detail.error.message` и SlowAPI rate-limit (не голый «Ошибка запроса»).
+**Auth UX:** кнопка регистрации — «Зарегистрироваться»; web/mobile парсят `detail.error.message` и SlowAPI rate-limit (не голый «Ошибка запроса»). OAuth (VK/Яндекс) на login+register с иконками; переключатели в `/admin/settings` (`platform_settings.oauth_login_methods`) влияют на web и mobile.
 
 **Prod:** https://taktapp.ru. Commit/push/deploy только по разрешению.

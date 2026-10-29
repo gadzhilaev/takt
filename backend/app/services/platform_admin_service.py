@@ -465,7 +465,7 @@ async def system_health(db: AsyncSession, settings) -> dict:
         },
         "oauth": {
             k: {"enabled": v["enabled"], "configured": v["configured"]}
-            for k, v in provider_availability(settings)["providers"].items()
+            for k, v in (await provider_availability(db, settings))["providers"].items()
         },
         "background_jobs": {
             "note": "Отдельной очереди ошибок фоновых задач пока нет — показатель не выдуман.",

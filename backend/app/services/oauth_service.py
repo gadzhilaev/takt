@@ -71,9 +71,37 @@ def _pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
-def provider_availability(settings: Settings | None = None) -> dict[str, Any]:
-    """Public provider flags. Apple may stay off for RU operators until legal clearance."""
+OAUTH_METHODS_SETTING_KEY = "oauth_login_methods"
+DEFAULT_OAUTH_METHOD_FLAGS: dict[str, bool] = {
+    "apple": True,
+    "vk": True,
+    "yandex": True,
+    "email_password": True,
+}
+
+
+async def load_oauth_method_flags(db: AsyncSession | None) -> dict[str, bool]:
+    """Admin toggles from platform_settings; missing keys default to enabled."""
+    flags = dict(DEFAULT_OAUTH_METHOD_FLAGS)
+    if db is None:
+        return flags
+    from app.models.platform import PlatformSetting
+
+    row = await db.get(PlatformSetting, OAUTH_METHODS_SETTING_KEY)
+    if not row or not isinstance(row.value, dict):
+        return flags
+    for key in DEFAULT_OAUTH_METHOD_FLAGS:
+        if key in row.value:
+            flags[key] = bool(row.value[key])
+    return flags
+
+
+async def provider_availability(
+    db: AsyncSession | None = None, settings: Settings | None = None
+) -> dict[str, Any]:
+    """Public provider flags. Env credentials + admin toggles + Apple RU policy."""
     s = settings or get_settings()
+    admin_flags = await load_oauth_method_flags(db)
     apple_configured = bool(
         s.OAUTH_APPLE_CLIENT_ID
         and s.OAUTH_APPLE_TEAM_ID
@@ -87,7 +115,10 @@ def provider_availability(settings: Settings | None = None) -> dict[str, Any]:
         s.OAUTH_OPERATOR_REGION.lower() == "ru" and not s.OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR
     )
     apple_enabled = (
-        s.OAUTH_APPLE_ENABLED and apple_configured and not apple_policy_blocked
+        s.OAUTH_APPLE_ENABLED
+        and apple_configured
+        and not apple_policy_blocked
+        and admin_flags["apple"]
     )
 
     notes: list[str] = []
@@ -98,36 +129,44 @@ def provider_availability(settings: Settings | None = None) -> dict[str, Any]:
         )
     if s.OAUTH_APPLE_ENABLED and not apple_configured:
         notes.append("Apple ID включён в конфиге, но credentials не заданы.")
+    if not admin_flags["vk"] and vk_configured:
+        notes.append("VK ID выключен в админке платформы.")
+    if not admin_flags["yandex"] and yandex_configured:
+        notes.append("Яндекс ID выключен в админке платформы.")
 
     return {
-        "email_password": True,
+        "email_password": admin_flags["email_password"],
+        "admin_flags": admin_flags,
         "providers": {
             "apple": {
                 "id": "apple",
                 "label": "Apple",
                 "enabled": apple_enabled,
                 "configured": apple_configured,
+                "admin_enabled": admin_flags["apple"],
                 "policy_blocked": apple_policy_blocked,
             },
             "vk": {
                 "id": "vk",
                 "label": "VK ID",
-                "enabled": s.OAUTH_VK_ENABLED and vk_configured,
+                "enabled": s.OAUTH_VK_ENABLED and vk_configured and admin_flags["vk"],
                 "configured": vk_configured,
+                "admin_enabled": admin_flags["vk"],
                 "policy_blocked": False,
             },
             "yandex": {
                 "id": "yandex",
                 "label": "Яндекс ID",
-                "enabled": s.OAUTH_YANDEX_ENABLED and yandex_configured,
+                "enabled": s.OAUTH_YANDEX_ENABLED and yandex_configured and admin_flags["yandex"],
                 "configured": yandex_configured,
+                "admin_enabled": admin_flags["yandex"],
                 "policy_blocked": False,
             },
         },
         "operator_region": s.OAUTH_OPERATOR_REGION,
         "notes": notes,
         "legal_notice": (
-            "Доступность способов входа задаётся конфигурацией оператора. "
+            "Доступность способов входа задаётся конфигурацией оператора и админкой. "
             "Геолокация пользователя по IP не используется как юридический критерий."
         ),
     }
@@ -139,9 +178,11 @@ def assert_redirect_allowed(redirect_uri: str, settings: Settings | None = None)
         raise OAuthError("invalid_redirect", "Redirect URI не в allowlist")
 
 
-def _provider_enabled(provider: OAuthProvider, settings: Settings) -> bool:
-    avail = provider_availability(settings)["providers"][provider.value]
-    return bool(avail["enabled"])
+async def _provider_enabled(
+    db: AsyncSession, provider: OAuthProvider, settings: Settings | None = None
+) -> bool:
+    avail = await provider_availability(db, settings)
+    return bool(avail["providers"][provider.value]["enabled"])
 
 
 async def start_oauth(
@@ -153,7 +194,7 @@ async def start_oauth(
     link_user_id: uuid.UUID | None = None,
 ) -> dict[str, str]:
     settings = get_settings()
-    if not _provider_enabled(provider, settings):
+    if not await _provider_enabled(db, provider, settings):
         raise OAuthError("provider_disabled", f"Провайдер {provider.value} недоступен")
     assert_redirect_allowed(redirect_uri, settings)
 
@@ -440,7 +481,7 @@ async def mobile_complete(
     link_user_id: uuid.UUID | None = None,
 ) -> tuple[User, bool]:
     settings = get_settings()
-    if not _provider_enabled(provider, settings):
+    if not await _provider_enabled(db, provider, settings):
         raise OAuthError("provider_disabled", f"Провайдер {provider.value} недоступен")
     assert_redirect_allowed(redirect_uri, settings)
     if id_token and provider == OAuthProvider.apple:

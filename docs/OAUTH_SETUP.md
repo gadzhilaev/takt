@@ -50,6 +50,12 @@ Native iOS: передайте `id_token` на `POST /api/v1/auth/oauth/mobile` 
 3. Callback URL из allowlist.
 4. `OAUTH_YANDEX_ENABLED=true`.
 
+## Админка: вкл/выкл способов входа
+
+`/admin/settings` → блок «Способы входа» пишет `platform_settings.oauth_login_methods`
+(`apple` / `vk` / `yandex` / `email_password`). Выключение скрывает кнопки на web и в Flutter;
+credentials в `.env` не трогаются. Без записи в БД все способы по умолчанию включены (если credentials есть).
+
 ## Привязка / отвязка
 
 - Привязка: авторизованный пользователь → `/auth/oauth/{provider}/start?link=true`.

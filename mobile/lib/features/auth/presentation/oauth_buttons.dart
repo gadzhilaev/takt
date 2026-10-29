@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/api_client.dart';
 import '../data/oauth_repository.dart';
 
-/// Shows enabled OAuth providers from backend policy. Does not claim store SDKs are live
-/// until credentials exist and a real provider login succeeds.
+/// Shows enabled OAuth providers from backend policy (env + admin toggles).
 class OAuthButtons extends StatefulWidget {
-  const OAuthButtons({super.key, this.link = false});
+  const OAuthButtons({super.key, this.link = false, this.register = false});
 
   final bool link;
+  final bool register;
 
   @override
   State<OAuthButtons> createState() => _OAuthButtonsState();
@@ -21,6 +22,12 @@ class _OAuthButtonsState extends State<OAuthButtons> {
   String? _error;
   String? _busy;
   bool _loaded = false;
+
+  static const _icons = <String, String>{
+    'vk': 'assets/brand/oauth/oauth-vk.svg',
+    'yandex': 'assets/brand/oauth/oauth-yandex.svg',
+    'apple': 'assets/brand/oauth/oauth-apple.svg',
+  };
 
   @override
   void didChangeDependencies() {
@@ -37,7 +44,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
       final data = await _repo!.providers();
       if (!mounted) return;
       setState(() => _providers = data['providers'] as Map<String, dynamic>?);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Не удалось загрузить способы входа');
     }
@@ -50,7 +57,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
     });
     try {
       await _repo!.startWebOAuth(id, link: widget.link);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Не удалось открыть $label');
     } finally {
@@ -84,6 +91,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
         ),
       );
     }
+    final prefix = widget.register ? 'Зарегистрироваться через' : 'Продолжить с';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -94,8 +102,26 @@ class _OAuthButtonsState extends State<OAuthButtons> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: OutlinedButton(
-              onPressed: _busy != null ? null : () => _start(e.key, (e.value as Map)['label'] as String? ?? e.key),
-              child: Text(_busy == e.key ? 'Открываем…' : 'Продолжить с ${(e.value as Map)['label']}'),
+              onPressed: _busy != null
+                  ? null
+                  : () => _start(e.key, (e.value as Map)['label'] as String? ?? e.key),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_icons.containsKey(e.key)) ...[
+                    SvgPicture.asset(_icons[e.key]!, width: 20, height: 20),
+                    const SizedBox(width: 10),
+                  ],
+                  Flexible(
+                    child: Text(
+                      _busy == e.key
+                          ? 'Открываем…'
+                          : '$prefix ${(e.value as Map)['label']}',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         if (_error != null)

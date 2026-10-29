@@ -32,8 +32,8 @@ def _oauth_http(e: oauth_service.OAuthError) -> HTTPException:
 
 
 @router.get("/providers")
-async def list_providers():
-    return oauth_service.provider_availability()
+async def list_providers(db: Annotated[AsyncSession, Depends(get_db)]):
+    return await oauth_service.provider_availability(db)
 
 
 @router.get("/{provider}/start")

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-mark";
-import { OAuthButtons } from "@/components/oauth/oauth-buttons";
+import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
 import { paths } from "@/lib/paths";
 
 const schema = z.object({
@@ -32,6 +32,8 @@ function LoginForm() {
   const oauthErr = searchParams.get("message") || searchParams.get("oauth_error");
   const [error, setError] = useState(oauthErr ? String(oauthErr) : "");
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
+  const { data: oauthMeta } = useOAuthProviders();
+  const emailPassword = oauthMeta?.email_password !== false;
 
   async function onSubmit(values: z.infer<typeof schema>) {
     setError("");
@@ -66,43 +68,49 @@ function LoginForm() {
               Войдите, чтобы открыть доску команды
             </p>
           </div>
-          <form className="space-y-3.5" method="post" action="#" onSubmit={form.handleSubmit(onSubmit)}>
-            <div>
-              <label className="label-text" htmlFor="login-email">
-                Email
-              </label>
-              <Input id="login-email" type="email" autoComplete="email" {...form.register("email")} />
-            </div>
-            <div>
-              <label className="label-text" htmlFor="login-password">
-                Пароль
-              </label>
-              <div className="relative">
-                <Input
-                  id="login-password"
-                  type={show ? "text" : "password"}
-                  autoComplete="current-password"
-                  {...form.register("password")}
-                />
-                <button
-                  type="button"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-sm)] p-1.5 text-muted hover:bg-[var(--surface-2)]"
-                  onClick={() => setShow((s) => !s)}
-                  aria-label={show ? "Скрыть пароль" : "Показать пароль"}
-                >
-                  {show ? <AppIcon name="eye-off" size={16} /> : <AppIcon name="eye" size={16} />}
-                </button>
+          {emailPassword ? (
+            <form className="space-y-3.5" method="post" action="#" onSubmit={form.handleSubmit(onSubmit)}>
+              <div>
+                <label className="label-text" htmlFor="login-email">
+                  Email
+                </label>
+                <Input id="login-email" type="email" autoComplete="email" {...form.register("email")} />
               </div>
-            </div>
-            {error && (
-              <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
-                {error}
-              </p>
-            )}
-            <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Входим…" : "Войти"}
-            </Button>
-          </form>
+              <div>
+                <label className="label-text" htmlFor="login-password">
+                  Пароль
+                </label>
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    type={show ? "text" : "password"}
+                    autoComplete="current-password"
+                    {...form.register("password")}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-sm)] p-1.5 text-muted hover:bg-[var(--surface-2)]"
+                    onClick={() => setShow((s) => !s)}
+                    aria-label={show ? "Скрыть пароль" : "Показать пароль"}
+                  >
+                    {show ? <AppIcon name="eye-off" size={16} /> : <AppIcon name="eye" size={16} />}
+                  </button>
+                </div>
+              </div>
+              {error && (
+                <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? "Входим…" : "Войти"}
+              </Button>
+            </form>
+          ) : error ? (
+            <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
+              {error}
+            </p>
+          ) : null}
           <OAuthButtons mode="login" />
           <p className="mt-5 text-center text-sm text-muted">
             Нет аккаунта?{" "}

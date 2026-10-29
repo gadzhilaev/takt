@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandLogo } from "@/components/brand-mark";
+import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
 
 const schema = z
   .object({
@@ -36,6 +37,8 @@ export default function RegisterPage() {
     resolver: zodResolver(schema),
     defaultValues: { name: "", email: "", password: "", password_confirm: "" },
   });
+  const { data: oauthMeta } = useOAuthProviders();
+  const emailPassword = oauthMeta?.email_password !== false;
 
   async function onSubmit(values: FormValues) {
     setError("");
@@ -107,59 +110,68 @@ export default function RegisterPage() {
           </div>
 
           {step === "form" ? (
-            <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
-              <div>
-                <label className="label-text" htmlFor="reg-name">
-                  Имя
-                </label>
-                <Input id="reg-name" autoComplete="name" {...form.register("name")} />
-                {form.formState.errors.name && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.name.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="label-text" htmlFor="reg-email">
-                  Email
-                </label>
-                <Input id="reg-email" type="email" autoComplete="email" {...form.register("email")} />
-                {form.formState.errors.email && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.email.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="label-text" htmlFor="reg-pass">
-                  Пароль
-                </label>
-                <Input id="reg-pass" type="password" autoComplete="new-password" {...form.register("password")} />
-                {form.formState.errors.password && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="label-text" htmlFor="reg-pass2">
-                  Подтверждение пароля
-                </label>
-                <Input
-                  id="reg-pass2"
-                  type="password"
-                  autoComplete="new-password"
-                  {...form.register("password_confirm")}
-                />
-                {form.formState.errors.password_confirm && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">
-                    {form.formState.errors.password_confirm.message}
-                  </p>
-                )}
-              </div>
-              {error && (
+            <>
+              {emailPassword ? (
+                <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+                  <div>
+                    <label className="label-text" htmlFor="reg-name">
+                      Имя
+                    </label>
+                    <Input id="reg-name" autoComplete="name" {...form.register("name")} />
+                    {form.formState.errors.name && (
+                      <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.name.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="label-text" htmlFor="reg-email">
+                      Email
+                    </label>
+                    <Input id="reg-email" type="email" autoComplete="email" {...form.register("email")} />
+                    {form.formState.errors.email && (
+                      <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.email.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="label-text" htmlFor="reg-pass">
+                      Пароль
+                    </label>
+                    <Input id="reg-pass" type="password" autoComplete="new-password" {...form.register("password")} />
+                    {form.formState.errors.password && (
+                      <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="label-text" htmlFor="reg-pass2">
+                      Подтверждение пароля
+                    </label>
+                    <Input
+                      id="reg-pass2"
+                      type="password"
+                      autoComplete="new-password"
+                      {...form.register("password_confirm")}
+                    />
+                    {form.formState.errors.password_confirm && (
+                      <p className="mt-1 text-xs text-[var(--danger)]">
+                        {form.formState.errors.password_confirm.message}
+                      </p>
+                    )}
+                  </div>
+                  {error && (
+                    <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+                      {error}
+                    </p>
+                  )}
+                  <Button type="submit" className="w-full" size="lg" disabled={sending || form.formState.isSubmitting}>
+                    Зарегистрироваться
+                  </Button>
+                </form>
+              ) : error ? (
                 <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
                   {error}
                 </p>
-              )}
-              <Button type="submit" className="w-full" size="lg" disabled={sending || form.formState.isSubmitting}>
-                Зарегистрироваться
-              </Button>
-            </form>
+              ) : null}
+              <OAuthButtons mode="register" />
+            </>
           ) : (
             <form className="space-y-3" onSubmit={onConfirm}>
               <div>

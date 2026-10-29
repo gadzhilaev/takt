@@ -90,6 +90,13 @@ async def register_send_code(
     body: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    from app.services.oauth_service import load_oauth_method_flags
+
+    if not (await load_oauth_method_flags(db)).get("email_password", True):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "method_disabled", "message": "Регистрация по email отключена"}},
+        )
     email = str(body.email).lower().strip()
     existing = await db.scalar(select(User).where(User.email == email))
     if existing:
@@ -188,6 +195,13 @@ async def login(
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    from app.services.oauth_service import load_oauth_method_flags
+
+    if not (await load_oauth_method_flags(db)).get("email_password", True):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "method_disabled", "message": "Вход по email отключён"}},
+        )
     settings = get_settings()
     ip = request.client.host if request.client else None
     try:

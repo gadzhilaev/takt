@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 type ProvidersResponse = {
+  email_password?: boolean;
   providers: Record<
     string,
     { id: string; label: string; enabled: boolean; configured: boolean; policy_blocked?: boolean }
@@ -14,16 +15,27 @@ type ProvidersResponse = {
   legal_notice?: string;
 };
 
-export function OAuthButtons({ mode = "login" }: { mode?: "login" | "link" }) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [err, setErr] = useState("");
-  const { data } = useQuery({
+export function useOAuthProviders() {
+  return useQuery({
     queryKey: ["oauth-providers"],
     queryFn: () => api<ProvidersResponse>("/api/v1/auth/oauth/providers"),
   });
+}
+
+const PROVIDER_ICONS: Record<string, { src: string; alt: string }> = {
+  vk: { src: "/brand/oauth-vk.svg", alt: "VK" },
+  yandex: { src: "/brand/oauth-yandex.svg", alt: "Яндекс" },
+  apple: { src: "/brand/oauth-apple.svg", alt: "Apple" },
+};
+
+export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" | "link" }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  const { data } = useOAuthProviders();
 
   const providers = data?.providers ?? {};
   const enabled = Object.values(providers).filter((p) => p.enabled);
+  const actionLabel = mode === "register" ? "Зарегистрироваться через" : "Продолжить с";
 
   async function start(provider: string) {
     setErr("");
@@ -41,7 +53,7 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "link" }) {
 
   if (!enabled.length) {
     return (
-      <p className="text-[12px] leading-snug text-muted">
+      <p className="mt-4 text-[12px] leading-snug text-muted">
         Вход через Apple / VK ID / Яндекс ID будет доступен после настройки провайдеров на сервере.
         {data?.notes?.[0] ? ` ${data.notes[0]}` : ""}
       </p>
@@ -54,18 +66,25 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "link" }) {
         <span className="bg-[var(--surface)] relative z-[1] px-2">или</span>
         <span className="absolute left-0 right-0 top-1/2 h-px bg-[var(--border)]" aria-hidden />
       </div>
-      {enabled.map((p) => (
-        <Button
-          key={p.id}
-          type="button"
-          variant="secondary"
-          className="w-full justify-center"
-          disabled={busy !== null}
-          onClick={() => start(p.id)}
-        >
-          {busy === p.id ? "Перенаправление…" : `Продолжить с ${p.label}`}
-        </Button>
-      ))}
+      {enabled.map((p) => {
+        const icon = PROVIDER_ICONS[p.id];
+        return (
+          <Button
+            key={p.id}
+            type="button"
+            variant="secondary"
+            className="w-full justify-center gap-2.5"
+            disabled={busy !== null}
+            onClick={() => start(p.id)}
+          >
+            {icon ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={icon.src} alt="" width={20} height={20} className="size-5 shrink-0 rounded-[5px]" />
+            ) : null}
+            <span>{busy === p.id ? "Перенаправление…" : `${actionLabel} ${p.label}`}</span>
+          </Button>
+        );
+      })}
       {err && (
         <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
           {err}

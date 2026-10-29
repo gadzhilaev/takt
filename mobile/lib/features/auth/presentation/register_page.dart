@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme.dart';
 import '../../../shared/widgets/app_icon.dart';
+import 'oauth_buttons.dart';
 import '../cubit/auth_cubit.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -324,6 +325,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                             child: const Text('Отправить код ещё раз'),
                                           ),
                                         ],
+                                        if (!_awaitingCode) const OAuthButtons(register: true),
                                       ],
                                     ),
                                   ),

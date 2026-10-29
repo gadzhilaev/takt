@@ -270,9 +270,17 @@ async def get_settings_api(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     stored = await pas.get_settings_map(db)
+    oauth = await provider_availability(db)
     return {
         "stored": stored,
-        "oauth_providers": provider_availability(),
+        "oauth_providers": oauth,
+        "oauth_login_methods": oauth.get("admin_flags")
+        or {
+            "apple": True,
+            "vk": True,
+            "yandex": True,
+            "email_password": True,
+        },
         "billing_placeholder": {
             "enabled": False,
             "note": "Тарифы не подключены; ключ reserved для будущей конфигурации.",
@@ -293,7 +301,20 @@ async def put_setting(
 ):
     if not key.replace("_", "").replace("-", "").isalnum():
         raise HTTPException(status_code=400, detail={"error": {"code": "bad_key", "message": "Некорректный ключ"}})
-    result = await pas.put_setting(db, admin, key[:100], body.value)
+    value = body.value
+    if key == "oauth_login_methods":
+        allowed = {"apple", "vk", "yandex", "email_password"}
+        cleaned: dict[str, bool] = {}
+        for k, v in value.items():
+            if k in allowed:
+                cleaned[k] = bool(v)
+        if not cleaned:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "bad_value", "message": "Нужен хотя бы один флаг способа входа"}},
+            )
+        value = cleaned
+    result = await pas.put_setting(db, admin, key[:100], value)
     await db.commit()
     return result
 
