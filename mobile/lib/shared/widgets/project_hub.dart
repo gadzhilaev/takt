@@ -6,7 +6,6 @@ import '../../core/theme.dart';
 import '../../features/projects/data/projects_repository.dart';
 import '../models/models.dart';
 import '../project_visibility.dart';
-import 'takt_mark.dart';
 import 'user_avatar.dart';
 
 /// Project list with expandable members — mirrors web sidebar.
@@ -173,15 +172,47 @@ class _ProjectHubState extends State<ProjectHub> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-          child: Text(
-            'Мои проекты',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
-              color: dark ? TaktColors.mutedDark : TaktColors.muted,
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Мои проекты',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                    color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onCreateProject,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppIcon(
+                        AppIcons.add,
+                        size: 16,
+                        color: dark ? TaktColors.accentDark : TaktColors.accent,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Создать',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: dark ? TaktColors.accentDark : TaktColors.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -208,66 +239,69 @@ class _ProjectHubState extends State<ProjectHub> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(TaktRadii.md),
-                              onTap: () => widget.onOpenProject(p.id),
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
-                                child: Row(
-                                  children: [
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      onPressed: () {
-                                        setState(() {
-                                          if (open) {
-                                            _expanded.remove(p.id);
-                                          } else {
-                                            _expanded.add(p.id);
-                                          }
-                                        });
-                                      },
-                                      icon: AppIcon(
-                                        open ? AppIcons.chevronDown : AppIcons.chevronRight,
-                                        size: 18,
-                                        color: dark ? TaktColors.mutedDark : TaktColors.muted,
-                                      ),
-                                    ),
-                                    const TaktMark(size: 20),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        p.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: -0.15,
-                                          color: dark
-                                              ? TaktColors.foregroundDark
-                                              : TaktColors.graphite,
-                                        ),
-                                      ),
-                                    ),
-                                    Text(
-                                      '${p.members.length}',
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () => widget.onOpenProject(p.id),
+                                    child: Text(
+                                      p.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 12,
-                                        color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: -0.15,
+                                        color: dark
+                                            ? TaktColors.foregroundDark
+                                            : TaktColors.graphite,
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    setState(() {
+                                      if (open) {
+                                        _expanded.remove(p.id);
+                                      } else {
+                                        _expanded.add(p.id);
+                                      }
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${p.members.length}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        AppIcon(
+                                          // Closed → down (tap to expand); open → right.
+                                          open ? AppIcons.chevronRight : AppIcons.chevronDown,
+                                          size: 18,
+                                          color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           if (open) ...[
                             Padding(
-                              padding: const EdgeInsets.only(left: 44, right: 8, bottom: 8),
+                              padding: const EdgeInsets.only(left: 12, right: 8, bottom: 8),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   border: Border(
@@ -321,17 +355,6 @@ class _ProjectHubState extends State<ProjectHub> {
                     );
                   },
                 ),
-        ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: OutlinedButton.icon(
-              onPressed: widget.onCreateProject,
-              icon: AppIcon(AppIcons.add, size: 18),
-              label: const Text('Создать проект'),
-            ),
-          ),
         ),
       ],
     );

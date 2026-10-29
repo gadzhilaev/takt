@@ -8,10 +8,13 @@ import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/project_hub.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_mark.dart';
+import '../../../shared/widgets/takt_sheet.dart';
+import '../../../shared/widgets/takt_ui.dart';
 import '../../board/cubit/board_cubit.dart';
 import '../../notifications/data/notifications_repository.dart';
+import '../../shell/takt_bottom_nav.dart';
 
-/// Welcome / project picker — outside bottom navigation.
+/// Welcome / project picker — has its own bottom nav (Главная / Профиль).
 class ProjectsWelcomePage extends StatefulWidget {
   const ProjectsWelcomePage({super.key});
 
@@ -60,20 +63,12 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
 
   Future<void> _createProject() async {
     final controller = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showTaktSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Новый проект'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Название'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Создать')),
-        ],
-      ),
+      title: 'Новый проект',
+      confirmLabel: 'Создать',
+      body: TaktTextField(controller: controller, label: 'Название'),
+      onConfirm: () => controller.text.trim().isNotEmpty,
     );
     if (ok == true && controller.text.trim().isNotEmpty && mounted) {
       await context.read<BoardCubit>().createProject(controller.text.trim());
@@ -95,12 +90,12 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
         return Scaffold(
           backgroundColor: bg,
           appBar: TaktAppBar(
-            title: 'Проекты',
+            title: 'Takt',
             leading: const Padding(
               padding: EdgeInsets.only(left: 12),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: TaktMark(height: 24),
+                child: TaktMark(height: 22),
               ),
             ),
             actions: [
@@ -127,57 +122,64 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
           ),
           body: _loading || (state.loading && state.projects.isEmpty)
               ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                      child: Text(
-                        'Выберите проект, чтобы открыть доску',
-                        style: TextStyle(fontSize: 13, height: 1.35, color: muted),
-                      ),
-                    ),
-                    Expanded(
-                      child: state.projects.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Создайте первый проект',
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Доска откроется сразу: четыре стандартных столбца.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: muted, height: 1.4),
-                                    ),
-                                    const SizedBox(height: 24),
-                                    FilledButton(
-                                      onPressed: _createProject,
-                                      child: const Text('Новый проект'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : ProjectHub(
-                              projects: state.projects,
-                              currentUserId: context.read<BoardCubit>().currentUserId,
-                              onOpenProject: _openProject,
-                              onCreateProject: _createProject,
-                              onProjectsChanged: () =>
-                                  context.read<BoardCubit>().refreshProjects(),
+              : state.projects.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Создайте первый проект',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Доска откроется сразу: четыре стандартных столбца.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: muted, height: 1.4),
+                            ),
+                            const SizedBox(height: 24),
+                            FilledButton(
+                              onPressed: _createProject,
+                              child: const Text('Новый проект'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ProjectHub(
+                      projects: state.projects,
+                      currentUserId: context.read<BoardCubit>().currentUserId,
+                      onOpenProject: _openProject,
+                      onCreateProject: _createProject,
+                      onProjectsChanged: () => context.read<BoardCubit>().refreshProjects(),
                     ),
-                  ],
-                ),
+          bottomNavigationBar: TaktBottomNav(
+            items: [
+              TaktBottomNavItem(
+                label: 'Главная',
+                icon: AppIcons.home,
+                selected: true,
+                onTap: () {},
+              ),
+              TaktBottomNavItem(
+                label: 'Мои задачи',
+                icon: AppIcons.myTasks,
+                selected: false,
+                onTap: () => context.go('/my-tasks'),
+              ),
+              TaktBottomNavItem(
+                label: 'Профиль',
+                icon: AppIcons.profile,
+                selected: false,
+                onTap: () => context.go('/profile'),
+              ),
+            ],
+          ),
         );
       },
     );
