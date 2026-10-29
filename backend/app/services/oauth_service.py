@@ -232,6 +232,8 @@ async def start_oauth(
         }
         url = f"{APPLE_AUTH}?{urlencode(params)}"
     elif provider == OAuthProvider.vk:
+        # VK ID requires a stable device_id for the PKCE web flow; echoed back on callback.
+        vk_device_id = secrets.token_urlsafe(24)
         params = {
             "client_id": settings.OAUTH_VK_CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -240,6 +242,7 @@ async def start_oauth(
             "state": state,
             "code_challenge": challenge,
             "code_challenge_method": "S256",
+            "device_id": vk_device_id,
         }
         url = f"{VK_AUTH}?{urlencode(params)}"
     else:

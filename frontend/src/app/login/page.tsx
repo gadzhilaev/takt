@@ -19,6 +19,24 @@ const schema = z.object({
   password: z.string().min(1, "Введите пароль"),
 });
 
+const OAUTH_ERROR_RU: Record<string, string> = {
+  missing_params: "Не удалось завершить вход: нет кода подтверждения. Попробуйте ещё раз.",
+  invalid_state: "Сессия входа устарела. Начните вход заново.",
+  state_expired: "Сессия входа истекла. Начните вход заново.",
+  state_reuse: "Этот вход уже был использован. Начните заново.",
+  provider_disabled: "Этот способ входа сейчас недоступен.",
+  access_denied: "Вход отменён.",
+  email_owned: "Email уже занят. Войдите в существующий аккаунт и привяжите провайдера в профиле.",
+  method_disabled: "Этот способ входа отключён.",
+};
+
+function oauthErrorText(message: string | null, code: string | null): string {
+  const msg = (message || "").trim();
+  if (msg && !/^[a-z][a-z0-9_]+$/i.test(msg)) return msg;
+  const key = (code || msg || "").trim();
+  return OAUTH_ERROR_RU[key] || (msg && !/^[a-z][a-z0-9_]+$/i.test(msg) ? msg : "Не удалось выполнить вход. Попробуйте ещё раз.");
+}
+
 function safeNext(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return paths.projects;
   if (raw.startsWith("/login") || raw.startsWith("/register")) return paths.projects;
@@ -29,8 +47,10 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [show, setShow] = useState(false);
-  const oauthErr = searchParams.get("message") || searchParams.get("oauth_error");
-  const [error, setError] = useState(oauthErr ? String(oauthErr) : "");
+  const oauthErr = oauthErrorText(searchParams.get("message"), searchParams.get("oauth_error"));
+  const [error, setError] = useState(
+    searchParams.get("message") || searchParams.get("oauth_error") ? oauthErr : ""
+  );
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
   const { data: oauthMeta } = useOAuthProviders();
   const emailPassword = oauthMeta?.email_password !== false;

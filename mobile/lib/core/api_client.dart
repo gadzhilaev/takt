@@ -74,6 +74,31 @@ class ApiClient {
     }
   }
 
+  static const _codeRu = <String, String>{
+    'missing_params': 'Не удалось завершить вход. Попробуйте ещё раз.',
+    'invalid_state': 'Сессия входа устарела. Начните вход заново.',
+    'state_expired': 'Сессия входа истекла. Начните вход заново.',
+    'state_reuse': 'Этот вход уже был использован. Начните заново.',
+    'provider_disabled': 'Этот способ входа сейчас недоступен.',
+    'method_disabled': 'Этот способ входа отключён.',
+    'access_denied': 'Вход отменён.',
+    'email_owned': 'Email уже занят. Войдите и привяжите провайдера в профиле.',
+    'email_taken': 'Email уже зарегистрирован',
+    'invalid_credentials': 'Неверный email или пароль',
+    'inactive': 'Учётная запись отключена',
+    'blocked': 'Учётная запись временно ограничена',
+    'locked': 'Слишком много попыток. Попробуйте позже.',
+  };
+
+  String _ru(String? message, [String? code]) {
+    final msg = (message ?? '').trim();
+    if (msg.isNotEmpty && !RegExp(r'^[a-z][a-z0-9_]+$', caseSensitive: false).hasMatch(msg)) {
+      return msg;
+    }
+    final key = (code ?? msg).trim();
+    return _codeRu[key] ?? (msg.isNotEmpty ? msg : 'Не удалось выполнить запрос');
+  }
+
   String messageFromError(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
@@ -81,10 +106,12 @@ class ApiClient {
         final detail = data['detail'];
         if (detail is Map) {
           final err = detail['error'];
-          if (err is Map && err['message'] is String) return err['message'] as String;
-          if (detail['message'] is String) return detail['message'] as String;
+          if (err is Map) {
+            return _ru(err['message'] as String?, err['code'] as String?);
+          }
+          if (detail['message'] is String) return _ru(detail['message'] as String);
         }
-        if (detail is String && detail.trim().isNotEmpty) return detail;
+        if (detail is String && detail.trim().isNotEmpty) return _ru(detail);
         if (detail is List && detail.isNotEmpty) {
           final first = detail.first;
           if (first is Map && first['msg'] is String) return first['msg'] as String;
@@ -94,9 +121,11 @@ class ApiClient {
           if (top.toLowerCase().contains('rate limit')) {
             return 'Слишком много попыток. Попробуйте через минуту';
           }
-          return top;
+          return _ru(top);
         }
-        if (top is Map && top['message'] is String) return top['message'] as String;
+        if (top is Map && top['message'] is String) {
+          return _ru(top['message'] as String, top['code'] as String?);
+        }
       }
       if (error.type == DioExceptionType.connectionError ||
           error.type == DioExceptionType.connectionTimeout) {

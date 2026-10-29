@@ -71,6 +71,26 @@ async def oauth_start(
     return started
 
 
+_OAUTH_ERROR_RU: dict[str, str] = {
+    "missing_params": "Не удалось завершить вход: нет кода подтверждения. Попробуйте ещё раз.",
+    "invalid_state": "Сессия входа устарела. Начните вход заново.",
+    "state_expired": "Сессия входа истекла. Начните вход заново.",
+    "state_reuse": "Этот вход уже был использован. Начните заново.",
+    "provider_disabled": "Этот способ входа сейчас недоступен.",
+    "access_denied": "Вход отменён.",
+    "email_owned": "Email уже занят. Войдите в существующий аккаунт и привяжите провайдера в профиле.",
+    "vk_token": "Не удалось войти через VK ID. Попробуйте ещё раз.",
+    "yandex_token": "Не удалось войти через Яндекс ID. Попробуйте ещё раз.",
+    "apple_token": "Не удалось войти через Apple. Попробуйте ещё раз.",
+}
+
+
+def _login_error_redirect(settings, *, code: str, message: str | None = None) -> RedirectResponse:
+    text = (message or "").strip() or _OAUTH_ERROR_RU.get(code) or "Не удалось выполнить вход. Попробуйте ещё раз."
+    q = urlencode({"oauth_error": code, "message": text})
+    return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
+
+
 async def _finish_web(
     db: AsyncSession,
     response: Response,
@@ -89,13 +109,20 @@ async def _finish_web(
         await db.commit()
     except oauth_service.OAuthError as e:
         await db.rollback()
-        q = urlencode({"oauth_error": e.code, "message": e.message})
-        return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
+        return _login_error_redirect(settings, code=e.code, message=e.message)
 
-    # Temporary response to set cookies, then redirect
+    # New OAuth users land in workspace the same as email registration.
     redirect = RedirectResponse(f"{settings.APP_PUBLIC_URL}/app/projects", status_code=302)
     _set_auth_cookies(redirect, access, refresh)
     return redirect
+
+
+async def _provider_from_state(db: AsyncSession, state: str) -> OAuthProvider | None:
+    from sqlalchemy import select
+    from app.models.platform import OAuthLoginState
+
+    row = await db.scalar(select(OAuthLoginState).where(OAuthLoginState.state == state))
+    return row.provider if row else None
 
 
 @router.get("/callback")
@@ -107,16 +134,19 @@ async def oauth_callback_get(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
+    device_id: str | None = None,
     provider: Literal["apple", "vk", "yandex"] | None = Query(default=None),
 ):
+    """VK / Yandex redirect here with code+state (no provider query). Resolve provider from state."""
     settings = get_settings()
     if error:
-        q = urlencode({"oauth_error": error})
-        return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
-    if not code or not state or not provider:
-        q = urlencode({"oauth_error": "missing_params"})
-        return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
-    return await _finish_web(db, response, OAuthProvider(provider), code, state)
+        return _login_error_redirect(settings, code=str(error), message=_OAUTH_ERROR_RU.get(str(error)))
+    if not code or not state:
+        return _login_error_redirect(settings, code="missing_params")
+    resolved = OAuthProvider(provider) if provider else await _provider_from_state(db, state)
+    if not resolved:
+        return _login_error_redirect(settings, code="invalid_state")
+    return await _finish_web(db, response, resolved, code, state, device_id=device_id)
 
 
 @router.post("/callback")
@@ -130,23 +160,18 @@ async def oauth_callback_post(
     error: Annotated[str | None, Form()] = None,
     user: Annotated[str | None, Form()] = None,  # Apple may send user JSON once
     id_token: Annotated[str | None, Form()] = None,
+    device_id: Annotated[str | None, Form()] = None,
 ):
     """Apple uses form_post. Provider inferred from state row."""
     settings = get_settings()
     if error:
-        q = urlencode({"oauth_error": str(error)})
-        return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
+        return _login_error_redirect(settings, code=str(error), message=_OAUTH_ERROR_RU.get(str(error)))
     if not code or not state:
-        q = urlencode({"oauth_error": "missing_params"})
-        return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
-    from sqlalchemy import select
-    from app.models.platform import OAuthLoginState
-
-    row = await db.scalar(select(OAuthLoginState).where(OAuthLoginState.state == state))
-    if not row:
-        q = urlencode({"oauth_error": "invalid_state"})
-        return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
-    return await _finish_web(db, response, row.provider, code, state)
+        return _login_error_redirect(settings, code="missing_params")
+    resolved = await _provider_from_state(db, state)
+    if not resolved:
+        return _login_error_redirect(settings, code="invalid_state")
+    return await _finish_web(db, response, resolved, code, state, device_id=device_id)
 
 
 class MobileOAuthBody(BaseModel):
