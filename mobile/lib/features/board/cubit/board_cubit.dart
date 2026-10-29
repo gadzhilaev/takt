@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_client.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/project_visibility.dart';
 import '../../projects/data/projects_repository.dart';
 import '../../widget_sync/widget_sync.dart';
 import '../data/board_repository.dart';
@@ -49,13 +52,14 @@ class BoardState extends Equatable {
     bool? offline,
     String? error,
     bool clearError = false,
+    bool clearProject = false,
   }) =>
       BoardState(
         projects: projects ?? this.projects,
-        project: project ?? this.project,
-        columns: columns ?? this.columns,
-        tasks: tasks ?? this.tasks,
-        columnIndex: columnIndex ?? this.columnIndex,
+        project: clearProject ? null : (project ?? this.project),
+        columns: clearProject ? const [] : (columns ?? this.columns),
+        tasks: clearProject ? const [] : (tasks ?? this.tasks),
+        columnIndex: clearProject ? 0 : (columnIndex ?? this.columnIndex),
         loading: loading ?? this.loading,
         offline: offline ?? this.offline,
         error: clearError ? null : (error ?? this.error),
@@ -79,33 +83,52 @@ class BoardCubit extends Cubit<BoardState> {
   final ApiClient api;
   final WidgetSync widgetSync;
 
+  /// Set from AuthCubit so widgets only show tasks assigned to this user.
+  String? currentUserId;
+
   static const _lastProjectKey = 'takt_last_project_id';
 
-  Future<void> bootstrap() async {
+  void setCurrentUserId(String? id) {
+    currentUserId = id;
+    if (id != null && state.project != null) {
+      unawaited(_publishWidget());
+    }
+  }
+
+  Future<void> _publishWidget() async {
+    final project = state.project;
+    final userId = currentUserId;
+    if (project == null || userId == null || userId.isEmpty) return;
+    await widgetSync.publishBoard(
+      project: project,
+      columns: state.columns,
+      tasks: state.tasks,
+      currentUserId: userId,
+      allProjects: state.projects,
+    );
+  }
+
+  Future<void> bootstrap({String? preferProjectId}) async {
     emit(state.copyWith(loading: true, clearError: true));
     try {
       final projects = await this.projects.listProjects();
-      final prefs = await SharedPreferences.getInstance();
-      final lastId = prefs.getString(_lastProjectKey);
-      Project? selected;
-      if (projects.isNotEmpty) {
-        for (final p in projects) {
-          if (p.id == lastId) {
-            selected = p;
-            break;
-          }
-        }
-        selected ??= projects.cast<Project?>().firstWhere(
-              (p) => p!.name == 'Колледж ДГУ',
-              orElse: () => null,
-            );
-        selected ??= projects.first;
+      final visible = projects.where((p) => !taktIsTestProject(p)).toList();
+      // Deep link / explicit project — open immediately; otherwise show hub.
+      String? openId = preferProjectId;
+      if (openId != null && openId.isNotEmpty) {
+        final match = visible.where((p) => p.id == openId).toList();
+        if (match.isEmpty) openId = null;
       }
-      if (selected == null) {
-        emit(state.copyWith(projects: projects, loading: false, project: null));
+      if (openId != null) {
+        await openProject(openId, projects: projects);
         return;
       }
-      await openProject(selected.id, projects: projects);
+      emit(state.copyWith(
+        projects: projects,
+        loading: false,
+        clearProject: true,
+        offline: false,
+      ));
     } catch (e) {
       emit(state.copyWith(
         loading: false,
@@ -113,6 +136,29 @@ class BoardCubit extends Cubit<BoardState> {
         error: api.messageFromError(e),
       ));
     }
+  }
+
+  Future<void> refreshProjects() async {
+    try {
+      final projects = await this.projects.listProjects();
+      final currentId = state.project?.id;
+      Project? project = state.project;
+      if (currentId != null) {
+        final matches = projects.where((p) => p.id == currentId);
+        project = matches.isEmpty ? null : matches.first;
+      }
+      if (project == null && currentId != null) {
+        emit(state.copyWith(projects: projects, clearProject: true));
+      } else {
+        emit(state.copyWith(projects: projects, project: project));
+      }
+    } catch (e) {
+      emit(state.copyWith(error: api.messageFromError(e)));
+    }
+  }
+
+  void clearProject() {
+    emit(state.copyWith(clearProject: true, clearError: true));
   }
 
   Future<void> openProject(String projectId, {List<Project>? projects}) async {
@@ -135,11 +181,7 @@ class BoardCubit extends Cubit<BoardState> {
         loading: false,
         offline: false,
       ));
-      await widgetSync.publishBoard(
-        project: project,
-        columns: loaded.columns,
-        tasks: loaded.tasks,
-      );
+      await _publishWidget();
     } catch (e) {
       emit(state.copyWith(loading: false, offline: true, error: api.messageFromError(e)));
     }
@@ -155,18 +197,20 @@ class BoardCubit extends Cubit<BoardState> {
     String? description,
     String priority = 'medium',
     List<String> assigneeIds = const [],
+    String? statusId,
   }) async {
     final project = state.project;
     final col = state.currentColumn;
-    if (project == null || col == null) return;
+    final targetStatusId = statusId ?? col?.id;
+    if (project == null || targetStatusId == null) return;
     if (state.offline) {
-      emit(state.copyWith(error: 'Нет сети — создание задачиблокировано'));
+      emit(state.copyWith(error: 'Нет сети: создание задачи блокировано'));
       return;
     }
     try {
       final task = await board.createTask(
         projectId: project.id,
-        statusId: col.id,
+        statusId: targetStatusId,
         title: title,
         description: description,
         priority: priority,
@@ -174,11 +218,7 @@ class BoardCubit extends Cubit<BoardState> {
       );
       final next = [task, ...state.tasks.where((t) => t.id != task.id)];
       emit(state.copyWith(tasks: next, clearError: true));
-      await widgetSync.publishBoard(
-        project: project,
-        columns: state.columns,
-        tasks: next,
-      );
+      await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
     }
@@ -186,7 +226,7 @@ class BoardCubit extends Cubit<BoardState> {
 
   Future<void> moveToColumn(TaskItem task, String statusId) async {
     if (state.offline) {
-      emit(state.copyWith(error: 'Нет сети — перемещение заблокировано'));
+      emit(state.copyWith(error: 'Нет сети: перемещение заблокировано'));
       return;
     }
     final peers = state.tasks.where((t) => t.statusId == statusId && t.id != task.id);
@@ -202,13 +242,7 @@ class BoardCubit extends Cubit<BoardState> {
       );
       final next = state.tasks.map((t) => t.id == updated.id ? updated : t).toList();
       emit(state.copyWith(tasks: next, clearError: true));
-      if (state.project != null) {
-        await widgetSync.publishBoard(
-          project: state.project!,
-          columns: state.columns,
-          tasks: next,
-        );
-      }
+      await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
     }
@@ -216,7 +250,7 @@ class BoardCubit extends Cubit<BoardState> {
 
   Future<void> updateTask(TaskItem updated) async {
     if (state.offline) {
-      emit(state.copyWith(error: 'Нет сети — изменение заблокировано'));
+      emit(state.copyWith(error: 'Нет сети: изменение заблокировано'));
       return;
     }
     try {
@@ -230,6 +264,7 @@ class BoardCubit extends Cubit<BoardState> {
       );
       final next = state.tasks.map((t) => t.id == saved.id ? saved : t).toList();
       emit(state.copyWith(tasks: next, clearError: true));
+      await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
     }
@@ -241,6 +276,21 @@ class BoardCubit extends Cubit<BoardState> {
       final list = [...state.projects, p];
       emit(state.copyWith(projects: list));
       await openProject(p.id, projects: list);
+    } catch (e) {
+      emit(state.copyWith(error: api.messageFromError(e)));
+    }
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    if (state.offline) {
+      emit(state.copyWith(error: 'Нет сети: удаление заблокировано'));
+      return;
+    }
+    try {
+      await board.deleteTask(taskId);
+      final next = state.tasks.where((t) => t.id != taskId).toList();
+      emit(state.copyWith(tasks: next, clearError: true));
+      await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
     }

@@ -60,6 +60,7 @@ class AuthCubit extends Cubit<AuthState> {
         emit(const AuthGuest());
       } else {
         emit(AuthAuthenticated(user));
+        // Token register only after user completed the notifications intro.
         await fcm?.registerForUser();
       }
     } catch (e) {
@@ -73,7 +74,6 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final user = await auth.login(email: email, password: password);
       emit(AuthAuthenticated(user));
-      await fcm?.registerForUser();
     } catch (e) {
       emit(AuthFailure(api.messageFromError(e)));
       emit(const AuthGuest());
@@ -95,7 +95,6 @@ class AuthCubit extends Cubit<AuthState> {
         passwordConfirm: passwordConfirm,
       );
       emit(AuthAuthenticated(user));
-      await fcm?.registerForUser();
     } catch (e) {
       emit(AuthFailure(api.messageFromError(e)));
       emit(const AuthGuest());

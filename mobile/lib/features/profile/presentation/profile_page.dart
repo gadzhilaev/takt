@@ -3,96 +3,309 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/push/fcm_bootstrap.dart';
+import '../../../shared/widgets/app_icon.dart';
+import '../../../core/theme.dart';
+import '../../../core/theme_scope.dart';
+import '../../../shared/widgets/takt_app_bar.dart';
+import '../../../shared/widgets/takt_ui.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../board/cubit/board_cubit.dart';
 import '../../projects/data/projects_repository.dart';
 import '../data/profile_repository.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final _name = TextEditingController();
-  final _email = TextEditingController();
   String? _message;
+  String? _avatarUrl;
+  String _name = '';
+  String _email = '';
+  PushPermission? _pushStatus;
+  bool _pushBusy = false;
 
   @override
   void initState() {
     super.initState();
     final auth = context.read<AuthCubit>().state;
     if (auth is AuthAuthenticated) {
-      _name.text = auth.user.name;
-      _email.text = auth.user.email;
+      _name = auth.user.name;
+      _email = auth.user.email;
+      _avatarUrl = auth.user.avatarUrl;
+    }
+    _refreshPushStatus();
+  }
+
+  Future<void> _refreshPushStatus() async {
+    final fcm = context.read<FcmBootstrap>();
+    final status = await fcm.currentPermission();
+    if (mounted) setState(() => _pushStatus = status);
+  }
+
+  String get _pushLabel {
+    switch (_pushStatus) {
+      case PushPermission.authorized:
+      case PushPermission.provisional:
+        return 'Разрешены';
+      case PushPermission.denied:
+        return 'Отклонены системой';
+      case PushPermission.notDetermined:
+        return 'Ещё не запрошены';
+      case PushPermission.unavailable:
+      case null:
+        return 'Недоступны на этом устройстве';
     }
   }
 
   @override
-  void dispose() {
-    _name.dispose();
-    _email.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final themeCtrl = ThemeScope.of(context);
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final border = dark ? TaktColors.borderDark : TaktColors.border;
+    final surface = dark ? TaktColors.surfaceDark : TaktColors.surface;
+
+    return ListenableBuilder(
+      listenable: themeCtrl,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: TaktAppBar(title: 'Профиль'),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(0, 4, 0, 28),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  children: [
+                    TaktUserAvatar(
+                      name: _name.isEmpty ? '?' : _name,
+                      avatarUrl: _avatarUrl,
+                      size: 48,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _name.isEmpty ? 'Пользователь' : _name,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.2,
+                              color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(_email, style: TextStyle(fontSize: 13, color: muted)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_message != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    _message!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: dark ? TaktColors.accentDark : TaktColors.accent,
+                    ),
+                  ),
+                ),
+              TaktSection(
+                title: 'Аккаунт',
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: _SettingsGroup(
+                  surface: surface,
+                  border: border,
+                  children: [
+                    TaktListTile(
+                      leading: AppIcon(AppIcons.edit, size: 20, color: muted),
+                      title: 'Личные данные',
+                      subtitle: _email,
+                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                      onTap: () => _editProfile(context),
+                    ),
+                    TaktListTile(
+                      leading: AppIcon(AppIcons.lock, size: 20, color: muted),
+                      title: 'Сменить пароль',
+                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                      onTap: () => _changePassword(context),
+                    ),
+                  ],
+                ),
+              ),
+              TaktSection(
+                title: 'Тема',
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: _SettingsGroup(
+                  surface: surface,
+                  border: border,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                      child: Row(
+                        children: [
+                          for (final entry in const [
+                            (ThemeMode.system, 'Авто'),
+                            (ThemeMode.light, 'Светлая'),
+                            (ThemeMode.dark, 'Тёмная'),
+                          ]) ...[
+                            Expanded(
+                              child: _ThemeChip(
+                                label: entry.$2,
+                                selected: themeCtrl.mode == entry.$1,
+                                onTap: () => themeCtrl.setMode(entry.$1),
+                              ),
+                            ),
+                            if (entry.$1 != ThemeMode.dark) const SizedBox(width: 6),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TaktSection(
+                title: 'Уведомления и проекты',
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: _SettingsGroup(
+                  surface: surface,
+                  border: border,
+                  children: [
+                    TaktListTile(
+                      leading: AppIcon(AppIcons.notifications, size: 20, color: muted),
+                      title: 'Системные push',
+                      subtitle: _pushLabel,
+                      trailing: _pushBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                      onTap: _pushBusy ? null : () => _handlePushTap(context),
+                    ),
+                    TaktListTile(
+                      leading: AppIcon(AppIcons.notifications, size: 20, color: muted),
+                      title: 'Центр уведомлений',
+                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                      onTap: () => context.push('/notifications'),
+                    ),
+                    TaktListTile(
+                      leading: AppIcon(AppIcons.invite, size: 20, color: muted),
+                      title: 'Пригласить участника',
+                      subtitle: 'В текущий проект',
+                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                      onTap: () => _inviteDialog(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Выйти из аккаунта?'),
+                        content: const Text('Виджеты очистят данные текущего пользователя.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: TextButton.styleFrom(foregroundColor: TaktColors.danger),
+                            child: const Text('Выйти'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true || !context.mounted) return;
+                    await context.read<AuthCubit>().logout();
+                    if (context.mounted) context.go('/login');
+                  },
+                  icon: const AppIcon(AppIcons.logout, size: 18, color: TaktColors.danger),
+                  label: const Text('Выйти', style: TextStyle(color: TaktColors.danger)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Профиль')),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          TextField(controller: _name, decoration: const InputDecoration(labelText: 'Имя')),
-          const SizedBox(height: 12),
-          TextField(controller: _email, decoration: const InputDecoration(labelText: 'Email')),
-          if (_message != null) ...[
-            const SizedBox(height: 12),
-            Text(_message!),
+  Future<void> _handlePushTap(BuildContext context) async {
+    final fcm = context.read<FcmBootstrap>();
+    if (_pushStatus == PushPermission.denied) {
+      setState(() => _message = 'Разрешите уведомления в настройках устройства');
+      await fcm.openSystemSettings();
+      return;
+    }
+    setState(() => _pushBusy = true);
+    try {
+      await fcm.enablePush();
+      await _refreshPushStatus();
+      if (!mounted) return;
+      setState(() => _message = 'Запрос уведомлений обработан');
+    } finally {
+      if (mounted) setState(() => _pushBusy = false);
+    }
+  }
+
+  Future<void> _editProfile(BuildContext context) async {
+    final name = TextEditingController(text: _name);
+    final email = TextEditingController(text: _email);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Личные данные'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TaktTextField(controller: name, label: 'Имя'),
+            const SizedBox(height: 10),
+            TaktTextField(controller: email, label: 'Email', keyboardType: TextInputType.emailAddress),
           ],
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: () async {
-              final profileRepo = context.read<ProfileRepository>();
-              final authCubit = context.read<AuthCubit>();
-              final api = context.read<ApiClient>();
-              try {
-                final user = await profileRepo.update(
-                  name: _name.text,
-                  email: _email.text,
-                );
-                if (!mounted) return;
-                authCubit.setUser(user);
-                setState(() => _message = 'Сохранено');
-              } catch (e) {
-                if (!mounted) return;
-                setState(() => _message = api.messageFromError(e));
-              }
-            },
-            child: const Text('Сохранить'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => _changePassword(context),
-            child: const Text('Сменить пароль'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => _inviteDialog(context),
-            child: const Text('Пригласить в текущий проект'),
-          ),
-          const SizedBox(height: 24),
-          TextButton(
-            onPressed: () async {
-              await context.read<AuthCubit>().logout();
-              if (context.mounted) context.go('/login');
-            },
-            child: const Text('Выйти'),
-          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Сохранить')),
         ],
       ),
     );
+    if (ok != true || !context.mounted) return;
+    final profileRepo = context.read<ProfileRepository>();
+    final authCubit = context.read<AuthCubit>();
+    final api = context.read<ApiClient>();
+    try {
+      final user = await profileRepo.update(name: name.text, email: email.text);
+      if (!mounted) return;
+      authCubit.setUser(user);
+      setState(() {
+        _name = user.name;
+        _email = user.email;
+        _avatarUrl = user.avatarUrl;
+        _message = 'Сохранено';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _message = api.messageFromError(e));
+    }
   }
 
   Future<void> _changePassword(BuildContext context) async {
@@ -106,9 +319,11 @@ class _ProfilePageState extends State<ProfilePage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: current, obscureText: true, decoration: const InputDecoration(labelText: 'Текущий')),
-            TextField(controller: next, obscureText: true, decoration: const InputDecoration(labelText: 'Новый')),
-            TextField(controller: confirm, obscureText: true, decoration: const InputDecoration(labelText: 'Повтор')),
+            TaktTextField(controller: current, label: 'Текущий', obscureText: true),
+            const SizedBox(height: 8),
+            TaktTextField(controller: next, label: 'Новый', obscureText: true),
+            const SizedBox(height: 8),
+            TaktTextField(controller: confirm, label: 'Повтор', obscureText: true),
           ],
         ),
         actions: [
@@ -140,7 +355,7 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Приглашение'),
-        content: TextField(controller: email, decoration: const InputDecoration(labelText: 'Email')),
+        content: TaktTextField(controller: email, label: 'Email', keyboardType: TextInputType.emailAddress),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Отправить')),
@@ -150,6 +365,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (ok != true || !context.mounted) return;
     final projectsRepo = context.read<ProjectsRepository>();
     final api = context.read<ApiClient>();
+    final currentId = context.read<BoardCubit>().state.project?.id;
     try {
       final projects = await projectsRepo.listProjects();
       if (!mounted) return;
@@ -157,15 +373,82 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() => _message = 'Сначала создайте проект');
         return;
       }
-      await projectsRepo.inviteMember(
-        projectId: projects.first.id,
-        email: email.text,
-      );
+      final projectId = currentId ?? projects.first.id;
+      await projectsRepo.inviteMember(projectId: projectId, email: email.text);
       if (!mounted) return;
       setState(() => _message = 'Приглашение отправлено');
     } catch (e) {
       if (!mounted) return;
       setState(() => _message = api.messageFromError(e));
     }
+  }
+}
+
+class _ThemeChip extends StatelessWidget {
+  const _ThemeChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark ? TaktColors.accentDark : TaktColors.accent;
+    return Material(
+      color: selected
+          ? (dark ? TaktColors.accentSoftDark : TaktColors.accentSoft)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(TaktRadii.md),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(TaktRadii.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? accent : (dark ? TaktColors.mutedDark : TaktColors.muted),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({
+    required this.children,
+    required this.surface,
+    required this.border,
+  });
+
+  final List<Widget> children;
+  final Color surface;
+  final Color border;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TaktRadii.md),
+        side: BorderSide(color: border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1)
+              Divider(height: 1, indent: 52, endIndent: 16, color: border),
+          ],
+        ],
+      ),
+    );
   }
 }

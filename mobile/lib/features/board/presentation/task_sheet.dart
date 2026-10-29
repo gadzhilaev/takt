@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/kanban_colors.dart';
+import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/widgets/urgency_badge.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../cubit/board_cubit.dart';
 
 class TaskSheet extends StatefulWidget {
@@ -43,215 +45,236 @@ class _TaskSheetState extends State<TaskSheet> {
     final board = context.watch<BoardCubit>().state;
     final members = board.project?.members ?? const <ProjectMember>[];
     final statusName = board.columns
-        .where((c) => c.id == widget.task.statusId)
+        .where((c) => c.id == (_editing ? _statusId : widget.task.statusId))
         .map((c) => c.name)
         .firstOrNull;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).dividerColor,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _editing ? 'Редактирование' : 'Задача',
-                    style: Theme.of(context).textTheme.titleMedium,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 10,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: dark ? TaktColors.borderDark : TaktColors.border,
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
-                if (!_editing)
-                  TextButton.icon(
-                    onPressed: () => setState(() => _editing = true),
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('Редактировать'),
-                  )
-                else
-                  TextButton(
-                    onPressed: () => setState(() => _editing = false),
-                    child: const Text('Готово'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_editing) ...[
-              TextField(controller: _title, decoration: const InputDecoration(labelText: 'Название')),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _description,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(labelText: 'Описание'),
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                // ignore: deprecated_member_use
-                value: _priority,
-                decoration: const InputDecoration(labelText: 'Срочность'),
-                items: const [
-                  DropdownMenuItem(value: 'urgent', child: Text('Срочно')),
-                  DropdownMenuItem(value: 'high', child: Text('Важно')),
-                  DropdownMenuItem(value: 'medium', child: Text('Обычная')),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _editing ? 'Редактирование' : 'Задача',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            letterSpacing: -0.2,
+                          ),
+                    ),
+                  ),
+                  if (!_editing)
+                    TextButton(
+                      onPressed: () => setState(() => _editing = true),
+                      child: const Text('Изменить'),
+                    )
+                  else
+                    TextButton(
+                      onPressed: () => setState(() => _editing = false),
+                      child: const Text('Отмена'),
+                    ),
                 ],
-                onChanged: (v) => setState(() => _priority = v ?? 'medium'),
               ),
+              const SizedBox(height: 4),
+              const Divider(height: 1),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                // ignore: deprecated_member_use
-                value: _statusId,
-                decoration: const InputDecoration(labelText: 'Столбец'),
-                items: board.columns
-                    .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
-                    .toList(),
-                onChanged: (v) => setState(() => _statusId = v ?? _statusId),
-              ),
-              const SizedBox(height: 16),
-              Text('Исполнители', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: members.map((m) {
-                  final selected = _assigneeIds.contains(m.userId);
-                  return FilterChip(
-                    label: Text(m.name),
-                    selected: selected,
-                    onSelected: (v) {
-                      setState(() {
-                        if (v) {
-                          _assigneeIds.add(m.userId);
-                        } else {
-                          _assigneeIds.remove(m.userId);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () async {
-                  final cubit = context.read<BoardCubit>();
-                  final updated = TaskItem(
-                    id: widget.task.id,
-                    title: _title.text.trim(),
-                    description:
-                        _description.text.trim().isEmpty ? null : _description.text.trim(),
-                    statusId: _statusId,
-                    priority: _priority,
-                    position: widget.task.position,
-                    projectId: widget.task.projectId,
-                    assignees: members
-                        .where((m) => _assigneeIds.contains(m.userId))
+              if (_editing) ...[
+                TextField(controller: _title, decoration: const InputDecoration(labelText: 'Название')),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _description,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: const InputDecoration(labelText: 'Описание'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  // ignore: deprecated_member_use
+                  value: _priority,
+                  decoration: const InputDecoration(labelText: 'Срочность'),
+                  items: const [
+                    DropdownMenuItem(value: 'urgent', child: Text('Срочно')),
+                    DropdownMenuItem(value: 'high', child: Text('Важно')),
+                    DropdownMenuItem(value: 'medium', child: Text('Обычная')),
+                  ],
+                  onChanged: (v) => setState(() => _priority = v ?? 'medium'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  // ignore: deprecated_member_use
+                  value: _statusId,
+                  decoration: const InputDecoration(labelText: 'Столбец'),
+                  items: board.columns
+                      .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _statusId = v ?? _statusId),
+                ),
+                const SizedBox(height: 16),
+                Text('Исполнители', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: members.map((m) {
+                    final selected = _assigneeIds.contains(m.userId);
+                    return FilterChip(
+                      avatar: TaktUserAvatar(name: m.name, avatarUrl: m.avatarUrl, size: 20, fontSize: 8),
+                      label: Text(m.name, style: const TextStyle(fontSize: 13)),
+                      selected: selected,
+                      onSelected: (v) {
+                        setState(() {
+                          if (v) {
+                            _assigneeIds.add(m.userId);
+                          } else {
+                            _assigneeIds.remove(m.userId);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () async {
+                    final cubit = context.read<BoardCubit>();
+                    final updated = TaskItem(
+                      id: widget.task.id,
+                      title: _title.text.trim(),
+                      description:
+                          _description.text.trim().isEmpty ? null : _description.text.trim(),
+                      statusId: _statusId,
+                      priority: _priority,
+                      position: widget.task.position,
+                      projectId: widget.task.projectId,
+                      assignees: members
+                          .where((m) => _assigneeIds.contains(m.userId))
+                          .map(
+                            (m) => TaskAssignee(
+                              id: m.userId,
+                              name: m.name,
+                              avatarUrl: m.avatarUrl,
+                            ),
+                          )
+                          .toList(),
+                      closedAt: widget.task.closedAt,
+                    );
+                    if (_statusId != widget.task.statusId) {
+                      await cubit.moveToColumn(widget.task, _statusId);
+                    }
+                    await cubit.updateTask(updated);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('Сохранить'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () async {
+                    final done = board.columns.where((c) => c.isDone).toList();
+                    if (done.isEmpty) return;
+                    await context.read<BoardCubit>().moveToColumn(widget.task, done.first.id);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('Завершить'),
+                ),
+              ] else ...[
+                Text(
+                  widget.task.title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                        height: 1.3,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                UrgencyBadge(priority: widget.task.priority),
+                const SizedBox(height: 16),
+                _MetaLabel(text: 'Описание', muted: muted),
+                const SizedBox(height: 4),
+                Text(
+                  (widget.task.description?.trim().isNotEmpty ?? false)
+                      ? widget.task.description!
+                      : 'Без описания',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: (widget.task.description?.trim().isNotEmpty ?? false)
+                        ? (dark ? TaktColors.foregroundDark : TaktColors.graphite)
+                        : muted,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _MetaLabel(text: 'Столбец', muted: muted),
+                const SizedBox(height: 4),
+                Text(statusName ?? '-', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 16),
+                _MetaLabel(text: 'Исполнители', muted: muted),
+                const SizedBox(height: 8),
+                if (widget.task.assignees.isEmpty)
+                  Text('Не назначены', style: TextStyle(fontSize: 14, color: muted))
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.task.assignees
                         .map(
-                          (m) => TaskAssignee(
-                            id: m.userId,
-                            name: m.name,
-                            avatarUrl: m.avatarUrl,
+                          (a) => Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TaktUserAvatar(name: a.name, avatarUrl: a.avatarUrl, size: 24, fontSize: 9),
+                              const SizedBox(width: 6),
+                              Text(a.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                            ],
                           ),
                         )
                         .toList(),
-                    closedAt: widget.task.closedAt,
-                  );
-                  if (_statusId != widget.task.statusId) {
-                    await cubit.moveToColumn(widget.task, _statusId);
-                  }
-                  await cubit.updateTask(updated);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('Сохранить'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () async {
-                  final done = board.columns.where((c) => c.isDone).toList();
-                  if (done.isEmpty) return;
-                  await context.read<BoardCubit>().moveToColumn(widget.task, done.first.id);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('Завершить'),
-              ),
-            ] else ...[
-              Text(
-                widget.task.title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              Text('Описание', style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: 4),
-              Text(
-                (widget.task.description?.trim().isNotEmpty ?? false)
-                    ? widget.task.description!
-                    : 'Без описания',
-                style: TextStyle(
-                  color: (widget.task.description?.trim().isNotEmpty ?? false)
-                      ? null
-                      : Theme.of(context).hintColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('Столбец', style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: 4),
-              Text(statusName ?? '—'),
-              const SizedBox(height: 12),
-              Text('Срочность', style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: 4),
-              Builder(
-                builder: (context) {
-                  final dark = Theme.of(context).brightness == Brightness.dark;
-                  final u = KanbanColors.urgency(widget.task.priority, dark: dark);
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: u.bg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        u.label,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: u.fg),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              Text('Исполнители', style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: 4),
-              if (widget.task.assignees.isEmpty)
-                Text('Не назначены', style: TextStyle(color: Theme.of(context).hintColor))
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: widget.task.assignees
-                      .map((a) => Chip(label: Text(a.name), visualDensity: VisualDensity.compact))
-                      .toList(),
-                ),
-              const SizedBox(height: 8),
+                  ),
+                const SizedBox(height: 12),
+              ],
             ],
-          ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _MetaLabel extends StatelessWidget {
+  const _MetaLabel({required this.text, required this.muted});
+  final String text;
+  final Color muted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted, letterSpacing: 0.1),
     );
   }
 }

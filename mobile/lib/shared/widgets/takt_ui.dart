@@ -1,0 +1,336 @@
+import 'package:flutter/material.dart';
+
+import '../../core/theme.dart';
+import 'app_icon.dart';
+
+/// Compact primary/secondary/ghost buttons — not oversized M3 defaults.
+class TaktButton extends StatelessWidget {
+  const TaktButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.variant = TaktButtonVariant.primary,
+    this.expand = false,
+    this.icon,
+    this.danger = false,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final TaktButtonVariant variant;
+  final bool expand;
+  final String? icon;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final child = Row(
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (icon != null) ...[
+          AppIcon(icon!, size: 18),
+          const SizedBox(width: 6),
+        ],
+        Text(label),
+      ],
+    );
+
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.md));
+    final size = Size(expand ? double.infinity : 0, 40);
+
+    switch (variant) {
+      case TaktButtonVariant.primary:
+        return FilledButton(
+          onPressed: onPressed,
+          style: FilledButton.styleFrom(
+            minimumSize: size,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            backgroundColor: danger ? TaktColors.danger : (dark ? TaktColors.accentDark : TaktColors.accent),
+            foregroundColor: Colors.white,
+            // Avoid custom textStyle — inherit mismatch breaks TextStyle.lerp on press.
+            shape: shape,
+          ),
+          child: child,
+        );
+      case TaktButtonVariant.secondary:
+        return OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            minimumSize: size,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            foregroundColor: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+            side: BorderSide(color: dark ? TaktColors.borderStrongDark : TaktColors.borderStrong),
+            shape: shape,
+          ),
+          child: child,
+        );
+      case TaktButtonVariant.ghost:
+        return TextButton(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            minimumSize: size,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            foregroundColor: danger
+                ? TaktColors.danger
+                : (dark ? TaktColors.accentDark : TaktColors.accent),
+          ),
+          child: child,
+        );
+    }
+  }
+}
+
+enum TaktButtonVariant { primary, secondary, ghost }
+
+class TaktCard extends StatelessWidget {
+  const TaktCard({super.key, required this.child, this.padding, this.onTap});
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final radius = BorderRadius.circular(TaktRadii.md);
+    final box = DecoratedBox(
+      decoration: BoxDecoration(
+        color: dark ? TaktColors.surfaceDark : TaktColors.surface,
+        borderRadius: radius,
+        border: Border.all(color: dark ? TaktColors.borderDark : TaktColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.22 : 0.04),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(TaktSpace.md),
+        child: child,
+      ),
+    );
+    if (onTap == null) return box;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: box,
+      ),
+    );
+  }
+}
+
+class TaktSection extends StatelessWidget {
+  const TaktSection({
+    super.key,
+    required this.title,
+    required this.child,
+    this.trailing,
+    this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 0),
+  });
+
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: padding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.25,
+                    color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                  ),
+                ),
+              ),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class TaktListTile extends StatelessWidget {
+  const TaktListTile({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.leading,
+    this.trailing,
+    this.onTap,
+    this.dense = true,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget? leading;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return ListTile(
+      dense: dense,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: leading,
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+        ),
+      ),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: dark ? TaktColors.mutedDark : TaktColors.muted,
+              ),
+            ),
+      trailing: trailing,
+      onTap: onTap,
+    );
+  }
+}
+
+class TaktEmptyState extends StatelessWidget {
+  const TaktEmptyState({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.icon = AppIcons.inbox,
+    this.action,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String icon;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(icon, size: 36, color: muted),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+              ),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                subtitle!,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, height: 1.4, color: muted),
+              ),
+            ],
+            if (action != null) ...[
+              const SizedBox(height: 16),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class TaktTextField extends StatelessWidget {
+  const TaktTextField({
+    super.key,
+    this.controller,
+    this.label,
+    this.obscureText = false,
+    this.keyboardType,
+    this.maxLines = 1,
+    this.enabled = true,
+    this.onChanged,
+  });
+
+  final TextEditingController? controller;
+  final String? label;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final int maxLines;
+  final bool enabled;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      enabled: enabled,
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+    );
+  }
+}
+
+/// Strip internal demo markers from notification copy.
+String taktSanitizeNotificationText(String? raw) {
+  if (raw == null) return '';
+  return raw
+      .replaceAll(RegExp(r'\[demo-seed\]\s*', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+String taktRelativeTime(String iso) {
+  final dt = DateTime.tryParse(iso)?.toLocal();
+  if (dt == null) return '';
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'только что';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} мин';
+  if (diff.inHours < 24) return '${diff.inHours} ч';
+  if (diff.inDays < 7) return '${diff.inDays} д';
+  return '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
+}
+
+String taktNotificationIcon(String kind) => AppIcon.notificationKind(kind);

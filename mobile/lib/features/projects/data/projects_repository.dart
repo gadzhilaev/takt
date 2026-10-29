@@ -70,4 +70,31 @@ class ProjectsRepository {
     final items = res.data?['items'] as List<dynamic>? ?? [];
     return items.map((e) => UserProfile.fromJson(e as Map<String, dynamic>)).toList();
   }
+
+  Future<void> removeMember({required String projectId, required String userId}) async {
+    await _api.dio.delete('/api/v1/projects/$projectId/members/$userId');
+  }
+
+  Future<LeaveRequest> requestLeave(String projectId) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/api/v1/projects/$projectId/leave-requests',
+    );
+    return LeaveRequest.fromJson(res.data!['request'] as Map<String, dynamic>);
+  }
+
+  Future<List<LeaveRequest>> listLeaveRequests(String projectId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/api/v1/projects/$projectId/leave-requests',
+    );
+    final items = res.data?['items'] as List<dynamic>? ?? [];
+    return items.map((e) => LeaveRequest.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> approveLeaveRequest({required String projectId, required String requestId}) async {
+    await _api.dio.post('/api/v1/projects/$projectId/leave-requests/$requestId/approve');
+  }
+
+  Future<void> rejectLeaveRequest({required String projectId, required String requestId}) async {
+    await _api.dio.post('/api/v1/projects/$projectId/leave-requests/$requestId/reject');
+  }
 }

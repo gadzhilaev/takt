@@ -6,33 +6,33 @@ void main() {
   test('standard presets resolve solid backgrounds', () {
     expect(
       KanbanColors.columnBackground('#607FA4', dark: false),
-      const Color(0xFFD2DDEB),
+      const Color(0xFFE4EAF2),
     );
     expect(
       KanbanColors.columnBackground('#347FA4', dark: false),
-      const Color(0xFFC9E3F1),
+      const Color(0xFFE0ECF3),
     );
     expect(
       KanbanColors.columnBackground('#9062B8', dark: false),
-      const Color(0xFFE0CFF0),
+      const Color(0xFFECE4F4),
     );
     expect(
       KanbanColors.columnBackground('#398A62', dark: false),
-      const Color(0xFFCCE8D8),
+      const Color(0xFFE2F0E8),
     );
   });
 
   test('legacy standard accents alias to current presets', () {
     expect(
       KanbanColors.columnBackground('#7892B2', dark: false),
-      const Color(0xFFD2DDEB),
+      const Color(0xFFE4EAF2),
     );
     expect(KanbanColors.columnAccent('#4B8CAF'), const Color(0xFF347FA4));
   });
 
   test('custom accent does not crash and differs from preset', () {
     final custom = KanbanColors.columnBackground('#FF00AA', dark: false);
-    expect(custom, isNot(const Color(0xFFD2DDEB)));
+    expect(custom, isNot(const Color(0xFFE4EAF2)));
   });
 
   test('urgency palette unchanged', () {

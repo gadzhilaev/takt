@@ -6,6 +6,29 @@ class BoardRepository {
 
   final ApiClient _api;
 
+  /// Tasks assigned to the current user across accessible projects (`mine=true`).
+  Future<List<TaskItem>> listMyTasks({bool includeDone = true}) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/api/v1/tasks',
+      queryParameters: {
+        'mine': true,
+        'page_size': 200,
+        'include_archived': false,
+      },
+    );
+    final tasks = (res.data?['items'] as List<dynamic>? ?? [])
+        .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    if (includeDone) return tasks;
+    return tasks.where((t) => !t.isDone).toList();
+  }
+
+  Future<TaskItem> getTask(String taskId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/tasks/$taskId');
+    final raw = res.data?['task'] as Map<String, dynamic>? ?? res.data!;
+    return TaskItem.fromJson(raw);
+  }
+
   Future<({List<StatusColumn> columns, List<TaskItem> tasks})> loadBoard(String projectId) async {
     final projectRes = await _api.dio.get<Map<String, dynamic>>('/api/v1/projects/$projectId');
     final project = projectRes.data!['project'] as Map<String, dynamic>;
@@ -90,6 +113,10 @@ class BoardRepository {
       data: {'status_id': statusId, 'position': position},
     );
     return TaskItem.fromJson(res.data!['task'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    await _api.dio.delete('/api/v1/tasks/$taskId');
   }
 
   Future<StatusColumn> createColumn({

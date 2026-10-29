@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../firebase_options.dart';
 import '../../features/notifications/data/notifications_repository.dart';
@@ -19,18 +20,56 @@ class FcmBootstrap {
   FcmBootstrap(this._notifications);
 
   final NotificationsRepository _notifications;
+  static const _promptSeenKey = 'takt_push_prompt_seen';
+
+  /// Firebase initialized (no system permission yet).
+  bool firebaseReady = false;
+
+  /// Permission requested and token pipeline wired.
   bool ready = false;
+
+  /// Drives go_router refresh when the intro is completed.
+  final ValueNotifier<bool> promptSeenListenable = ValueNotifier(false);
+
+  bool get promptSeen => promptSeenListenable.value;
+
   String? token;
   StreamSubscription<String>? _refreshSub;
 
-  /// Soft-init: app runs without google-services; push activates when configured.
-  ///
-  /// Uses classic FCM registration tokens (`getToken`) so backend
-  /// `firebase_admin.messaging.Message(token=…)` keeps working.
+  Future<void> loadPromptState() async {
+    final prefs = await SharedPreferences.getInstance();
+    promptSeenListenable.value = prefs.getBool(_promptSeenKey) ?? false;
+  }
+
+  Future<void> markPromptSeen() async {
+    if (promptSeenListenable.value) return;
+    promptSeenListenable.value = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_promptSeenKey, true);
+  }
+
+  /// Soft Firebase init only. Does **not** ask for notification permission.
   Future<void> init() async {
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      firebaseReady = true;
+    } catch (e) {
+      firebaseReady = false;
+      debugPrint('FCM unavailable (проверьте GoogleService-Info / google-services): $e');
+    }
+  }
+
+  /// Call after the in-app intro: system permission dialog, then token.
+  Future<void> enablePush() async {
+    if (!firebaseReady) {
+      await init();
+      if (!firebaseReady) {
+        await markPromptSeen();
+        return;
+      }
+    }
+    try {
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: true, sound: true);
       await messaging.setForegroundNotificationPresentationOptions(
@@ -40,6 +79,7 @@ class FcmBootstrap {
       );
       // ignore: deprecated_member_use
       token = await messaging.getToken();
+      await _refreshSub?.cancel();
       // ignore: deprecated_member_use
       _refreshSub = messaging.onTokenRefresh.listen((t) async {
         token = t;
@@ -47,11 +87,17 @@ class FcmBootstrap {
       });
       ready = true;
       debugPrint('FCM ready, token=${token != null}');
-    } catch (e, st) {
+      if (token != null) await _register(token!);
+    } catch (e) {
       ready = false;
-      debugPrint(
-        'FCM unavailable (add google-services / GoogleService-Info): $e\n$st',
-      );
+      final msg = e.toString();
+      if (msg.contains('apns-token-not-set')) {
+        debugPrint('FCM: push пока недоступен (нет APNS-токена; на симуляторе это нормально)');
+      } else {
+        debugPrint('FCM enable failed: $e');
+      }
+    } finally {
+      await markPromptSeen();
     }
   }
 
@@ -104,7 +150,46 @@ class FcmBootstrap {
     return null;
   }
 
+  /// Current OS permission without prompting.
+  Future<PushPermission> currentPermission() async {
+    if (!firebaseReady) return PushPermission.unavailable;
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      switch (settings.authorizationStatus) {
+        case AuthorizationStatus.authorized:
+          return PushPermission.authorized;
+        case AuthorizationStatus.provisional:
+          return PushPermission.provisional;
+        case AuthorizationStatus.denied:
+        case AuthorizationStatus.deniedPermanently:
+          return PushPermission.denied;
+        case AuthorizationStatus.notDetermined:
+          return PushPermission.notDetermined;
+      }
+    } catch (_) {
+      return PushPermission.unavailable;
+    }
+  }
+
+  /// When permission is already denied, the OS will not show the prompt again.
+  /// Profile UI tells the user to enable notifications in system Settings.
+  /// (Opening Settings requires a dedicated plugin; we avoid re-prompting here.)
+  Future<void> openSystemSettings() async {
+    debugPrint(
+      'Push denied: enable notifications in system Settings → Takt',
+    );
+  }
+
   void dispose() {
     _refreshSub?.cancel();
+    promptSeenListenable.dispose();
   }
+}
+
+enum PushPermission {
+  unavailable,
+  notDetermined,
+  denied,
+  authorized,
+  provisional,
 }

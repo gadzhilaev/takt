@@ -144,6 +144,10 @@ class TaskItem extends Equatable {
     this.description,
     this.assignees = const [],
     this.closedAt,
+    this.statusName,
+    this.authorId,
+    this.authorName,
+    this.commentCount = 0,
   });
 
   final String id;
@@ -155,21 +159,60 @@ class TaskItem extends Equatable {
   final String? description;
   final List<TaskAssignee> assignees;
   final String? closedAt;
+  final String? statusName;
+  final String? authorId;
+  final String? authorName;
+  final int commentCount;
 
   bool get isDone => closedAt != null;
 
-  factory TaskItem.fromJson(Map<String, dynamic> json) => TaskItem(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        statusId: json['status_id'] as String,
-        priority: json['priority'] as String? ?? 'medium',
-        position: (json['position'] as num?)?.toDouble() ?? 0,
-        projectId: json['project_id'] as String?,
-        description: json['description'] as String?,
-        assignees: (json['assignees'] as List<dynamic>? ?? [])
-            .map((e) => TaskAssignee.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        closedAt: json['closed_at'] as String?,
+  factory TaskItem.fromJson(Map<String, dynamic> json) {
+    final status = json['status'] as Map<String, dynamic>?;
+    final author = json['author'] as Map<String, dynamic>?;
+    return TaskItem(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      statusId: json['status_id'] as String,
+      priority: json['priority'] as String? ?? 'medium',
+      position: (json['position'] as num?)?.toDouble() ?? 0,
+      projectId: json['project_id'] as String?,
+      description: json['description'] as String?,
+      assignees: (json['assignees'] as List<dynamic>? ?? [])
+          .map((e) => TaskAssignee.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      closedAt: json['closed_at'] as String?,
+      statusName: status?['name'] as String?,
+      authorId: json['author_id'] as String? ?? author?['id'] as String?,
+      authorName: author?['name'] as String?,
+      commentCount: (json['comment_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  TaskItem copyWith({
+    String? title,
+    String? description,
+    String? statusId,
+    String? priority,
+    String? projectId,
+    List<TaskAssignee>? assignees,
+    String? closedAt,
+    String? statusName,
+    double? position,
+  }) =>
+      TaskItem(
+        id: id,
+        title: title ?? this.title,
+        statusId: statusId ?? this.statusId,
+        priority: priority ?? this.priority,
+        position: position ?? this.position,
+        projectId: projectId ?? this.projectId,
+        description: description ?? this.description,
+        assignees: assignees ?? this.assignees,
+        closedAt: closedAt ?? this.closedAt,
+        statusName: statusName ?? this.statusName,
+        authorId: authorId,
+        authorName: authorName,
+        commentCount: commentCount,
       );
 
   Map<String, dynamic> toWidgetJson() => {
@@ -178,11 +221,11 @@ class TaskItem extends Equatable {
         'priority': priority,
         'status_id': statusId,
         'project_id': projectId,
-        'assignees': assignees.map((a) => a.name).toList(),
+        'assignee_ids': assignees.map((a) => a.id).toList(),
       };
 
   @override
-  List<Object?> get props => [id, title, statusId, priority, position];
+  List<Object?> get props => [id, title, statusId, priority, position, assignees, closedAt];
 }
 
 class AppNotification extends Equatable {
@@ -243,4 +286,34 @@ class ProjectInvite extends Equatable {
 
   @override
   List<Object?> get props => [id, projectId, status];
+}
+
+class LeaveRequest extends Equatable {
+  const LeaveRequest({
+    required this.id,
+    required this.projectId,
+    required this.userId,
+    required this.userName,
+    required this.status,
+    this.avatarUrl,
+  });
+
+  final String id;
+  final String projectId;
+  final String userId;
+  final String userName;
+  final String status;
+  final String? avatarUrl;
+
+  factory LeaveRequest.fromJson(Map<String, dynamic> json) => LeaveRequest(
+        id: json['id'] as String,
+        projectId: json['project_id'] as String,
+        userId: json['user_id'] as String,
+        userName: json['user_name'] as String? ?? '',
+        status: json['status'] as String? ?? 'pending',
+        avatarUrl: json['avatar_url'] as String?,
+      );
+
+  @override
+  List<Object?> get props => [id, projectId, userId, status];
 }
