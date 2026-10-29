@@ -75,18 +75,18 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" |
             key={p.id}
             type="button"
             variant="secondary"
-            className="w-full justify-center gap-2.5"
+            className="w-full justify-center gap-2.5 rounded-full"
             disabled={busy !== null}
             onClick={() => start(p.id)}
           >
             {icon ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={icon.src}
+                src={`${icon.src}?v=2`}
                 alt=""
-                width={20}
-                height={20}
-                className="size-5 shrink-0 object-contain"
+                width={22}
+                height={22}
+                className="size-[22px] shrink-0 rounded-[7px] object-contain"
               />
             ) : null}
             <span>{busy === p.id ? "Перенаправление…" : `${actionLabel} ${p.label}`}</span>

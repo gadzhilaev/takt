@@ -102,6 +102,10 @@ class _OAuthButtonsState extends State<OAuthButtons> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
               onPressed: _busy != null
                   ? null
                   : () => _start(e.key, (e.value as Map)['label'] as String? ?? e.key),
@@ -109,7 +113,10 @@ class _OAuthButtonsState extends State<OAuthButtons> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (_icons.containsKey(e.key)) ...[
-                    SvgPicture.asset(_icons[e.key]!, width: 20, height: 20),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(7),
+                      child: SvgPicture.asset(_icons[e.key]!, width: 22, height: 22),
+                    ),
                     const SizedBox(width: 10),
                   ],
                   Flexible(
