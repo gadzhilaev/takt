@@ -1,0 +1,154 @@
+{
+  "strokeWidth": 1.75,
+  "viewBox": "0 0 24 24",
+  "icons": {
+    "home": {
+      "file": "home.svg",
+      "lucide": "house"
+    },
+    "my-tasks": {
+      "file": "my-tasks.svg",
+      "lucide": "list-checks"
+    },
+    "profile": {
+      "file": "profile.svg",
+      "lucide": "user"
+    },
+    "back": {
+      "file": "back.svg",
+      "lucide": "arrow-left"
+    },
+    "close": {
+      "file": "close.svg",
+      "lucide": "x"
+    },
+    "more": {
+      "file": "more.svg",
+      "lucide": "ellipsis"
+    },
+    "add": {
+      "file": "add.svg",
+      "lucide": "plus"
+    },
+    "edit": {
+      "file": "edit.svg",
+      "lucide": "pencil"
+    },
+    "delete": {
+      "file": "delete.svg",
+      "lucide": "trash-2"
+    },
+    "check": {
+      "file": "check.svg",
+      "lucide": "check"
+    },
+    "chevron-down": {
+      "file": "chevron-down.svg",
+      "lucide": "chevron-down"
+    },
+    "chevron-right": {
+      "file": "chevron-right.svg",
+      "lucide": "chevron-right"
+    },
+    "chevron-left": {
+      "file": "chevron-left.svg",
+      "lucide": "chevron-left"
+    },
+    "notifications": {
+      "file": "notifications.svg",
+      "lucide": "bell"
+    },
+    "search": {
+      "file": "search.svg",
+      "lucide": "search"
+    },
+    "settings": {
+      "file": "settings.svg",
+      "lucide": "settings"
+    },
+    "lock": {
+      "file": "lock.svg",
+      "lucide": "lock"
+    },
+    "logout": {
+      "file": "logout.svg",
+      "lucide": "log-out"
+    },
+    "invite": {
+      "file": "invite.svg",
+      "lucide": "user-plus"
+    },
+    "theme": {
+      "file": "theme.svg",
+      "lucide": "contrast"
+    },
+    "mail": {
+      "file": "mail.svg",
+      "lucide": "mail"
+    },
+    "eye": {
+      "file": "eye.svg",
+      "lucide": "eye"
+    },
+    "eye-off": {
+      "file": "eye-off.svg",
+      "lucide": "eye-off"
+    },
+    "menu": {
+      "file": "menu.svg",
+      "lucide": "menu"
+    },
+    "camera": {
+      "file": "camera.svg",
+      "lucide": "camera"
+    },
+    "copy": {
+      "file": "copy.svg",
+      "lucide": "copy"
+    },
+    "monitor": {
+      "file": "monitor.svg",
+      "lucide": "monitor"
+    },
+    "moon": {
+      "file": "moon.svg",
+      "lucide": "moon"
+    },
+    "sun": {
+      "file": "sun.svg",
+      "lucide": "sun"
+    },
+    "alert": {
+      "file": "alert.svg",
+      "lucide": "circle-alert"
+    },
+    "message": {
+      "file": "message.svg",
+      "lucide": "message-circle"
+    },
+    "status": {
+      "file": "status.svg",
+      "lucide": "arrow-left-right"
+    },
+    "inbox": {
+      "file": "inbox.svg",
+      "lucide": "inbox"
+    },
+    "circle": {
+      "file": "circle.svg",
+      "lucide": "circle"
+    },
+    "circle-check": {
+      "file": "circle-check.svg",
+      "lucide": "circle-check"
+    },
+    "assignment": {
+      "file": "assignment.svg",
+      "lucide": "clipboard-list"
+    },
+    "forum": {
+      "file": "forum.svg",
+      "lucide": "messages-square"
+    }
+  }
+}

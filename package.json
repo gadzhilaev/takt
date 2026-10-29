@@ -8,6 +8,7 @@
     "db:down": "docker compose stop db",
     "migrate": "cd backend && alembic upgrade head",
     "backend": "cd backend && ./.venv/bin/uvicorn app.main:app --reload --port 8000",
-    "setup:local": "npm run db:up && npm run migrate"
+    "setup:local": "npm run db:up && npm run migrate",
+    "icons:sync": "node scripts/sync-lucide-icons.mjs"
   }
 }
