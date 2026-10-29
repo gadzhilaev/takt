@@ -80,7 +80,7 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  Future<void> register({
+  Future<void> sendRegisterCode({
     required String name,
     required String email,
     required String password,
@@ -88,12 +88,26 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     try {
-      final user = await auth.register(
+      await auth.sendRegisterCode(
         name: name,
         email: email,
         password: password,
         passwordConfirm: passwordConfirm,
       );
+      emit(const AuthGuest());
+    } catch (e) {
+      emit(AuthFailure(api.messageFromError(e)));
+      emit(const AuthGuest());
+    }
+  }
+
+  Future<void> confirmRegister({
+    required String email,
+    required String code,
+  }) async {
+    emit(const AuthLoading());
+    try {
+      final user = await auth.confirmRegister(email: email, code: code);
       emit(AuthAuthenticated(user));
     } catch (e) {
       emit(AuthFailure(api.messageFromError(e)));

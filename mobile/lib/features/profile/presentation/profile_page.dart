@@ -435,7 +435,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final ok = await showTaktSheet(
       context: context,
       title: 'Смена пароля',
-      confirmLabel: 'Сменить',
+      confirmLabel: 'Получить код',
       body: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -451,13 +451,35 @@ class _ProfilePageState extends State<ProfilePage> {
     final authRepo = context.read<AuthRepository>();
     final api = context.read<ApiClient>();
     try {
-      await authRepo.changePassword(
+      await authRepo.sendChangePasswordCode(
         currentPassword: current.text,
         newPassword: next.text,
         newPasswordConfirm: confirm.text,
       );
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _message = 'Пароль обновлён');
+      setState(() => _message = api.messageFromError(e));
+      return;
+    }
+    if (!context.mounted) return;
+    final codeCtrl = TextEditingController();
+    final confirmed = await showTaktSheet(
+      context: context,
+      title: 'Код из письма',
+      confirmLabel: 'Подтвердить',
+      body: TaktTextField(
+        controller: codeCtrl,
+        label: 'Код',
+        keyboardType: TextInputType.number,
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await authRepo.confirmChangePassword(code: codeCtrl.text);
+      if (!mounted) return;
+      setState(() => _message = 'Пароль обновлён — войдите снова');
+      await context.read<AuthCubit>().logout();
+      if (context.mounted) context.go('/login');
     } catch (e) {
       if (!mounted) return;
       setState(() => _message = api.messageFromError(e));

@@ -4,7 +4,7 @@
 
 - Flutter 3.47+ (stable)
 - Xcode 16+ (iOS), Android Studio / SDK 34+
-- Backend Takt на `http://127.0.0.1:8000` (или `--dart-define=API_BASE=…`)
+- Backend по умолчанию: `https://taktapp.ru`. Локально: `--dart-define=API_BASE=http://127.0.0.1:8000`
 - Миграции: `cd backend && alembic upgrade head` (нужна `007_device_push_tokens`)
 
 ## Запуск
@@ -12,9 +12,10 @@
 ```bash
 cd mobile
 flutter pub get
-flutter run --dart-define=API_BASE=http://127.0.0.1:8000
-# iOS Simulator: API_BASE=http://127.0.0.1:8000
-# Android Emulator: API_BASE=http://10.0.2.2:8000
+flutter run
+# Локальный backend:
+# flutter run --dart-define=API_BASE=http://127.0.0.1:8000
+# Android Emulator → host: API_BASE=http://10.0.2.2:8000
 ```
 
 Подпись на устройстве: **Takt**. Иконка — `assets/brand/app_icon_1024.png` (генерируется через `dart run flutter_launcher_icons`).

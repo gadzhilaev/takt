@@ -23,21 +23,62 @@ const schema = z
     path: ["password_confirm"],
   });
 
+type FormValues = z.infer<typeof schema>;
+
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [step, setStep] = useState<"form" | "code">("form");
+  const [pending, setPending] = useState<FormValues | null>(null);
+  const [code, setCode] = useState("");
+  const [sending, setSending] = useState(false);
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: { name: "", email: "", password: "", password_confirm: "" },
   });
 
-  async function onSubmit(values: z.infer<typeof schema>) {
+  async function onSubmit(values: FormValues) {
     setError("");
+    setSending(true);
     try {
-      await api("/api/v1/auth/register", { method: "POST", json: values });
-      router.push("/projects");
+      await api("/api/v1/auth/register/send-code", { method: "POST", json: values });
+      setPending(values);
+      setStep("code");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка регистрации");
+      setError(e instanceof Error ? e.message : "Ошибка отправки кода");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function onConfirm(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pending) return;
+    setError("");
+    setSending(true);
+    try {
+      await api("/api/v1/auth/register/confirm", {
+        method: "POST",
+        json: { email: pending.email, code: code.trim() },
+      });
+      router.push("/projects");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Неверный код");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function resend() {
+    if (!pending) return;
+    setError("");
+    setSending(true);
+    try {
+      await api("/api/v1/auth/register/send-code", { method: "POST", json: pending });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось отправить код");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -53,64 +94,112 @@ export default function RegisterPage() {
         </div>
         <div className="surface-panel p-6 sm:p-7">
           <div className="mb-6">
-            <h1 className="text-xl font-semibold tracking-tight">Регистрация</h1>
+            <h1 className="text-xl font-semibold tracking-tight">
+              {step === "form" ? "Регистрация" : "Код из письма"}
+            </h1>
             <p className="mt-1.5 text-[13px] leading-snug text-muted">
-              Создайте аккаунт и свой первый проект
+              {step === "form"
+                ? "Создайте аккаунт — пришлём код подтверждения на email"
+                : `Введите код, отправленный на ${pending?.email}`}
             </p>
           </div>
-          <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
-            <div>
-              <label className="label-text" htmlFor="reg-name">
-                Имя
-              </label>
-              <Input id="reg-name" autoComplete="name" {...form.register("name")} />
-              {form.formState.errors.name && (
-                <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.name.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="label-text" htmlFor="reg-email">
-                Email
-              </label>
-              <Input id="reg-email" type="email" autoComplete="email" {...form.register("email")} />
-              {form.formState.errors.email && (
-                <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.email.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="label-text" htmlFor="reg-pass">
-                Пароль
-              </label>
-              <Input id="reg-pass" type="password" autoComplete="new-password" {...form.register("password")} />
-              {form.formState.errors.password && (
-                <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="label-text" htmlFor="reg-pass2">
-                Подтверждение пароля
-              </label>
-              <Input
-                id="reg-pass2"
-                type="password"
-                autoComplete="new-password"
-                {...form.register("password_confirm")}
-              />
-              {form.formState.errors.password_confirm && (
-                <p className="mt-1 text-xs text-[var(--danger)]">
-                  {form.formState.errors.password_confirm.message}
+
+          {step === "form" ? (
+            <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+              <div>
+                <label className="label-text" htmlFor="reg-name">
+                  Имя
+                </label>
+                <Input id="reg-name" autoComplete="name" {...form.register("name")} />
+                {form.formState.errors.name && (
+                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.name.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="label-text" htmlFor="reg-email">
+                  Email
+                </label>
+                <Input id="reg-email" type="email" autoComplete="email" {...form.register("email")} />
+                {form.formState.errors.email && (
+                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.email.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="label-text" htmlFor="reg-pass">
+                  Пароль
+                </label>
+                <Input id="reg-pass" type="password" autoComplete="new-password" {...form.register("password")} />
+                {form.formState.errors.password && (
+                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="label-text" htmlFor="reg-pass2">
+                  Подтверждение пароля
+                </label>
+                <Input
+                  id="reg-pass2"
+                  type="password"
+                  autoComplete="new-password"
+                  {...form.register("password_confirm")}
+                />
+                {form.formState.errors.password_confirm && (
+                  <p className="mt-1 text-xs text-[var(--danger)]">
+                    {form.formState.errors.password_confirm.message}
+                  </p>
+                )}
+              </div>
+              {error && (
+                <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+                  {error}
                 </p>
               )}
-            </div>
-            {error && (
-              <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-                {error}
-              </p>
-            )}
-            <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
-              Зарегистрироваться
-            </Button>
-          </form>
+              <Button type="submit" className="w-full" size="lg" disabled={sending || form.formState.isSubmitting}>
+                Получить код
+              </Button>
+            </form>
+          ) : (
+            <form className="space-y-3" onSubmit={onConfirm}>
+              <div>
+                <label className="label-text" htmlFor="reg-code">
+                  Код из письма
+                </label>
+                <Input
+                  id="reg-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="6 цифр"
+                />
+              </div>
+              {error && (
+                <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" className="w-full" size="lg" disabled={sending || code.trim().length < 4}>
+                Подтвердить
+              </Button>
+              <Button type="button" variant="ghost" className="w-full" disabled={sending} onClick={resend}>
+                Отправить код ещё раз
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                disabled={sending}
+                onClick={() => {
+                  setStep("form");
+                  setCode("");
+                  setError("");
+                }}
+              >
+                Изменить данные
+              </Button>
+            </form>
+          )}
+
           <p className="mt-5 text-center text-sm text-muted">
             Уже есть аккаунт?{" "}
             <Link href="/login" className="font-medium text-[var(--accent)]">

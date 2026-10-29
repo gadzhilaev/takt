@@ -31,20 +31,30 @@ class AuthRepository {
     return UserProfile.fromJson(res.data!['user'] as Map<String, dynamic>);
   }
 
-  Future<UserProfile> register({
+  Future<void> sendRegisterCode({
     required String name,
     required String email,
     required String password,
     required String passwordConfirm,
   }) async {
-    final res = await api.dio.post<Map<String, dynamic>>(
-      '/api/v1/auth/register',
+    await api.dio.post(
+      '/api/v1/auth/register/send-code',
       data: {
         'name': name.trim(),
         'email': email.trim(),
         'password': password,
         'password_confirm': passwordConfirm,
       },
+    );
+  }
+
+  Future<UserProfile> confirmRegister({
+    required String email,
+    required String code,
+  }) async {
+    final res = await api.dio.post<Map<String, dynamic>>(
+      '/api/v1/auth/register/confirm',
+      data: {'email': email.trim(), 'code': code.trim()},
     );
     await _persistTokens(res.data!);
     return UserProfile.fromJson(res.data!['user'] as Map<String, dynamic>);
@@ -59,19 +69,27 @@ class AuthRepository {
     await tokens.clear();
   }
 
-  Future<void> changePassword({
+  Future<void> sendChangePasswordCode({
     required String currentPassword,
     required String newPassword,
     required String newPasswordConfirm,
   }) async {
     await api.dio.post(
-      '/api/v1/auth/change-password',
+      '/api/v1/auth/change-password/send-code',
       data: {
         'current_password': currentPassword,
         'new_password': newPassword,
         'new_password_confirm': newPasswordConfirm,
       },
     );
+  }
+
+  Future<void> confirmChangePassword({required String code}) async {
+    await api.dio.post(
+      '/api/v1/auth/change-password/confirm',
+      data: {'code': code.trim()},
+    );
+    await tokens.clear();
   }
 
   Future<void> _persistTokens(Map<String, dynamic> data) async {

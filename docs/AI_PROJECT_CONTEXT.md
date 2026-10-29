@@ -43,7 +43,8 @@ cd mobile && flutter analyze && flutter test
 
 ## Статус (обновлено 2026-10-29)
 
-Иконки UI: единый Lucide (`shared/icons/`, stroke 1.75) → web `AppIcon` (lucide-react), Flutter `AppIcon` (flutter_svg, symlink `mobile/assets/icons`). `home` = Lucide `house`. Бренд не трогали.  
-Flutter: хаб проектов, AppBar без chevron у названия, clamping PageView, аватары рядом. Участники mobile+web: remove / leave-request (`010`).  
-Web: уведомления — боковой drawer (как задача), не отдельная страница; VAPID в `.env`. Скрины `docs/screenshots/mobile-ui/`. Миграции `008`–`010`.  
-Commit/push/deploy только по разрешению.
+**Prod:** https://taktapp.ru на VPS `5.129.221.12` (`/opt/takt`, edge nginx + LE). Секреты: `.env` (VAPID, SMTP.BZ API, admin), `secrets/firebase-adminsdk.json`. Mobile API default → `https://taktapp.ru`.
+
+**Auth email OTP:** регистрация и смена пароля — код на почту (`011` `email_codes`, smtp.bz HTTP API; на VPS SMTP-порты закрыты). FROM пока `noreply@tarazpay.am` → после верификации `taktapp.ru` в smtp.bz сменить на `noreply@taktapp.ru`.
+
+Иконки Lucide; leave-request `010`; notifications drawer; VAPID. Commit/push только по разрешению.

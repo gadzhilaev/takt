@@ -31,6 +31,8 @@ export function ProfileDrawer({
   const [err, setErr] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [passwordCode, setPasswordCode] = useState("");
+  const [passwordStep, setPasswordStep] = useState<"form" | "code">("form");
   const [pushMsg, setPushMsg] = useState("");
   const [pushBusy, setPushBusy] = useState(false);
   const [pushState, setPushState] = useState<Awaited<ReturnType<typeof getPushStatus>> | null>(null);
@@ -50,6 +52,10 @@ export function ProfileDrawer({
       setMsg("");
       setErr("");
       setPushMsg("");
+      setPasswordStep("form");
+      setPasswordCode("");
+      setCurrentPassword("");
+      setNewPassword("");
       getPushStatus().then(setPushState).catch(() => null);
     }
   }, [open, user]);
@@ -73,11 +79,25 @@ export function ProfileDrawer({
     onError: (e: Error) => setErr(e.message),
   });
 
-  const changePassword = useMutation({
+  const sendPasswordCode = useMutation({
     mutationFn: () =>
-      api("/api/v1/auth/change-password", {
+      api("/api/v1/auth/change-password/send-code", {
         method: "POST",
         json: { current_password: currentPassword, new_password: newPassword },
+      }),
+    onSuccess: () => {
+      setErr("");
+      setMsg("Код отправлен на email");
+      setPasswordStep("code");
+    },
+    onError: (e: Error) => setErr(e.message),
+  });
+
+  const confirmPasswordCode = useMutation({
+    mutationFn: () =>
+      api("/api/v1/auth/change-password/confirm", {
+        method: "POST",
+        json: { code: passwordCode.trim() },
       }),
     onSuccess: async () => {
       setMsg("Пароль изменён. Войдите снова");
@@ -255,41 +275,88 @@ export function ProfileDrawer({
 
           <div className="border-t border-hairline pt-4">
             <p className="mb-2 text-sm font-semibold">Смена пароля</p>
-            <form
-              className="space-y-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                changePassword.mutate();
-              }}
-            >
-              <div>
-                <label className="label-text" htmlFor="cur-pass">
-                  Текущий пароль
-                </label>
-                <Input
-                  id="cur-pass"
-                  type="password"
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label-text" htmlFor="new-pass">
-                  Новый пароль
-                </label>
-                <Input
-                  id="new-pass"
-                  type="password"
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </div>
-              <Button type="submit" size="sm" variant="secondary" disabled={changePassword.isPending || newPassword.length < 8}>
-                Сменить пароль
-              </Button>
-            </form>
+            {passwordStep === "form" ? (
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  sendPasswordCode.mutate();
+                }}
+              >
+                <div>
+                  <label className="label-text" htmlFor="cur-pass">
+                    Текущий пароль
+                  </label>
+                  <Input
+                    id="cur-pass"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label-text" htmlFor="new-pass">
+                    Новый пароль
+                  </label>
+                  <Input
+                    id="new-pass"
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  disabled={sendPasswordCode.isPending || newPassword.length < 8}
+                >
+                  Получить код на email
+                </Button>
+              </form>
+            ) : (
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  confirmPasswordCode.mutate();
+                }}
+              >
+                <p className="text-xs text-muted">Код отправлен на {user.email}</p>
+                <div>
+                  <label className="label-text" htmlFor="pwd-code">
+                    Код из письма
+                  </label>
+                  <Input
+                    id="pwd-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={passwordCode}
+                    onChange={(e) => setPasswordCode(e.target.value)}
+                    placeholder="6 цифр"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  disabled={confirmPasswordCode.isPending || passwordCode.trim().length < 4}
+                >
+                  Подтвердить и сменить
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={sendPasswordCode.isPending}
+                  onClick={() => sendPasswordCode.mutate()}
+                >
+                  Отправить код ещё раз
+                </Button>
+              </form>
+            )}
           </div>
 
           {msg && <p className="text-sm text-[var(--success)]">{msg}</p>}
