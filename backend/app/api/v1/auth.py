@@ -9,17 +9,21 @@ from app.api.serializers import avatar_url
 from app.core.config import get_settings
 from app.core.csrf import CSRF_COOKIE, generate_csrf_token
 from app.core.limiter import limiter
-from app.core.security import decode_token, hash_password
+from app.core.security import decode_token, hash_password, verify_password
 from app.db.session import get_db
+from app.models.email_code import EmailCodePurpose
 from app.models.user import User, UserRole
 from app.schemas.auth import (
+    ChangePasswordConfirmRequest,
     ChangePasswordRequest,
     ForceChangePasswordRequest,
     LoginRequest,
+    RegisterConfirmRequest,
     RegisterRequest,
     UserPublic,
 )
 from app.services import auth_service, invite_service
+from app.services.email_code_service import EmailCodeError, consume_code, create_and_send_code
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -69,12 +73,18 @@ def _user_public(user: User) -> UserPublic:
     )
 
 
-@router.post("/register")
+def _http_from_email_code(e: EmailCodeError) -> HTTPException:
+    return HTTPException(
+        status_code=e.status_code,
+        detail={"error": {"code": e.code, "message": e.message}},
+    )
+
+
+@router.post("/register/send-code")
 @limiter.limit("5/minute")
-async def register(
+async def register_send_code(
     request: Request,
     body: RegisterRequest,
-    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     email = str(body.email).lower().strip()
@@ -84,10 +94,60 @@ async def register(
             status_code=400,
             detail={"error": {"code": "email_taken", "message": "Email уже зарегистрирован"}},
         )
+    try:
+        result = await create_and_send_code(
+            db,
+            email=email,
+            purpose=EmailCodePurpose.register,
+            payload={
+                "name": body.name.strip(),
+                "password_hash": hash_password(body.password),
+            },
+        )
+    except EmailCodeError as e:
+        raise _http_from_email_code(e) from e
+    await db.commit()
+    return result
+
+
+@router.post("/register/confirm")
+@limiter.limit("10/minute")
+async def register_confirm(
+    request: Request,
+    body: RegisterConfirmRequest,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    email = str(body.email).lower().strip()
+    try:
+        payload = await consume_code(
+            db,
+            email=email,
+            purpose=EmailCodePurpose.register,
+            code=body.code,
+        )
+    except EmailCodeError as e:
+        raise _http_from_email_code(e) from e
+
+    existing = await db.scalar(select(User).where(User.email == email))
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "email_taken", "message": "Email уже зарегистрирован"}},
+        )
+
+    name = str(payload.get("name") or "").strip()
+    password_hash = str(payload.get("password_hash") or "")
+    if not name or not password_hash:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "invalid_challenge", "message": "Запросите код заново"}},
+        )
+
     user = User(
         email=email,
-        name=body.name.strip(),
-        password_hash=hash_password(body.password),
+        name=name,
+        password_hash=password_hash,
         role=UserRole.member,
         is_active=True,
         must_change_password=False,
@@ -98,13 +158,23 @@ async def register(
     access, refresh, _ = await auth_service.create_token_pair(db, user)
     await db.commit()
     _set_auth_cookies(response, access, refresh)
-    # Tokens in body for mobile (Bearer); cookies remain for the web app.
     return {
         "user": _user_public(user),
         "access_token": access,
         "refresh_token": refresh,
         "token_type": "bearer",
     }
+
+
+@router.post("/register")
+@limiter.limit("5/minute")
+async def register_legacy(
+    request: Request,
+    body: RegisterRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Совместимость: раньше создавал пользователя сразу. Теперь только шлёт код."""
+    return await register_send_code(request, body, db)
 
 
 @router.post("/login")
@@ -201,21 +271,78 @@ async def refresh(
     }
 
 
-@router.post("/change-password", dependencies=[Depends(verify_csrf)])
-async def change_password(
+@router.post("/change-password/send-code", dependencies=[Depends(verify_csrf)])
+@limiter.limit("5/minute")
+async def change_password_send_code(
+    request: Request,
     body: ChangePasswordRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not verify_password(user.password_hash, body.current_password):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "invalid_password", "message": "Неверный текущий пароль"}},
+        )
+    try:
+        result = await create_and_send_code(
+            db,
+            email=user.email,
+            purpose=EmailCodePurpose.change_password,
+            payload={"new_password_hash": hash_password(body.new_password)},
+            user_id=user.id,
+        )
+    except EmailCodeError as e:
+        raise _http_from_email_code(e) from e
+    await db.commit()
+    return result
+
+
+@router.post("/change-password/confirm", dependencies=[Depends(verify_csrf)])
+@limiter.limit("10/minute")
+async def change_password_confirm(
+    request: Request,
+    body: ChangePasswordConfirmRequest,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     response: Response,
 ):
     try:
-        await auth_service.change_password(db, user, body.current_password, body.new_password)
-    except auth_service.AuthError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        payload = await consume_code(
+            db,
+            email=user.email,
+            purpose=EmailCodePurpose.change_password,
+            code=body.code,
+            user_id=user.id,
+        )
+    except EmailCodeError as e:
+        raise _http_from_email_code(e) from e
+
+    new_hash = str(payload.get("new_password_hash") or "")
+    if not new_hash:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "invalid_challenge", "message": "Запросите код заново"}},
+        )
+    user.password_hash = new_hash
+    user.must_change_password = False
+    await auth_service.revoke_all_user_tokens(db, user.id)
     await db.commit()
     response.delete_cookie(ACCESS_COOKIE, path="/")
     response.delete_cookie(REFRESH_COOKIE, path="/")
     return {"ok": True}
+
+
+@router.post("/change-password", dependencies=[Depends(verify_csrf)])
+@limiter.limit("5/minute")
+async def change_password_legacy(
+    request: Request,
+    body: ChangePasswordRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Совместимость: раньше менял пароль сразу. Теперь только шлёт код."""
+    return await change_password_send_code(request, body, user, db)
 
 
 @router.post("/force-change-password", dependencies=[Depends(verify_csrf)])

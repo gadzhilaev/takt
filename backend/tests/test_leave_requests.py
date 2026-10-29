@@ -3,7 +3,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.db.session import get_db
 from app.main import app
-from tests.conftest import TestSession
+from tests.conftest import TestSession, register_verified
 
 
 @pytest.mark.asyncio
@@ -39,17 +39,8 @@ async def test_leave_request_and_owner_remove(admin_client: AsyncClient):
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as member:
-        reg = await member.post(
-            "/api/v1/auth/register",
-            json={
-                "name": "Участник",
-                "email": "leaver@example.com",
-                "password": "SecurePass123!",
-                "password_confirm": "SecurePass123!",
-            },
-        )
-        assert reg.status_code == 200, reg.text
-        member_id = reg.json()["user"]["id"]
+        reg = await register_verified(member, name="Участник", email="leaver@example.com")
+        member_id = reg["user"]["id"]
 
         mine = await member.get("/api/v1/invites/mine")
         assert mine.status_code == 200

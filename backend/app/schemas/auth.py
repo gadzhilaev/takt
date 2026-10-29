@@ -19,9 +19,25 @@ class RegisterRequest(BaseModel):
         return self
 
 
+class RegisterConfirmRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=4, max_length=12)
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
+    new_password_confirm: str | None = Field(default=None, min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.new_password_confirm is not None and self.new_password != self.new_password_confirm:
+            raise ValueError("Пароли не совпадают")
+        return self
+
+
+class ChangePasswordConfirmRequest(BaseModel):
+    code: str = Field(min_length=4, max_length=12)
 
 
 class ForceChangePasswordRequest(BaseModel):

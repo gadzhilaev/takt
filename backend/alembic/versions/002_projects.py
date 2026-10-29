@@ -17,95 +17,187 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _tables() -> set[str]:
+    return set(sa.inspect(op.get_bind()).get_table_names())
+
+
+def _columns(table: str) -> set[str]:
+    return {c["name"] for c in sa.inspect(op.get_bind()).get_columns(table)}
+
+
+def _indexes(table: str) -> set[str]:
+    return {i["name"] for i in sa.inspect(op.get_bind()).get_indexes(table) if i.get("name")}
+
+
+def _fks(table: str) -> set[str]:
+    return {fk["name"] for fk in sa.inspect(op.get_bind()).get_foreign_keys(table) if fk.get("name")}
+
+
 def upgrade() -> None:
-    op.create_table(
-        "projects",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("name", sa.String(200), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("color", sa.String(7), nullable=False, server_default="#4f46e5"),
-        sa.Column("icon", sa.String(40), nullable=False, server_default="folder"),
-        sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-    )
-    op.create_table(
-        "project_members",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("project_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column(
-            "role",
-            sa.Enum("admin", "member", "viewer", name="projectmemberrole"),
-            nullable=False,
-            server_default="member",
-        ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("project_id", "user_id", name="uq_project_member"),
-    )
-    op.create_index("ix_project_members_project_id", "project_members", ["project_id"])
-    op.create_index("ix_project_members_user_id", "project_members", ["user_id"])
+    tables = _tables()
 
-    op.create_table(
-        "notifications",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("actor_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("task_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True),
-        sa.Column("project_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=True),
-        sa.Column("kind", sa.String(50), nullable=False),
-        sa.Column("title", sa.String(255), nullable=False),
-        sa.Column("body", sa.Text(), nullable=True),
-        sa.Column("is_read", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    )
-    op.create_index("ix_notifications_user_id", "notifications", ["user_id"])
-    op.create_index("ix_notifications_task_id", "notifications", ["task_id"])
-    op.create_index("ix_notifications_created_at", "notifications", ["created_at"])
+    if "projects" not in tables:
+        op.create_table(
+            "projects",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column("name", sa.String(200), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("color", sa.String(7), nullable=False, server_default="#4f46e5"),
+            sa.Column("icon", sa.String(40), nullable=False, server_default="folder"),
+            sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        )
 
-    op.add_column("statuses", sa.Column("project_id", postgresql.UUID(as_uuid=True), nullable=True))
-    op.create_foreign_key(
-        "fk_statuses_project_id",
-        "statuses",
-        "projects",
-        ["project_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
-    op.create_index("ix_statuses_project_id", "statuses", ["project_id"])
+    if "project_members" not in tables:
+        op.create_table(
+            "project_members",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column(
+                "project_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("projects.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column(
+                "user_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column(
+                "role",
+                sa.Enum("admin", "member", "viewer", name="projectmemberrole", create_type=True),
+                nullable=False,
+                server_default="member",
+            ),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+            sa.UniqueConstraint("project_id", "user_id", name="uq_project_member"),
+        )
 
-    op.add_column("tasks", sa.Column("project_id", postgresql.UUID(as_uuid=True), nullable=True))
-    op.add_column("tasks", sa.Column("parent_id", postgresql.UUID(as_uuid=True), nullable=True))
-    op.add_column("tasks", sa.Column("archived_at", sa.DateTime(timezone=True), nullable=True))
-    op.create_foreign_key(
-        "fk_tasks_project_id",
-        "tasks",
-        "projects",
-        ["project_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
-    op.create_foreign_key(
-        "fk_tasks_parent_id",
-        "tasks",
-        "tasks",
-        ["parent_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
-    op.create_index("ix_tasks_project_id", "tasks", ["project_id"])
-    op.create_index("ix_tasks_parent_id", "tasks", ["parent_id"])
+    indexes = _indexes("project_members") if "project_members" in _tables() else set()
+    if "ix_project_members_project_id" not in indexes:
+        op.create_index("ix_project_members_project_id", "project_members", ["project_id"])
+    if "ix_project_members_user_id" not in indexes:
+        op.create_index("ix_project_members_user_id", "project_members", ["user_id"])
+
+    tables = _tables()
+    if "notifications" not in tables:
+        op.create_table(
+            "notifications",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column(
+                "user_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column(
+                "actor_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("users.id", ondelete="SET NULL"),
+                nullable=True,
+            ),
+            sa.Column(
+                "task_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("tasks.id", ondelete="CASCADE"),
+                nullable=True,
+            ),
+            sa.Column(
+                "project_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("projects.id", ondelete="CASCADE"),
+                nullable=True,
+            ),
+            sa.Column("kind", sa.String(50), nullable=False),
+            sa.Column("title", sa.String(255), nullable=False),
+            sa.Column("body", sa.Text(), nullable=True),
+            sa.Column("is_read", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        )
+
+    indexes = _indexes("notifications") if "notifications" in _tables() else set()
+    if "ix_notifications_user_id" not in indexes:
+        op.create_index("ix_notifications_user_id", "notifications", ["user_id"])
+    if "ix_notifications_task_id" not in indexes:
+        op.create_index("ix_notifications_task_id", "notifications", ["task_id"])
+    if "ix_notifications_created_at" not in indexes:
+        op.create_index("ix_notifications_created_at", "notifications", ["created_at"])
+
+    status_cols = _columns("statuses")
+    if "project_id" not in status_cols:
+        op.add_column("statuses", sa.Column("project_id", postgresql.UUID(as_uuid=True), nullable=True))
+    fks = _fks("statuses")
+    if "fk_statuses_project_id" not in fks:
+        op.create_foreign_key(
+            "fk_statuses_project_id",
+            "statuses",
+            "projects",
+            ["project_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
+    indexes = _indexes("statuses")
+    if "ix_statuses_project_id" not in indexes:
+        op.create_index("ix_statuses_project_id", "statuses", ["project_id"])
+
+    task_cols = _columns("tasks")
+    if "project_id" not in task_cols:
+        op.add_column("tasks", sa.Column("project_id", postgresql.UUID(as_uuid=True), nullable=True))
+    if "parent_id" not in task_cols:
+        op.add_column("tasks", sa.Column("parent_id", postgresql.UUID(as_uuid=True), nullable=True))
+    if "archived_at" not in task_cols:
+        op.add_column("tasks", sa.Column("archived_at", sa.DateTime(timezone=True), nullable=True))
+    fks = _fks("tasks")
+    if "fk_tasks_project_id" not in fks:
+        op.create_foreign_key(
+            "fk_tasks_project_id",
+            "tasks",
+            "projects",
+            ["project_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
+    if "fk_tasks_parent_id" not in fks:
+        op.create_foreign_key(
+            "fk_tasks_parent_id",
+            "tasks",
+            "tasks",
+            ["parent_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
+    indexes = _indexes("tasks")
+    if "ix_tasks_project_id" not in indexes:
+        op.create_index("ix_tasks_project_id", "tasks", ["project_id"])
+    if "ix_tasks_parent_id" not in indexes:
+        op.create_index("ix_tasks_parent_id", "tasks", ["parent_id"])
 
     # Data migration: default project + backfill
-    op.execute(
-        """
-        INSERT INTO projects (id, name, description, color, icon, is_default, is_archived, created_at, updated_at)
-        SELECT gen_random_uuid(), 'Общее', 'Задачи без отдельного проекта', '#4f46e5', 'inbox', true, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM projects WHERE is_default = true)
-        """
-    )
+    # create_all (001) may already include is_demo; older 002-created tables do not.
+    if "is_demo" in _columns("projects"):
+        op.execute(
+            """
+            INSERT INTO projects (
+                id, name, description, color, icon, is_default, is_archived, is_demo, created_at, updated_at
+            )
+            SELECT gen_random_uuid(), 'Общее', 'Задачи без отдельного проекта', '#4f46e5', 'inbox',
+                   true, false, false, NOW(), NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM projects WHERE is_default = true)
+            """
+        )
+    else:
+        op.execute(
+            """
+            INSERT INTO projects (id, name, description, color, icon, is_default, is_archived, created_at, updated_at)
+            SELECT gen_random_uuid(), 'Общее', 'Задачи без отдельного проекта', '#4f46e5', 'inbox',
+                   true, false, NOW(), NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM projects WHERE is_default = true)
+            """
+        )
     op.execute(
         """
         UPDATE statuses SET project_id = (SELECT id FROM projects WHERE is_default = true LIMIT 1)

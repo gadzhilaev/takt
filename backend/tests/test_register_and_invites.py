@@ -3,23 +3,14 @@ from httpx import ASGITransport, AsyncClient
 
 from app.db.session import get_db
 from app.main import app
-from tests.conftest import TestSession
+from tests.conftest import TestSession, register_verified
 
 
 @pytest.mark.asyncio
 async def test_register_login_and_create_project(client: AsyncClient):
     email = "newbie@example.com"
-    reg = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "name": "Новичок",
-            "email": email,
-            "password": "SecurePass123!",
-            "password_confirm": "SecurePass123!",
-        },
-    )
-    assert reg.status_code == 200, reg.text
-    user = reg.json()["user"]
+    reg = await register_verified(client, name="Новичок", email=email)
+    user = reg["user"]
     assert user["email"] == email
     assert user["role"] == "member"
     assert user["must_change_password"] is False
@@ -51,14 +42,16 @@ async def test_register_login_and_create_project(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email(client: AsyncClient):
-    payload = {
-        "name": "A",
-        "email": "dup@example.com",
-        "password": "SecurePass123!",
-        "password_confirm": "SecurePass123!",
-    }
-    assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 200
-    again = await client.post("/api/v1/auth/register", json=payload)
+    await register_verified(client, name="A", email="dup@example.com")
+    again = await client.post(
+        "/api/v1/auth/register/send-code",
+        json={
+            "name": "A",
+            "email": "dup@example.com",
+            "password": "SecurePass123!",
+            "password_confirm": "SecurePass123!",
+        },
+    )
     assert again.status_code == 400
 
 
@@ -96,16 +89,8 @@ async def test_invite_accept_flow(admin_client: AsyncClient):
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as invitee:
-        reg = await invitee.post(
-            "/api/v1/auth/register",
-            json={
-                "name": "Invitee",
-                "email": "invitee@example.com",
-                "password": "SecurePass123!",
-                "password_confirm": "SecurePass123!",
-            },
-        )
-        assert reg.status_code == 200, reg.text
+        reg = await register_verified(invitee, name="Invitee", email="invitee@example.com")
+        assert reg["user"]["email"] == "invitee@example.com"
         mine = await invitee.get("/api/v1/invites/mine")
         assert mine.status_code == 200
         items = mine.json()["items"]

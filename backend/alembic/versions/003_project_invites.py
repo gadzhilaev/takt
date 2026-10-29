@@ -18,6 +18,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    tables = set(sa.inspect(op.get_bind()).get_table_names())
     invitestatus = postgresql.ENUM(
         "pending",
         "accepted",
@@ -27,40 +28,50 @@ def upgrade() -> None:
         create_type=True,
     )
     invitestatus.create(op.get_bind(), checkfirst=True)
-    op.create_table(
-        "project_invites",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "project_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("projects.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column("email", sa.String(320), nullable=False),
-        sa.Column(
-            "invited_by_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column(
-            "invitee_user_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("users.id", ondelete="SET NULL"),
-            nullable=True,
-        ),
-        sa.Column("token", sa.String(64), nullable=False, unique=True),
-        sa.Column(
-            "status",
-            invitestatus,
-            nullable=False,
-            server_default="pending",
-        ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("responded_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.create_index("ix_project_invites_project_id", "project_invites", ["project_id"])
-    op.create_index("ix_project_invites_email", "project_invites", ["email"])
+
+    if "project_invites" not in tables:
+        op.create_table(
+            "project_invites",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column(
+                "project_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("projects.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column("email", sa.String(320), nullable=False),
+            sa.Column(
+                "invited_by_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column(
+                "invitee_user_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("users.id", ondelete="SET NULL"),
+                nullable=True,
+            ),
+            sa.Column("token", sa.String(64), nullable=False, unique=True),
+            sa.Column(
+                "status",
+                invitestatus,
+                nullable=False,
+                server_default="pending",
+            ),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("responded_at", sa.DateTime(timezone=True), nullable=True),
+        )
+
+    indexes = {
+        i["name"]
+        for i in sa.inspect(op.get_bind()).get_indexes("project_invites")
+        if i.get("name")
+    }
+    if "ix_project_invites_project_id" not in indexes:
+        op.create_index("ix_project_invites_project_id", "project_invites", ["project_id"])
+    if "ix_project_invites_email" not in indexes:
+        op.create_index("ix_project_invites_email", "project_invites", ["email"])
 
 
 def downgrade() -> None:

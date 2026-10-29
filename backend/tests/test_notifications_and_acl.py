@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import register_verified
+
 
 async def _login(client: AsyncClient, email: str, password: str) -> None:
     r = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
@@ -8,12 +10,8 @@ async def _login(client: AsyncClient, email: str, password: str) -> None:
 
 
 async def _register(client: AsyncClient, name: str, email: str, password: str = "SecurePass123!") -> dict:
-    r = await client.post(
-        "/api/v1/auth/register",
-        json={"name": name, "email": email, "password": password, "password_confirm": password},
-    )
-    assert r.status_code == 200, r.text
-    return r.json()["user"]
+    data = await register_verified(client, name=name, email=email, password=password)
+    return data["user"]
 
 
 async def _accept_all_invites(client: AsyncClient) -> None:

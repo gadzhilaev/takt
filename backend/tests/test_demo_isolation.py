@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import register_verified
+
 
 @pytest.mark.asyncio
 async def test_demo_projects_hidden_from_admin_without_membership(client: AsyncClient):
@@ -17,16 +19,10 @@ async def test_demo_projects_hidden_from_admin_without_membership(client: AsyncC
 
     # Register demo-like user and create [E2E] project (auto is_demo)
     await client.post("/api/v1/auth/logout")
-    reg = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "name": "Демо пользователь",
-            "email": "demo-iso@example.com",
-            "password": "SecurePass123!",
-            "password_confirm": "SecurePass123!",
-        },
+    reg = await register_verified(
+        client, name="Демо пользователь", email="demo-iso@example.com"
     )
-    assert reg.status_code == 200, reg.text
+    assert reg["user"]["email"] == "demo-iso@example.com"
     e2e = await client.post(
         "/api/v1/projects",
         json={

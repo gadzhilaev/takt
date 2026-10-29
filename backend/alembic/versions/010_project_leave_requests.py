@@ -27,46 +27,59 @@ def upgrade() -> None:
     )
     leavestatus.create(op.get_bind(), checkfirst=True)
 
-    op.create_table(
-        "project_leave_requests",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "project_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("projects.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column(
-            "user_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column(
-            "status",
-            postgresql.ENUM(
-                "pending",
-                "approved",
-                "rejected",
-                "cancelled",
-                name="projectleaverequeststatus",
-                create_type=False,
+    tables = set(sa.inspect(op.get_bind()).get_table_names())
+    if "project_leave_requests" not in tables:
+        op.create_table(
+            "project_leave_requests",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column(
+                "project_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("projects.id", ondelete="CASCADE"),
+                nullable=False,
             ),
-            nullable=False,
-            server_default="pending",
-        ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("responded_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.create_index("ix_project_leave_requests_project_id", "project_leave_requests", ["project_id"])
-    op.create_index("ix_project_leave_requests_user_id", "project_leave_requests", ["user_id"])
-    op.create_index(
-        "uq_leave_pending_per_user",
-        "project_leave_requests",
-        ["project_id", "user_id"],
-        unique=True,
-        postgresql_where=sa.text("status = 'pending'"),
-    )
+            sa.Column(
+                "user_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column(
+                "status",
+                postgresql.ENUM(
+                    "pending",
+                    "approved",
+                    "rejected",
+                    "cancelled",
+                    name="projectleaverequeststatus",
+                    create_type=False,
+                ),
+                nullable=False,
+                server_default="pending",
+            ),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("responded_at", sa.DateTime(timezone=True), nullable=True),
+        )
+
+    indexes = {
+        i["name"]
+        for i in sa.inspect(op.get_bind()).get_indexes("project_leave_requests")
+        if i.get("name")
+    }
+    if "ix_project_leave_requests_project_id" not in indexes:
+        op.create_index(
+            "ix_project_leave_requests_project_id", "project_leave_requests", ["project_id"]
+        )
+    if "ix_project_leave_requests_user_id" not in indexes:
+        op.create_index("ix_project_leave_requests_user_id", "project_leave_requests", ["user_id"])
+    if "uq_leave_pending_per_user" not in indexes:
+        op.create_index(
+            "uq_leave_pending_per_user",
+            "project_leave_requests",
+            ["project_id", "user_id"],
+            unique=True,
+            postgresql_where=sa.text("status = 'pending'"),
+        )
 
 
 def downgrade() -> None:

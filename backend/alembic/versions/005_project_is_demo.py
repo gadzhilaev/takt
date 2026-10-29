@@ -17,11 +17,17 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "projects",
-        sa.Column("is_demo", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-    )
-    op.create_index("ix_projects_is_demo", "projects", ["is_demo"])
+    cols = {c["name"] for c in sa.inspect(op.get_bind()).get_columns("projects")}
+    if "is_demo" not in cols:
+        op.add_column(
+            "projects",
+            sa.Column("is_demo", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        )
+    indexes = {
+        i["name"] for i in sa.inspect(op.get_bind()).get_indexes("projects") if i.get("name")
+    }
+    if "ix_projects_is_demo" not in indexes:
+        op.create_index("ix_projects_is_demo", "projects", ["is_demo"])
 
 
 def downgrade() -> None:

@@ -76,3 +76,31 @@ async def admin_client(client: AsyncClient) -> AsyncClient:
     )
     assert r.status_code == 200
     return client
+
+
+async def register_verified(
+    client: AsyncClient,
+    *,
+    name: str,
+    email: str,
+    password: str = "SecurePass123!",
+) -> dict:
+    """Registration via email OTP (dev_code available when ENV=test)."""
+    send = await client.post(
+        "/api/v1/auth/register/send-code",
+        json={
+            "name": name,
+            "email": email,
+            "password": password,
+            "password_confirm": password,
+        },
+    )
+    assert send.status_code == 200, send.text
+    code = send.json().get("dev_code")
+    assert code, "expected dev_code in test env"
+    confirm = await client.post(
+        "/api/v1/auth/register/confirm",
+        json={"email": email, "code": code},
+    )
+    assert confirm.status_code == 200, confirm.text
+    return confirm.json()

@@ -54,6 +54,19 @@ class Settings(BaseSettings):
     FIREBASE_CREDENTIALS_FILE: str = ""
     FCM_ENABLED: bool = False
 
+    # Email OTP: classic SMTP (connect.smtp.bz) and/or SMTP.BZ HTTP API.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_BZ_API_KEY: str = ""
+    SMTP_FROM_EMAIL: str = "Takt <noreply@taktapp.ru>"
+    EMAIL_CODE_TTL_MINUTES: int = 10
+    EMAIL_CODE_LENGTH: int = 6
+    EMAIL_CODE_RESEND_SECONDS: int = 60
+    EMAIL_CODE_MAX_ATTEMPTS: int = 5
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
