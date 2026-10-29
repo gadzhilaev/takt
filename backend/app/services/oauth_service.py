@@ -14,6 +14,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
@@ -32,9 +33,18 @@ APPLE_TOKEN = "https://appleid.apple.com/auth/token"
 APPLE_KEYS = "https://appleid.apple.com/auth/keys"
 VK_AUTH = "https://id.vk.com/authorize"
 VK_TOKEN = "https://id.vk.com/oauth2/auth"
+VK_USER_INFO = "https://id.vk.com/oauth2/user_info"
 YANDEX_AUTH = "https://oauth.yandex.ru/authorize"
 YANDEX_TOKEN = "https://oauth.yandex.ru/token"
 YANDEX_INFO = "https://login.yandex.ru/info"
+
+_AVATAR_EXT_BY_TYPE = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 
 
 class OAuthError(Exception):
@@ -52,6 +62,7 @@ class ProviderProfile:
     email_verified: bool
     display_name: str | None
     raw_claims: dict[str, Any]
+    avatar_url: str | None = None
 
 
 def _pkce_pair() -> tuple[str, str]:
@@ -297,18 +308,38 @@ async def _exchange_vk(code: str, redirect_uri: str, verifier: str | None, devic
     }
     async with httpx.AsyncClient(timeout=20) as client:
         r = await client.post(VK_TOKEN, data=data)
-    if r.status_code >= 400:
-        raise OAuthError("vk_token", "Не удалось обменять код VK ID")
-    body = r.json()
-    user_id = body.get("user_id") or (body.get("user") or {}).get("user_id")
-    email = body.get("email")
-    if not user_id:
-        # Prefer id_token if present
-        id_token = body.get("id_token")
-        if id_token:
-            claims = _decode_unverified_jwt_claims(id_token)
-            user_id = claims.get("sub")
-            email = email or claims.get("email")
+        if r.status_code >= 400:
+            raise OAuthError("vk_token", "Не удалось обменять код VK ID")
+        body = r.json()
+        access_token = body.get("access_token")
+        user_id = body.get("user_id") or (body.get("user") or {}).get("user_id")
+        email = body.get("email")
+        display_name: str | None = None
+        avatar: str | None = None
+        if not user_id:
+            id_token = body.get("id_token")
+            if id_token:
+                claims = _decode_unverified_jwt_claims(id_token)
+                user_id = claims.get("sub")
+                email = email or claims.get("email")
+        if access_token:
+            info = await client.post(
+                VK_USER_INFO,
+                data={
+                    "client_id": settings.OAUTH_VK_CLIENT_ID,
+                    "access_token": access_token,
+                },
+            )
+            if info.status_code < 400:
+                user_obj = (info.json() or {}).get("user") or {}
+                user_id = user_id or user_obj.get("user_id")
+                email = email or user_obj.get("email")
+                first = (user_obj.get("first_name") or "").strip()
+                last = (user_obj.get("last_name") or "").strip()
+                display_name = f"{first} {last}".strip() or None
+                raw_avatar = user_obj.get("avatar") or user_obj.get("photo_200") or user_obj.get("photo")
+                if isinstance(raw_avatar, str) and raw_avatar.startswith("http"):
+                    avatar = raw_avatar
     if not user_id:
         raise OAuthError("vk_claims", "VK ID не вернул идентификатор пользователя")
     return ProviderProfile(
@@ -316,8 +347,9 @@ async def _exchange_vk(code: str, redirect_uri: str, verifier: str | None, devic
         provider_user_id=str(user_id),
         email=email.lower() if isinstance(email, str) else None,
         email_verified=bool(email),
-        display_name=None,
-        raw_claims={"has_email": bool(email)},
+        display_name=display_name,
+        raw_claims={"has_email": bool(email), "has_avatar": bool(avatar)},
+        avatar_url=avatar,
     )
 
 
@@ -355,13 +387,18 @@ async def _exchange_yandex(code: str, redirect_uri: str, verifier: str | None) -
     default_email = body.get("default_email")
     email = default_email or (emails[0] if emails else None)
     name = body.get("real_name") or body.get("display_name") or body.get("login")
+    avatar: str | None = None
+    avatar_id = body.get("default_avatar_id")
+    if isinstance(avatar_id, str) and avatar_id and not body.get("is_avatar_empty"):
+        avatar = f"https://avatars.yandex.net/get-yapic/{avatar_id}/islands-200"
     return ProviderProfile(
         provider=OAuthProvider.yandex,
         provider_user_id=str(uid),
         email=email.lower() if isinstance(email, str) else None,
         email_verified=bool(email),
         display_name=name,
-        raw_claims={"login": body.get("login")},
+        raw_claims={"login": body.get("login"), "has_avatar": bool(avatar)},
+        avatar_url=avatar,
     )
 
 
@@ -448,6 +485,48 @@ def _synthetic_email(provider: OAuthProvider, provider_user_id: str) -> str:
     return f"{provider.value}_{safe}@oauth.takt.local"
 
 
+async def _maybe_set_avatar_from_url(user: User, avatar_url: str | None, *, force: bool = False) -> bool:
+    """Download provider photo into local avatar storage. Skip if user already has one (unless force)."""
+    if not avatar_url or not avatar_url.startswith(("http://", "https://")):
+        return False
+    if user.avatar_path and not force:
+        return False
+    settings = get_settings()
+    max_bytes = min(settings.MAX_UPLOAD_BYTES, 2 * 1024 * 1024)
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            r = await client.get(avatar_url)
+        if r.status_code >= 400 or not r.content:
+            return False
+        if len(r.content) > max_bytes or len(r.content) < 32:
+            return False
+        content_type = (r.headers.get("content-type") or "").split(";")[0].strip().lower()
+        ext = _AVATAR_EXT_BY_TYPE.get(content_type)
+        if not ext:
+            # sniff magic bytes
+            head = r.content[:16]
+            if head.startswith(b"\xff\xd8\xff"):
+                ext = ".jpg"
+            elif head.startswith(b"\x89PNG"):
+                ext = ".png"
+            elif head.startswith(b"RIFF") and b"WEBP" in head:
+                ext = ".webp"
+            elif head[:6] in (b"GIF87a", b"GIF89a"):
+                ext = ".gif"
+            else:
+                return False
+        avatars_dir = Path(settings.UPLOAD_DIR) / "avatars"
+        avatars_dir.mkdir(parents=True, exist_ok=True)
+        for old in avatars_dir.glob(f"{user.id}.*"):
+            old.unlink(missing_ok=True)
+        path = avatars_dir / f"{user.id}{ext}"
+        path.write_bytes(r.content)
+        user.avatar_path = str(path)
+        return True
+    except Exception:
+        return False
+
+
 async def login_or_register(db: AsyncSession, profile: ProviderProfile) -> tuple[User, bool]:
     identity = await db.scalar(
         select(UserIdentity).where(
@@ -462,6 +541,9 @@ async def login_or_register(db: AsyncSession, profile: ProviderProfile) -> tuple
         if user.blocked_until and user.blocked_until > datetime.now(UTC):
             raise OAuthError("blocked", "Учётная запись временно ограничена")
         user.last_login_at = datetime.now(UTC)
+        if profile.display_name and (not user.name or user.name.startswith("Пользователь")):
+            user.name = profile.display_name[:200]
+        await _maybe_set_avatar_from_url(user, profile.avatar_url)
         await record_activity(db, user.id, "login_oauth", {"provider": profile.provider.value})
         await db.flush()
         return user, False
@@ -495,6 +577,7 @@ async def login_or_register(db: AsyncSession, profile: ProviderProfile) -> tuple
     await db.flush()
     created = True
     await _attach_identity(db, user.id, profile)
+    await _maybe_set_avatar_from_url(user, profile.avatar_url, force=True)
     await record_activity(
         db,
         user.id,
@@ -517,6 +600,7 @@ async def link_identity(db: AsyncSession, user_id: uuid.UUID, profile: ProviderP
     if taken and taken.user_id != user_id:
         raise OAuthError("identity_taken", "Этот аккаунт провайдера уже привязан к другому пользователю")
     if taken and taken.user_id == user_id:
+        await _maybe_set_avatar_from_url(user, profile.avatar_url)
         return user
     same_provider = await db.scalar(
         select(UserIdentity).where(
@@ -526,6 +610,7 @@ async def link_identity(db: AsyncSession, user_id: uuid.UUID, profile: ProviderP
     if same_provider:
         raise OAuthError("already_linked", "Провайдер уже привязан")
     await _attach_identity(db, user_id, profile)
+    await _maybe_set_avatar_from_url(user, profile.avatar_url)
     await record_activity(db, user_id, "oauth_linked", {"provider": profile.provider.value})
     return user
 

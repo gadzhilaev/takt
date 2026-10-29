@@ -39,6 +39,7 @@ Native iOS: передайте `id_token` на `POST /api/v1/auth/oauth/mobile` 
 2. `OAUTH_VK_CLIENT_ID`, `OAUTH_VK_CLIENT_SECRET`.
 3. Redirect URI из allowlist.
 4. `OAUTH_VK_ENABLED=true`.
+5. В кабинете VK ID: **Доступы → Почта** и **Авторизация → Фото профиля** — включить (имя/фамилия обычно уже в личных данных). Фото скачивается на сервер и становится аватаркой Takt, если своей ещё нет.
 
 Используйте актуальный OAuth 2.1 / PKCE поток VK ID (не устаревший standalone).
 
