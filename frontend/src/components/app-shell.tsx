@@ -1,8 +1,8 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Menu, Plus } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
@@ -12,9 +12,11 @@ import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
 import { BrandLogo, BrandMark } from "@/components/brand-mark";
 import { Dialog } from "@/components/ui/dialog";
+import { NotificationsDrawer } from "@/components/notifications-drawer";
+import { NotificationsMenu } from "@/components/notifications-menu";
 import { ProfileDrawer } from "@/components/profile-drawer";
 import { ThemeMenu } from "@/components/ui/theme-menu";
-import { setLastProjectId } from "@/lib/last-project";
+import { getLastProjectId, setLastProjectId } from "@/lib/last-project";
 import { cn } from "@/lib/utils";
 
 type InviteItem = {
@@ -26,6 +28,15 @@ type InviteItem = {
   invited_by_name: string | null;
 };
 
+type LeaveRequest = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  user_name: string;
+  avatar_url: string | null;
+  status: string;
+};
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -33,6 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
@@ -56,10 +68,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => api<{ items: InviteItem[] }>("/api/v1/invites/mine"),
     staleTime: 15_000,
   });
+  const { data: notifMeta } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: () =>
+      api<{ items: unknown[]; unread: number }>("/api/v1/notifications?page_size=1"),
+    staleTime: 20_000,
+    refetchInterval: 60_000,
+  });
 
   const user = data?.user;
   const projects = projectsData?.items ?? [];
   const myInvites = invitesData?.items ?? [];
+  const unreadCount = notifMeta?.unread ?? 0;
 
   const currentProjectId = useMemo(() => {
     const m = pathname.match(/^\/projects\/([^/?#]+)/);
@@ -69,6 +89,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (currentProjectId) setLastProjectId(currentProjectId);
   }, [currentProjectId]);
+
+  useEffect(() => {
+    if (!pathname.startsWith("/inbox")) return;
+    setNotificationsOpen(true);
+    setMobileOpen(false);
+    const fallback = getLastProjectId();
+    router.replace(fallback ? `/projects/${fallback}` : "/projects");
+  }, [pathname, router]);
 
   const createProject = useMutation({
     mutationFn: () =>
@@ -134,13 +162,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/projects/${id}`);
   }
 
+  async function removeMember(projectId: string, member: Project["members"][number]) {
+    if (!confirm(`Убрать ${member.name} из проекта?`)) return;
+    await api(`/api/v1/projects/${projectId}/members/${member.user_id}`, { method: "DELETE" });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["leave-requests", projectId] });
+  }
+
+  async function requestLeave(projectId: string, projectName: string) {
+    if (!confirm(`Отправить заявку на выход из «${projectName}»?`)) return;
+    await api(`/api/v1/projects/${projectId}/leave-requests`, { method: "POST" });
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    alert("Заявка отправлена владельцу проекта");
+  }
+
+  async function decideLeave(projectId: string, requestId: string, approve: boolean) {
+    await api(
+      `/api/v1/projects/${projectId}/leave-requests/${requestId}/${approve ? "approve" : "reject"}`,
+      { method: "POST" }
+    );
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["leave-requests", projectId] });
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+  }
+
   const Sidebar = (
     <aside className="flex h-full w-[15.5rem] shrink-0 flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
       <div className="flex shrink-0 items-center justify-between gap-2 px-3.5 py-4">
         <Link href="/projects" className="inline-flex min-w-0" aria-label="Takt">
           <BrandLogo className="h-6" />
         </Link>
-        <ThemeMenu />
+        <div className="flex items-center gap-0.5">
+          <NotificationsMenu onOpen={() => setNotificationsOpen(true)} />
+          <ThemeMenu />
+        </div>
+      </div>
+
+      <div className="shrink-0 px-2 pb-2">
+        <button
+          type="button"
+          onClick={() => {
+            setNotificationsOpen(true);
+            setMobileOpen(false);
+          }}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-[var(--radius)] px-2.5 py-2 text-left text-[13px]",
+            notificationsOpen
+              ? "bg-[var(--surface-2)] font-semibold text-foreground"
+              : "text-[var(--muted-fg)] hover:bg-[var(--surface-2)] hover:text-foreground"
+          )}
+        >
+          <AppIcon name="notifications" size={16} className="shrink-0" />
+          <span className="min-w-0 flex-1">Уведомления</span>
+          {unreadCount > 0 && (
+            <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {myInvites.length > 0 && (
@@ -193,6 +272,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           const active = p.id === currentProjectId;
           const open = !!expanded[p.id];
           const isOwner = p.members.some((m) => m.user_id === user?.id && m.role === "admin");
+          const adminCount = p.members.filter((m) => m.role === "admin").length;
           return (
             <div key={p.id} className="rounded-[var(--radius)]">
               <div
@@ -207,7 +287,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   aria-label={open ? "Свернуть участников" : "Показать участников"}
                   onClick={(e) => toggleExpand(p.id, e)}
                 >
-                  {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  {open ? <AppIcon name="chevron-down" size={16} /> : <AppIcon name="chevron-right" size={16} />}
                 </button>
                 <button
                   type="button"
@@ -221,30 +301,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
               {open && (
-                <ul className="mb-1 ml-7 space-y-0.5 border-l border-hairline pl-2">
-                  {p.members.map((m) => (
-                    <li key={m.user_id} className="flex items-center gap-1.5 py-1 text-xs text-muted">
-                      <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={5} />
-                      <span className="truncate">{m.name}</span>
-                    </li>
-                  ))}
-                  {isOwner && (
-                    <li>
-                      <button
-                        type="button"
-                        className="py-1 text-xs font-medium text-[var(--accent)]"
-                        onClick={() => {
-                          setInviteOpen(p.id);
-                          setInviteEmail("");
-                          setInviteNote("");
-                          setInviteSearch("");
-                        }}
-                      >
-                        + Добавить участника
-                      </button>
-                    </li>
-                  )}
-                </ul>
+                <ProjectMembersPanel
+                  project={p}
+                  userId={user?.id}
+                  isOwner={isOwner}
+                  adminCount={adminCount}
+                  onInvite={() => {
+                    setInviteOpen(p.id);
+                    setInviteEmail("");
+                    setInviteNote("");
+                    setInviteSearch("");
+                  }}
+                  onRemove={(m) => removeMember(p.id, m)}
+                  onLeave={() => requestLeave(p.id, p.name)}
+                  onDecideLeave={(reqId, approve) => decideLeave(p.id, reqId, approve)}
+                />
               )}
             </div>
           );
@@ -259,7 +330,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           size="sm"
           onClick={() => setCreateOpen(true)}
         >
-          <Plus className="h-4 w-4" /> Создать проект
+          <AppIcon name="add" size={16} /> Создать проект
         </Button>
         {user && (
           <button
@@ -288,12 +359,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="z-30 flex h-11 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--surface)] px-3 lg:hidden">
           <Button variant="ghost" size="icon" aria-label="Меню" onClick={() => setMobileOpen(true)}>
-            <Menu className="h-4 w-4" />
+            <AppIcon name="menu" size={16} />
           </Button>
           <BrandMark className="h-6" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {projects.find((p) => p.id === currentProjectId)?.name || "Takt"}
           </span>
+          <NotificationsMenu onOpen={() => setNotificationsOpen(true)} />
           <ThemeMenu />
         </header>
         <main className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden bg-[var(--kanban-board-bg)] p-3 md:p-4">
@@ -301,7 +373,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {user && <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} user={user} />}
+      {user && (
+        <ProfileDrawer
+          open={profileOpen}
+          onClose={() => setProfileOpen(false)}
+          user={user}
+          onOpenNotifications={() => {
+            setProfileOpen(false);
+            setNotificationsOpen(true);
+          }}
+        />
+      )}
+      <NotificationsDrawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen} title="Новый проект">
         <form
@@ -378,7 +461,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </ul>
             )}
             {inviteSearch.trim().length >= 2 && userSearch.isFetched && !(userSearch.data?.items?.length) && (
-              <p className="mt-1 text-xs text-muted">Никого не найдено — укажите email вручную ниже.</p>
+              <p className="mt-1 text-xs text-muted">Никого не найдено. Укажите email вручную ниже.</p>
             )}
           </div>
           <div>
@@ -423,5 +506,101 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </form>
       </Dialog>
     </div>
+  );
+}
+
+function ProjectMembersPanel({
+  project,
+  userId,
+  isOwner,
+  adminCount,
+  onInvite,
+  onRemove,
+  onLeave,
+  onDecideLeave,
+}: {
+  project: Project;
+  userId?: string;
+  isOwner: boolean;
+  adminCount: number;
+  onInvite: () => void;
+  onRemove: (m: Project["members"][number]) => void;
+  onLeave: () => void;
+  onDecideLeave: (requestId: string, approve: boolean) => void;
+}) {
+  const { data: leaveData } = useQuery({
+    queryKey: ["leave-requests", project.id],
+    enabled: isOwner,
+    queryFn: () => api<{ items: LeaveRequest[] }>(`/api/v1/projects/${project.id}/leave-requests`),
+    staleTime: 15_000,
+  });
+  const pending = (leaveData?.items ?? []).filter((r) => r.status === "pending");
+
+  return (
+    <ul className="mb-1 ml-7 space-y-0.5 border-l border-hairline pl-2">
+      {project.members.map((m) => {
+        const isSelf = m.user_id === userId;
+        const canRemove = isOwner && !isSelf;
+        const canLeave = !!isSelf && !(m.role === "admin" && adminCount <= 1);
+        return (
+          <li key={m.user_id} className="flex items-center gap-1.5 py-1 text-xs text-muted">
+            <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={5} />
+            <span className="min-w-0 flex-1 truncate">{m.name}</span>
+            {m.role === "admin" && <span className="shrink-0 text-[10px]">владелец</span>}
+            {canRemove && (
+              <button
+                type="button"
+                className="shrink-0 rounded p-0.5 text-muted hover:text-[var(--danger)]"
+                title="Удалить из проекта"
+                onClick={() => onRemove(m)}
+              >
+                <AppIcon name="delete" size={16} />
+              </button>
+            )}
+            {canLeave && (
+              <button
+                type="button"
+                className="shrink-0 text-[11px] font-medium text-[var(--accent)]"
+                onClick={onLeave}
+              >
+                Выйти
+              </button>
+            )}
+          </li>
+        );
+      })}
+      {isOwner && pending.length > 0 && (
+        <li className="space-y-1 pt-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Заявки на выход</p>
+          {pending.map((req) => (
+            <div key={req.id} className="flex items-center gap-1.5 text-xs">
+              <UserAvatar name={req.user_name} avatarUrl={req.avatar_url} size={5} />
+              <span className="min-w-0 flex-1 truncate">{req.user_name}</span>
+              <button
+                type="button"
+                className="text-[11px] text-muted hover:text-foreground"
+                onClick={() => onDecideLeave(req.id, false)}
+              >
+                Нет
+              </button>
+              <button
+                type="button"
+                className="text-[11px] font-medium text-[var(--accent)]"
+                onClick={() => onDecideLeave(req.id, true)}
+              >
+                Удалить
+              </button>
+            </div>
+          ))}
+        </li>
+      )}
+      {isOwner && (
+        <li>
+          <button type="button" className="py-1 text-xs font-medium text-[var(--accent)]" onClick={onInvite}>
+            + Добавить участника
+          </button>
+        </li>
+      )}
+    </ul>
   );
 }

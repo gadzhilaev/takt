@@ -42,74 +42,82 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="surface-panel w-full max-w-sm p-6">
-        <div className="mb-6 space-y-3">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(49,95,114,0.12),_transparent_55%),linear-gradient(180deg,var(--background),color-mix(in_srgb,var(--accent)_6%,var(--background)))]"
+      />
+      <div className="relative w-full max-w-sm">
+        <div className="mb-7 px-1">
           <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Регистрация</h1>
-            <p className="text-[13px] text-muted">Создайте аккаунт и свой первый проект</p>
-          </div>
         </div>
-        <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
-          <div>
-            <label className="label-text" htmlFor="reg-name">
-              Имя
-            </label>
-            <Input id="reg-name" autoComplete="name" {...form.register("name")} />
-            {form.formState.errors.name && (
-              <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.name.message}</p>
-            )}
+        <div className="surface-panel p-6 sm:p-7">
+          <div className="mb-6">
+            <h1 className="text-xl font-semibold tracking-tight">Регистрация</h1>
+            <p className="mt-1.5 text-[13px] leading-snug text-muted">
+              Создайте аккаунт и свой первый проект
+            </p>
           </div>
-          <div>
-            <label className="label-text" htmlFor="reg-email">
-              Email
-            </label>
-            <Input id="reg-email" type="email" autoComplete="email" {...form.register("email")} />
-            {form.formState.errors.email && (
-              <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.email.message}</p>
-            )}
-          </div>
-          <div>
-            <label className="label-text" htmlFor="reg-pass">
-              Пароль
-            </label>
-            <Input id="reg-pass" type="password" autoComplete="new-password" {...form.register("password")} />
-            {form.formState.errors.password && (
-              <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
-            )}
-          </div>
-          <div>
-            <label className="label-text" htmlFor="reg-pass2">
-              Подтверждение пароля
-            </label>
-            <Input
-              id="reg-pass2"
-              type="password"
-              autoComplete="new-password"
-              {...form.register("password_confirm")}
-            />
-            {form.formState.errors.password_confirm && (
-              <p className="mt-1 text-xs text-[var(--danger)]">
-                {form.formState.errors.password_confirm.message}
+          <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+            <div>
+              <label className="label-text" htmlFor="reg-name">
+                Имя
+              </label>
+              <Input id="reg-name" autoComplete="name" {...form.register("name")} />
+              {form.formState.errors.name && (
+                <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.name.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="label-text" htmlFor="reg-email">
+                Email
+              </label>
+              <Input id="reg-email" type="email" autoComplete="email" {...form.register("email")} />
+              {form.formState.errors.email && (
+                <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.email.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="label-text" htmlFor="reg-pass">
+                Пароль
+              </label>
+              <Input id="reg-pass" type="password" autoComplete="new-password" {...form.register("password")} />
+              {form.formState.errors.password && (
+                <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="label-text" htmlFor="reg-pass2">
+                Подтверждение пароля
+              </label>
+              <Input
+                id="reg-pass2"
+                type="password"
+                autoComplete="new-password"
+                {...form.register("password_confirm")}
+              />
+              {form.formState.errors.password_confirm && (
+                <p className="mt-1 text-xs text-[var(--danger)]">
+                  {form.formState.errors.password_confirm.message}
+                </p>
+              )}
+            </div>
+            {error && (
+              <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+                {error}
               </p>
             )}
-          </div>
-          {error && (
-            <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-              {error}
-            </p>
-          )}
-          <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-            Зарегистрироваться
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted">
-          Уже есть аккаунт?{" "}
-          <Link href="/login" className="font-medium text-[var(--accent)]">
-            Войти
-          </Link>
-        </p>
+            <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
+              Зарегистрироваться
+            </Button>
+          </form>
+          <p className="mt-5 text-center text-sm text-muted">
+            Уже есть аккаунт?{" "}
+            <Link href="/login" className="font-medium text-[var(--accent)]">
+              Войти
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

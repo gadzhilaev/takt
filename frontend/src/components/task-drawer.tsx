@@ -1,7 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { ProjectMember, Status, Task, User } from "@/lib/types";
@@ -92,7 +92,7 @@ export function TaskDrawer({
   const task = data?.task;
   const assigneeIds = task?.assignees.map((a) => a.id) ?? [];
   const isAuthor = !!task && !!meData?.user && task.author_id === meData.user.id;
-  const statusName = task ? statuses.find((s) => s.id === task.status_id)?.name ?? "—" : "—";
+  const statusName = task ? statuses.find((s) => s.id === task.status_id)?.name ?? "-" : "-";
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Задача">
@@ -108,7 +108,7 @@ export function TaskDrawer({
           <div className="flex items-center gap-1">
             {task && !editing && (
               <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(true)}>
-                <Pencil className="h-3.5 w-3.5" /> Редактировать
+                <AppIcon name="edit" size={16} /> Редактировать
               </Button>
             )}
             {editing && (
@@ -117,7 +117,7 @@ export function TaskDrawer({
               </Button>
             )}
             <Button variant="ghost" size="icon" aria-label="Закрыть" onClick={onClose}>
-              <X className="h-5 w-5" />
+              <AppIcon name="close" size={20} />
             </Button>
           </div>
         </div>
@@ -198,7 +198,7 @@ export function TaskDrawer({
                         if (confirm("Удалить задачу?")) remove.mutate();
                       }}
                     >
-                      <Trash2 className="h-4 w-4" /> Удалить задачу
+                      <AppIcon name="delete" size={16} /> Удалить задачу
                     </Button>
                     {remove.isError && (
                       <p className="mt-1 text-sm text-[var(--danger)]">{(remove.error as Error).message}</p>

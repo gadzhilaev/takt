@@ -1,16 +1,16 @@
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import { AppIcon, type AppIconName } from "@/components/ui/app-icon";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const options = [
-  { value: "light", label: "Светлая", icon: Sun },
-  { value: "dark", label: "Тёмная", icon: Moon },
-  { value: "system", label: "Системная", icon: Monitor },
-] as const;
+const options: { value: string; label: string; icon: AppIconName }[] = [
+  { value: "light", label: "Светлая", icon: "sun" },
+  { value: "dark", label: "Тёмная", icon: "moon" },
+  { value: "system", label: "Системная", icon: "monitor" },
+];
 
 export function ThemeMenu() {
   const { theme, setTheme } = useTheme();
@@ -21,17 +21,16 @@ export function ThemeMenu() {
     return <Button variant="ghost" size="icon" aria-label="Тема" />;
   }
   const current = options.find((o) => o.value === theme) ?? options[2];
-  const Icon = current.icon;
   return (
     <div className="relative">
       <Button variant="ghost" size="icon" aria-label="Тема" onClick={() => setOpen((v) => !v)}>
-        <Icon className="h-4 w-4" />
+        <AppIcon name={current.icon} size={16} />
       </Button>
       {open && (
         <>
           <button className="fixed inset-0 z-40 cursor-default" aria-label="Закрыть" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-1.5 w-40 overflow-hidden rounded-[var(--radius-lg)] border border-hairline bg-[var(--surface)] shadow-soft">
-            {options.map(({ value, label, icon: ItemIcon }) => (
+            {options.map(({ value, label, icon }) => (
               <button
                 key={value}
                 className={cn(
@@ -43,7 +42,7 @@ export function ThemeMenu() {
                   setOpen(false);
                 }}
               >
-                <ItemIcon className="h-3.5 w-3.5" />
+                <AppIcon name={icon} size={16} active={theme === value} />
                 {label}
               </button>
             ))}

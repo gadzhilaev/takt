@@ -28,14 +28,14 @@ export function yAxisMax(data: { count: number }[]): number {
 }
 
 export function formatAvgDays(value: number | null | undefined, closed: number): string {
-  if (!closed || value == null || Number.isNaN(Number(value))) return "—";
+  if (!closed || value == null || Number.isNaN(Number(value))) return "-";
   const n = Number(value);
-  if (n < 0) return "—";
+  if (n < 0) return "-";
   if (n < 0.05) return "< 1";
   return String(Math.round(n * 10) / 10);
 }
 
 export function formatOnTimePct(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "-";
   return `${Number(value)}%`;
 }

@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Takt — задачи команды",
+  title: "Takt: задачи команды",
   description: "Командный трекер задач Takt",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],

@@ -1,7 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ export function Dialog({
           <div className="mb-3 flex items-start justify-between gap-2">
             <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
             <DialogPrimitive.Close className="rounded p-1 text-muted hover:bg-[var(--surface-2)] hover:text-foreground" aria-label="Закрыть">
-              <X className="h-4 w-4" />
+              <AppIcon name="close" size={16} />
             </DialogPrimitive.Close>
           </div>
           {children}

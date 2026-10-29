@@ -1,11 +1,11 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Camera, LogOut, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { NotificationItem, User } from "@/lib/types";
+import type { User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
@@ -15,10 +15,12 @@ export function ProfileDrawer({
   open,
   onClose,
   user,
+  onOpenNotifications,
 }: {
   open: boolean;
   onClose: () => void;
   user: User;
+  onOpenNotifications?: () => void;
 }) {
   const qc = useQueryClient();
   const router = useRouter();
@@ -37,7 +39,7 @@ export function ProfileDrawer({
     queryKey: ["notifications"],
     enabled: open,
     queryFn: () =>
-      api<{ items: NotificationItem[]; unread: number }>("/api/v1/notifications?page_size=20"),
+      api<{ items: { id: string }[]; unread: number }>("/api/v1/notifications?page_size=20"),
     refetchInterval: open ? 30_000 : false,
   });
 
@@ -78,7 +80,7 @@ export function ProfileDrawer({
         json: { current_password: currentPassword, new_password: newPassword },
       }),
     onSuccess: async () => {
-      setMsg("Пароль изменён — войдите снова");
+      setMsg("Пароль изменён. Войдите снова");
       await api("/api/v1/auth/logout", { method: "POST" }).catch(() => null);
       router.push("/login");
     },
@@ -129,7 +131,7 @@ export function ProfileDrawer({
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
           <h2 className="text-base font-semibold">Мой профиль</h2>
           <button type="button" className="rounded p-1.5 text-muted hover:bg-[var(--surface-2)]" onClick={onClose} aria-label="Закрыть">
-            <X className="h-4 w-4" />
+            <AppIcon name="close" size={16} />
           </button>
         </div>
 
@@ -144,7 +146,7 @@ export function ProfileDrawer({
               <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={28} />
               <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                 <span className="flex flex-col items-center gap-1 text-[12px] font-medium">
-                  <Camera className="h-5 w-5" />
+                  <AppIcon name="camera" size={20} />
                   Изменить
                 </span>
               </span>
@@ -193,85 +195,62 @@ export function ProfileDrawer({
 
           <div className="border-t border-hairline pt-4">
             <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
-              <Bell className="h-4 w-4" /> Уведомления
+              <AppIcon name="notifications" size={16} /> Уведомления
             </p>
-            <div className="mb-3 space-y-2">
+            <div className="space-y-2">
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
-                disabled={pushBusy || pushState?.supported === false}
-                onClick={async () => {
-                  setPushBusy(true);
-                  setPushMsg("");
-                  try {
-                    if (pushState?.subscribed) {
-                      await disableWebPush();
-                      setPushMsg("Браузерные уведомления отключены");
-                    } else {
-                      const res = await enableWebPush();
-                      setPushMsg(res.message);
-                    }
-                    setPushState(await getPushStatus());
-                  } catch (e) {
-                    setPushMsg((e as Error).message || "Не удалось изменить уведомления");
-                  } finally {
-                    setPushBusy(false);
+                className="w-full justify-start"
+                onClick={() => {
+                  if (onOpenNotifications) onOpenNotifications();
+                  else {
+                    onClose();
+                    router.push("/inbox");
                   }
                 }}
               >
-                {pushState?.subscribed ? "Отключить push" : "Включить уведомления в браузере"}
+                Открыть все уведомления
+                {(notificationsQuery.data?.unread ?? 0) > 0
+                  ? ` · ${notificationsQuery.data?.unread}`
+                  : ""}
               </Button>
-              {pushMsg && <p className="text-xs text-muted">{pushMsg}</p>}
-              {pushState && !pushState.configured && pushState.supported && (
-                <p className="text-xs text-muted">
-                  Push на сервере не настроен (нужны VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY). In-app уведомления
-                  работают.
-                </p>
-              )}
-            </div>
-            <div className="max-h-48 space-y-2 overflow-y-auto">
-              {(notificationsQuery.data?.items ?? []).length === 0 && (
-                <p className="text-xs text-muted">Пока нет уведомлений</p>
-              )}
-              {(notificationsQuery.data?.items ?? []).map((n) => (
-                <button
-                  key={n.id}
+              {pushState?.supported && (
+                <Button
                   type="button"
-                  className={`block w-full rounded-[var(--radius)] border border-hairline px-2.5 py-2 text-left text-xs ${
-                    n.is_read ? "opacity-70" : "bg-[var(--surface-2)]"
-                  }`}
+                  size="sm"
+                  variant="ghost"
+                  className="w-full justify-start"
+                  disabled={pushBusy || pushState.configured === false}
                   onClick={async () => {
-                    if (!n.is_read) {
-                      await api(`/api/v1/notifications/${n.id}/read`, { method: "POST" });
-                      notificationsQuery.refetch();
-                    }
-                    if (n.project_id && n.task_id) {
-                      onClose();
-                      router.push(`/projects/${n.project_id}?task=${n.task_id}`);
-                    } else if (n.project_id) {
-                      onClose();
-                      router.push(`/projects/${n.project_id}`);
+                    setPushBusy(true);
+                    setPushMsg("");
+                    try {
+                      if (pushState.subscribed) {
+                        await disableWebPush();
+                        setPushMsg("Браузерные уведомления отключены");
+                      } else {
+                        const res = await enableWebPush();
+                        setPushMsg(res.message);
+                      }
+                      setPushState(await getPushStatus());
+                    } catch (e) {
+                      setPushMsg((e as Error).message || "Не удалось изменить уведомления");
+                    } finally {
+                      setPushBusy(false);
                     }
                   }}
                 >
-                  <span className="font-medium text-foreground">{n.title}</span>
-                  {n.body && <span className="mt-0.5 block text-muted">{n.body}</span>}
-                </button>
-              ))}
+                  {pushState.subscribed
+                    ? "Отключить браузерный push"
+                    : pushState.configured
+                      ? "Включить браузерный push"
+                      : "Браузерный push недоступен"}
+                </Button>
+              )}
+              {pushMsg && <p className="text-xs text-muted">{pushMsg}</p>}
             </div>
-            {(notificationsQuery.data?.unread ?? 0) > 0 && (
-              <button
-                type="button"
-                className="mt-2 text-xs text-[var(--accent)]"
-                onClick={async () => {
-                  await api("/api/v1/notifications/read-all", { method: "POST" });
-                  notificationsQuery.refetch();
-                }}
-              >
-                Отметить все прочитанными
-              </button>
-            )}
           </div>
 
           <div className="border-t border-hairline pt-4">
@@ -319,7 +298,7 @@ export function ProfileDrawer({
 
         <div className="border-t border-hairline p-3">
           <Button variant="ghost" className="w-full justify-start" onClick={logout}>
-            <LogOut className="h-4 w-4" /> Выйти
+            <AppIcon name="logout" size={16} /> Выйти
           </Button>
         </div>
       </aside>

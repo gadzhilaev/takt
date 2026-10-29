@@ -1,7 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SelectOption = { value: string; label: string; disabled?: boolean };
@@ -38,7 +38,7 @@ export function Select({
       >
         <SelectPrimitive.Value placeholder={placeholder} />
         <SelectPrimitive.Icon>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+          <AppIcon name="chevron-down" size={16} className="shrink-0 opacity-60" />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
@@ -57,7 +57,7 @@ export function Select({
               >
                 <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
                   <SelectPrimitive.ItemIndicator>
-                    <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
+                    <AppIcon name="check" size={16} className="text-[var(--accent)]" />
                   </SelectPrimitive.ItemIndicator>
                 </span>
                 <SelectPrimitive.ItemText>{opt.label}</SelectPrimitive.ItemText>

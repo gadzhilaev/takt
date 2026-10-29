@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, X } from "lucide-react";
+import { AppIcon } from "@/components/ui/app-icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -74,7 +74,7 @@ export function MultiSelect({
         <span className="min-w-0 flex-1 truncate">
           {selected.length ? selected.map((s) => s.label).join(", ") : placeholder}
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+        <AppIcon name="chevron-down" size={16} className="shrink-0 opacity-60" />
       </button>
       {open && (
         <div
@@ -111,7 +111,7 @@ export function MultiSelect({
                         on && "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
                       )}
                     >
-                      {on && <Check className="h-3 w-3" />}
+                      {on && <AppIcon name="check" size={16} />}
                     </span>
                     {opt.label}
                   </button>
@@ -130,7 +130,7 @@ export function MultiSelect({
                   onClick={() => toggle(s.value)}
                 >
                   {s.label}
-                  <X className="h-3 w-3" />
+                  <AppIcon name="close" size={16} />
                 </button>
               ))}
             </div>

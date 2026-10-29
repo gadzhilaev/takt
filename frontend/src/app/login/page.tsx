@@ -1,11 +1,11 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,58 +38,66 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="surface-panel w-full max-w-sm p-6">
-        <div className="mb-6 space-y-3">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(49,95,114,0.12),_transparent_55%),linear-gradient(180deg,var(--background),color-mix(in_srgb,var(--accent)_6%,var(--background)))]"
+      />
+      <div className="relative w-full max-w-sm">
+        <div className="mb-7 px-1">
           <BrandLogo className="h-9 w-auto max-w-[11.5rem]" title="Takt" />
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Вход</h1>
-            <p className="text-[13px] text-muted">Войдите или создайте аккаунт</p>
-          </div>
         </div>
-        <form className="space-y-3.5" method="post" action="#" onSubmit={form.handleSubmit(onSubmit)}>
-          <div>
-            <label className="label-text" htmlFor="login-email">
-              Email
-            </label>
-            <Input id="login-email" type="email" autoComplete="email" {...form.register("email")} />
-          </div>
-          <div>
-            <label className="label-text" htmlFor="login-password">
-              Пароль
-            </label>
-            <div className="relative">
-              <Input
-                id="login-password"
-                type={show ? "text" : "password"}
-                autoComplete="current-password"
-                {...form.register("password")}
-              />
-              <button
-                type="button"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-sm)] p-1.5 text-muted hover:bg-[var(--surface-2)]"
-                onClick={() => setShow((s) => !s)}
-                aria-label={show ? "Скрыть пароль" : "Показать пароль"}
-              >
-                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-          {error && (
-            <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
-              {error}
+        <div className="surface-panel p-6 sm:p-7">
+          <div className="mb-6">
+            <h1 className="text-xl font-semibold tracking-tight">Вход</h1>
+            <p className="mt-1.5 text-[13px] leading-snug text-muted">
+              Войдите, чтобы открыть доску команды
             </p>
-          )}
-          <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Входим…" : "Войти"}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted">
-          Нет аккаунта?{" "}
-          <Link href="/register" className="font-medium text-[var(--accent)]">
-            Регистрация
-          </Link>
-        </p>
+          </div>
+          <form className="space-y-3.5" method="post" action="#" onSubmit={form.handleSubmit(onSubmit)}>
+            <div>
+              <label className="label-text" htmlFor="login-email">
+                Email
+              </label>
+              <Input id="login-email" type="email" autoComplete="email" {...form.register("email")} />
+            </div>
+            <div>
+              <label className="label-text" htmlFor="login-password">
+                Пароль
+              </label>
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  type={show ? "text" : "password"}
+                  autoComplete="current-password"
+                  {...form.register("password")}
+                />
+                <button
+                  type="button"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-sm)] p-1.5 text-muted hover:bg-[var(--surface-2)]"
+                  onClick={() => setShow((s) => !s)}
+                  aria-label={show ? "Скрыть пароль" : "Показать пароль"}
+                >
+                  {show ? <AppIcon name="eye-off" size={16} /> : <AppIcon name="eye" size={16} />}
+                </button>
+              </div>
+            </div>
+            {error && (
+              <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
+                {error}
+              </p>
+            )}
+            <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Входим…" : "Войти"}
+            </Button>
+          </form>
+          <p className="mt-5 text-center text-sm text-muted">
+            Нет аккаунта?{" "}
+            <Link href="/register" className="font-medium text-[var(--accent)]">
+              Регистрация
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

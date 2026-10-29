@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import {
   DndContext,
   DragEndEvent,
@@ -13,7 +14,6 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, MoreHorizontal, Plus } from "lucide-react";
 import { api, wsUrl } from "@/lib/api";
 import type { ProjectMember, Status, Task } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -590,7 +590,7 @@ export function KanbanBoard({
           setQuickCol(status.id);
         }}
       >
-        <Plus className="h-3.5 w-3.5" /> Добавить
+        <AppIcon name="add" size={16} /> Добавить
       </button>
     );
   }
@@ -629,7 +629,7 @@ export function KanbanBoard({
         <span className="text-xs tabular-nums text-muted">{count}</span>
         <details className="relative">
           <summary className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded text-muted hover:bg-[var(--surface)]/70 hover:text-foreground [&::-webkit-details-marker]:hidden">
-            <MoreHorizontal className="h-4 w-4" aria-label={`Действия столбца ${status.name}`} />
+            <AppIcon name="more" size={16} />
           </summary>
           <div className="absolute right-0 z-30 mt-1 w-52 rounded-[var(--radius)] border border-hairline bg-[var(--surface)] py-1 shadow-sm">
             <button
@@ -669,7 +669,7 @@ export function KanbanBoard({
                 columnMutation.mutate({ type: "done", id: status.id, is_done: !status.is_done })
               }
             >
-              <Check className={cn("h-3.5 w-3.5", status.is_done ? "text-[var(--success)]" : "text-muted")} />
+              <AppIcon name="check" size={20} />
               {status.is_done ? "Снять «завершённый»" : "Столбец завершения"}
             </button>
             <button

@@ -56,7 +56,7 @@ export default function AdminSettingsPage() {
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-xs text-slate-500">Редактирование цветов и порядка — через API /api/v1/settings/statuses</p>
+        <p className="mt-2 text-xs text-slate-500">Редактирование цветов и порядка: через API /api/v1/settings/statuses</p>
       </section>
     </div>
   );

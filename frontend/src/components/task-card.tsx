@@ -1,7 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { Check } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Status, Task } from "@/lib/types";
 import { UserAvatar } from "@/components/user-avatar";
@@ -118,11 +118,7 @@ export function TaskCard({
         <button type="button" className="w-full p-2.5 pl-3.5 text-left" onClick={onOpen}>
           <div className="flex items-start gap-1.5">
             {isDone && (
-              <Check
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--success)]"
-                strokeWidth={2.5}
-                aria-label="Выполнено"
-              />
+              <AppIcon name="check" size={16} className="mt-0.5 shrink-0 text-[var(--success)]" />
             )}
             <h3
               className={cn(

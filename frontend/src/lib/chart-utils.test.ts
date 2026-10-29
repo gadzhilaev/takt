@@ -32,8 +32,8 @@ describe("yAxisMax", () => {
 
 describe("formatAvgDays", () => {
   it("shows dash when nothing closed", () => {
-    expect(formatAvgDays(0, 0)).toBe("—");
-    expect(formatAvgDays(null, 0)).toBe("—");
+    expect(formatAvgDays(0, 0)).toBe("-");
+    expect(formatAvgDays(null, 0)).toBe("-");
   });
 
   it("shows < 1 for tiny averages", () => {
@@ -47,7 +47,7 @@ describe("formatAvgDays", () => {
 
 describe("formatOnTimePct", () => {
   it("formats null as dash", () => {
-    expect(formatOnTimePct(null)).toBe("—");
+    expect(formatOnTimePct(null)).toBe("-");
   });
 
   it("formats numbers with percent", () => {

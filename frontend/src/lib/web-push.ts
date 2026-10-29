@@ -49,7 +49,10 @@ export async function enableWebPush(): Promise<{ ok: boolean; message: string }>
     "/api/v1/notifications/push/vapid-public-key"
   );
   if (!meta.configured || !meta.public_key) {
-    return { ok: false, message: "Web Push не настроен на сервере (VAPID)" };
+    return {
+      ok: false,
+      message: "Браузерные push пока недоступны. In-app уведомления работают как обычно.",
+    };
   }
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {

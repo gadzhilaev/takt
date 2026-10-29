@@ -1,9 +1,9 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import Link from "next/link";
-import { Copy, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +80,7 @@ export default function AdminPage() {
 
       <div className="rounded-xl border p-4 dark:border-slate-800">
         <h2 className="mb-3 flex items-center gap-2 font-medium">
-          <Plus className="h-4 w-4" /> Добавить пользователя
+          <AppIcon name="add" size={16} /> Добавить пользователя
         </h2>
         <div className="grid gap-2 md:grid-cols-2">
           <Input placeholder="Имя" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -117,7 +117,7 @@ export default function AdminPage() {
             Создать
           </Button>
           <Button variant="secondary" onClick={copyLogin}>
-            <Copy className="h-4 w-4" /> Скопировать данные для входа
+            <AppIcon name="copy" size={16} /> Скопировать данные для входа
           </Button>
         </div>
         {tempCreds && (
@@ -161,7 +161,7 @@ export default function AdminPage() {
                 <td className="px-3 py-2">{u.role === "admin" ? "Админ" : "Участник"}</td>
                 <td className="px-3 py-2">{u.is_active ? "Активен" : "Отключён"}</td>
                 <td className="px-3 py-2">{u.created_at.slice(0, 10)}</td>
-                <td className="px-3 py-2">{u.last_login_at?.slice(0, 10) ?? "—"}</td>
+                <td className="px-3 py-2">{u.last_login_at?.slice(0, 10) ?? "-"}</td>
                 <td className="px-3 py-2">
                   <Button
                     size="sm"
