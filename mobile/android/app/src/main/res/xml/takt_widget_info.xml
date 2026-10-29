@@ -8,6 +8,8 @@
     android:targetCellHeight="1"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/takt_widget"
-    android:resizeMode="horizontal|vertical"
+    android:configure="ru.gadzhilaev.takt.TaktWidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen"
+    android:resizeMode="horizontal|vertical"
     android:description="@string/widget_description" />

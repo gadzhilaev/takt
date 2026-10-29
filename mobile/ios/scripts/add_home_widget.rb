@@ -60,8 +60,10 @@ unless widget_target
     'SKIP_INSTALL' => 'YES',
     'TARGETED_DEVICE_FAMILY' => '1,2',
     'SWIFT_VERSION' => '5.0',
-    'CURRENT_PROJECT_VERSION' => '$(FLUTTER_BUILD_NUMBER)',
-    'MARKETING_VERSION' => '$(FLUTTER_BUILD_NAME)',
+    # Literal versions: widget target does not include Flutter Generated.xcconfig,
+    # so $(FLUTTER_BUILD_*) would strip CFBundleVersion and break sim install.
+    'CURRENT_PROJECT_VERSION' => '1',
+    'MARKETING_VERSION' => '1.0.0',
     'GENERATE_INFOPLIST_FILE' => 'NO',
     'CLANG_ENABLE_MODULES' => 'YES',
   }
@@ -93,6 +95,20 @@ unless widget_target
   puts "Created target #{WIDGET_NAME}"
 else
   puts "#{WIDGET_NAME} already exists"
+end
+
+# Avoid Xcode "Cycle inside Runner" with Flutter: Embed Foundation Extensions
+# before CocoaPods embed phases, Thin Binary last.
+thin = runner.build_phases.find { |p| p.respond_to?(:name) && p.name == 'Thin Binary' }
+embed_phase = runner.copy_files_build_phases.find { |p| p.name == 'Embed Foundation Extensions' }
+cp_embed = runner.build_phases.find { |p| p.respond_to?(:name) && p.name == '[CP] Embed Pods Frameworks' }
+cp_res = runner.build_phases.find { |p| p.respond_to?(:name) && p.name == '[CP] Copy Pods Resources' }
+if thin && embed_phase
+  [embed_phase, cp_embed, cp_res, thin].compact.each { |p| runner.build_phases.delete(p) }
+  runner.build_phases << embed_phase
+  runner.build_phases << cp_embed if cp_embed
+  runner.build_phases << cp_res if cp_res
+  runner.build_phases << thin
 end
 
 runner_group = project.main_group.find_subpath('Runner', false)

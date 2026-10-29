@@ -29,6 +29,17 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="takt" android:host="board" />
                 <data android:scheme="takt" android:host="task" />
+                <data android:scheme="takt" android:host="my-tasks" />
+                <data android:scheme="takt" android:host="profile" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".TaktWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Takt.WidgetConfig">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
 

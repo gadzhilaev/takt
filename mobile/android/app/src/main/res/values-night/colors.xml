@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="takt_accent">#6A9AAB</color>
+    <color name="takt_graphite">#E7EBEF</color>
+    <color name="takt_muted">#AEB8C3</color>
+    <color name="takt_board">#22272E</color>
+    <color name="takt_surface">#353D47</color>
+    <color name="takt_urgent">#E88A8A</color>
+    <color name="takt_high">#D4A45A</color>
+    <color name="takt_medium">#7AADC4</color>
+    <color name="takt_card_border">#4A5563</color>
+</resources>

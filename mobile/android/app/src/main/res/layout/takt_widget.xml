@@ -1,39 +1,136 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Medium widget: header + count + up to 3 my-tasks -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="#F7F8FA">
+    android:background="@drawable/takt_widget_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:contentDescription="@null"
+            android:src="@drawable/takt_mark" />
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:text="Мои задачи"
+            android:textColor="@color/takt_graphite"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0"
+            android:textColor="@color/takt_accent"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/widget_project"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#202938"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:maxLines="1"
+        android:layout_marginTop="2dp"
         android:ellipsize="end"
-        android:text="Takt" />
+        android:maxLines="1"
+        android:textColor="@color/takt_muted"
+        android:textSize="11sp" />
 
     <TextView
-        android:id="@+id/widget_count"
+        android:id="@+id/widget_urgent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textColor="#315F72"
-        android:textSize="12sp"
-        android:text="0 незавершённых" />
+        android:layout_marginTop="2dp"
+        android:textColor="@color/takt_urgent"
+        android:textSize="11sp"
+        android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/widget_tasks"
+    <LinearLayout
+        android:id="@+id/widget_tasks_list"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginTop="8dp"
-        android:textColor="#202938"
-        android:textSize="12sp"
-        android:lineSpacingExtra="2dp"
-        android:text="" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Task 1 -->
+        <LinearLayout
+            android:id="@+id/widget_task_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/takt_task_card_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="6dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone">
+            <View android:id="@+id/task_1_priority" android:layout_width="3dp" android:layout_height="22dp" android:background="@color/takt_medium" />
+            <TextView android:id="@+id/task_1_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:textColor="@color/takt_graphite" android:textSize="12sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Task 2 -->
+        <LinearLayout
+            android:id="@+id/widget_task_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/takt_task_card_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="6dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone">
+            <View android:id="@+id/task_2_priority" android:layout_width="3dp" android:layout_height="22dp" android:background="@color/takt_medium" />
+            <TextView android:id="@+id/task_2_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:textColor="@color/takt_graphite" android:textSize="12sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Task 3 -->
+        <LinearLayout
+            android:id="@+id/widget_task_3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/takt_task_card_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="6dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone">
+            <View android:id="@+id/task_3_priority" android:layout_width="3dp" android:layout_height="22dp" android:background="@color/takt_medium" />
+            <TextView android:id="@+id/task_3_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:textColor="@color/takt_graphite" android:textSize="12sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Нет назначенных задач"
+            android:textColor="@color/takt_muted"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_count_label"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 </LinearLayout>
