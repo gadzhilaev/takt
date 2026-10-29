@@ -25,8 +25,10 @@ export function useOAuthProviders() {
 const PROVIDER_ICONS: Record<string, { src: string; alt: string }> = {
   vk: { src: "/brand/oauth-vk.svg", alt: "VK" },
   yandex: { src: "/brand/oauth-yandex.svg", alt: "Яндекс" },
-  apple: { src: "/brand/oauth-apple.svg", alt: "Apple" },
 };
+
+/** Web: только VK / Яндекс. Apple — только в мобильном приложении. */
+const WEB_PROVIDERS = new Set(["vk", "yandex"]);
 
 export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" | "link" }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" |
   const { data } = useOAuthProviders();
 
   const providers = data?.providers ?? {};
-  const enabled = Object.values(providers).filter((p) => p.enabled);
+  const enabled = Object.values(providers).filter((p) => p.enabled && WEB_PROVIDERS.has(p.id));
   const actionLabel = mode === "register" ? "Зарегистрироваться через" : "Продолжить с";
 
   async function start(provider: string) {
@@ -54,7 +56,7 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" |
   if (!enabled.length) {
     return (
       <p className="mt-4 text-[12px] leading-snug text-muted">
-        Вход через Apple / VK ID / Яндекс ID будет доступен после настройки провайдеров на сервере.
+        Вход через VK ID / Яндекс ID будет доступен после настройки провайдеров на сервере.
         {data?.notes?.[0] ? ` ${data.notes[0]}` : ""}
       </p>
     );
@@ -79,7 +81,13 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" |
           >
             {icon ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={icon.src} alt="" width={20} height={20} className="size-5 shrink-0 rounded-[5px]" />
+              <img
+                src={icon.src}
+                alt=""
+                width={20}
+                height={20}
+                className="size-5 shrink-0 object-contain"
+              />
             ) : null}
             <span>{busy === p.id ? "Перенаправление…" : `${actionLabel} ${p.label}`}</span>
           </Button>

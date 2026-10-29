@@ -21,17 +21,31 @@ Backend FastAPI — единый центр. Client secrets и Apple private key
 - Web: `https://taktapp.ru/api/v1/auth/oauth/callback` (и localhost для dev)
 - Mobile deep link: `takt://oauth/callback`
 
-## Apple
+## Apple (только mobile; на сайте кнопок нет)
 
-1. [Apple Developer](https://developer.apple.com) → Certificates, Identifiers & Profiles.
-2. Создайте **App ID** (iOS/Android bundle) с Sign In with Apple.
-3. Создайте **Services ID** (web client id) → `OAUTH_APPLE_CLIENT_ID`.
-4. Configure domains + return URL = web callback выше.
-5. Keys → Sign in with Apple → скачайте `.p8` → `OAUTH_APPLE_PRIVATE_KEY_FILE` или PEM в `OAUTH_APPLE_PRIVATE_KEY`.
-6. Заполните `OAUTH_APPLE_TEAM_ID`, `OAUTH_APPLE_KEY_ID`.
-7. Включите `OAUTH_APPLE_ENABLED=true` только после юр. решения для целевой аудитории.
+Bundle ID приложения: `ru.gadzhilaev.takt`.
 
-Native iOS: передайте `id_token` на `POST /api/v1/auth/oauth/mobile` (Sign in with Apple SDK). Не кладите private key в приложение.
+1. [Apple Developer](https://developer.apple.com) → **Certificates, Identifiers & Profiles**.
+2. **Identifiers → App IDs** → ваш App ID `ru.gadzhilaev.takt` → включите capability **Sign In with Apple** → Save.
+3. **Keys → +** → **Sign in with Apple** → Configure (выберите App ID) → Continue → Register → **скачайте `.p8` один раз**.
+4. Запишите:
+   - **Key ID** → `OAUTH_APPLE_KEY_ID`
+   - **Team ID** (Membership) → `OAUTH_APPLE_TEAM_ID`
+   - Client ID для native = bundle id → `OAUTH_APPLE_CLIENT_ID=ru.gadzhilaev.takt`
+5. На сервере положите ключ, например `/opt/takt/secrets/AuthKey_XXXXX.p8`, и в `/opt/takt/.env`:
+   ```bash
+   OAUTH_APPLE_ENABLED=true
+   OAUTH_APPLE_CLIENT_ID=ru.gadzhilaev.takt
+   OAUTH_APPLE_TEAM_ID=…
+   OAUTH_APPLE_KEY_ID=…
+   OAUTH_APPLE_PRIVATE_KEY_FILE=/secrets/AuthKey_XXXXX.p8
+   # для оператора РФ после юр. решения:
+   OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR=true
+   ```
+6. Рестарт backend. В админке `/admin/settings` включите **Apple**.
+7. В приложении кнопка появится после `enabled` у `/api/v1/auth/oauth/providers`. Native Sign in with Apple отдаёт `id_token` на `POST /api/v1/auth/oauth/mobile`. Private key **только** на сервере.
+
+Пока `OAUTH_OPERATOR_REGION=ru` и `OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR=false`, Apple останется выключенным политикой (149-ФЗ).
 
 ## VK ID
 
