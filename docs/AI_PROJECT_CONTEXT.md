@@ -41,8 +41,9 @@ cd mobile && flutter analyze && flutter test
 # Android emulator API: --dart-define=API_BASE=http://10.0.2.2:8000
 ```
 
-## Статус (обновлено 2026-10-28)
+## Статус (обновлено 2026-10-29)
 
-Flutter `mobile/`: bundle **`ru.gadzhilaev.takt`**, FCM, виджеты; палитра Kanban в `kanban_colors.dart` (= web).  
-Kanban: усиленные пресеты столбцов (v2); миграции `008`/`009` обновляют только известные default hex.  
+Иконки UI: единый Lucide (`shared/icons/`, stroke 1.75) → web `AppIcon` (lucide-react), Flutter `AppIcon` (flutter_svg, symlink `mobile/assets/icons`). `home` = Lucide `house`. Бренд не трогали.  
+Flutter: хаб проектов, AppBar без chevron у названия, clamping PageView, аватары рядом. Участники mobile+web: remove / leave-request (`010`).  
+Web: уведомления — боковой drawer (как задача), не отдельная страница; VAPID в `.env`. Скрины `docs/screenshots/mobile-ui/`. Миграции `008`–`010`.  
 Commit/push/deploy только по разрешению.
