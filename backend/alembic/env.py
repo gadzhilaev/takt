@@ -13,6 +13,8 @@ from app.models import (  # noqa: F401
     ChecklistItem,
     Comment,
     Label,
+    ProjectLeaveRequest,
+    ProjectLeaveRequestStatus,
     RefreshToken,
     Task,
     TaskAssignee,

@@ -1,6 +1,7 @@
 from app.models.auth import RefreshToken
 from app.models.device_push_token import DevicePushToken
 from app.models.invite import ProjectInvite, ProjectInviteStatus
+from app.models.leave_request import ProjectLeaveRequest, ProjectLeaveRequestStatus
 from app.models.notification import Notification
 from app.models.push_subscription import PushSubscription
 from app.models.project import Project, ProjectMember, ProjectMemberRole
@@ -41,4 +42,6 @@ __all__ = [
     "DevicePushToken",
     "ProjectInvite",
     "ProjectInviteStatus",
+    "ProjectLeaveRequest",
+    "ProjectLeaveRequestStatus",
 ]

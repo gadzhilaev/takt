@@ -547,7 +547,7 @@ async def _seed_notifications(
             actor_id=isaeva.id,
             kind="task_assigned",
             title=title,
-            body=f"{NOTIF_MARKER} Демо-уведомление о назначении",
+            body=f"Вас назначили исполнителем этой задачи. {NOTIF_MARKER}",
             task_id=t1.id,
             project_id=project.id,
         )
@@ -587,7 +587,7 @@ async def _seed_notifications(
             actor_id=velieva.id,
             kind="task_assigned",
             title=title,
-            body=f"{NOTIF_MARKER} Демо-уведомление о групповом назначении",
+            body=f"Вас добавили в список исполнителей вместе с коллегами. {NOTIF_MARKER}",
             task_id=t2.id,
             project_id=project.id,
         )
@@ -609,7 +609,7 @@ async def _seed_notifications(
             actor_id=kadachiev.id,
             kind="task_completed",
             title=title,
-            body=f"{NOTIF_MARKER} Демо-уведомление о завершении",
+            body=f"Задача отмечена как выполненная. {NOTIF_MARKER}",
             task_id=t3.id,
             project_id=project.id,
         )

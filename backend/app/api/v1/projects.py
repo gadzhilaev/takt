@@ -11,7 +11,8 @@ from app.db.session import get_db
 from app.models.project import ProjectMember, ProjectMemberRole
 from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectMemberUpdate, ProjectOut, ProjectUpdate
-from app.services import project_service
+from app.services import leave_request_service, project_service
+from app.services.leave_request_service import LeaveRequestError
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -169,3 +170,105 @@ async def set_members(
     project = await project_service.get_project(db, project_id)
     umap = await _users_map(db, [m.user_id for m in project.members])  # type: ignore[union-attr]
     return {"project": _project_out(project, umap)}
+
+
+def _leave_out(req, user: User | None) -> dict:
+    return {
+        "id": str(req.id),
+        "project_id": str(req.project_id),
+        "user_id": str(req.user_id),
+        "user_name": user.name if user else "",
+        "avatar_url": avatar_url(user) if user else None,
+        "status": req.status.value if hasattr(req.status, "value") else str(req.status),
+        "created_at": req.created_at.isoformat() if req.created_at else None,
+    }
+
+
+@router.delete("/{project_id}/members/{user_id}", dependencies=[Depends(verify_csrf)])
+async def remove_member(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        await leave_request_service.remove_member(
+            db, project_id=project_id, target_user_id=user_id, actor=user
+        )
+    except PermissionError:
+        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}})
+    except LeaveRequestError as e:
+        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+    await db.commit()
+    project = await project_service.get_project(db, project_id)
+    umap = await _users_map(db, [m.user_id for m in project.members])  # type: ignore[union-attr]
+    return {"project": _project_out(project, umap)}
+
+
+@router.post("/{project_id}/leave-requests", dependencies=[Depends(verify_csrf)])
+async def create_leave_request(
+    project_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        req = await leave_request_service.create_leave_request(db, project_id=project_id, user=user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет доступа"}})
+    except LeaveRequestError as e:
+        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+    await db.commit()
+    await db.refresh(req)
+    return {"request": _leave_out(req, user)}
+
+
+@router.get("/{project_id}/leave-requests")
+async def list_leave_requests(
+    project_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        items = await leave_request_service.list_leave_requests(db, project_id=project_id, user=user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}})
+    umap = await _users_map(db, [r.user_id for r in items])
+    return {"items": [_leave_out(r, umap.get(r.user_id)) for r in items]}
+
+
+@router.post("/{project_id}/leave-requests/{request_id}/approve", dependencies=[Depends(verify_csrf)])
+async def approve_leave_request(
+    project_id: uuid.UUID,
+    request_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        await leave_request_service.approve_leave_request(
+            db, project_id=project_id, request_id=request_id, actor=user
+        )
+    except PermissionError:
+        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}})
+    except LeaveRequestError as e:
+        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/{project_id}/leave-requests/{request_id}/reject", dependencies=[Depends(verify_csrf)])
+async def reject_leave_request(
+    project_id: uuid.UUID,
+    request_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        await leave_request_service.reject_leave_request(
+            db, project_id=project_id, request_id=request_id, actor=user
+        )
+    except PermissionError:
+        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}})
+    except LeaveRequestError as e:
+        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+    await db.commit()
+    return {"ok": True}
