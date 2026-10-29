@@ -315,7 +315,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                                     color: Colors.white,
                                                   ),
                                                 )
-                                              : Text(_awaitingCode ? 'Подтвердить' : 'Получить код'),
+                                              : Text(_awaitingCode ? 'Подтвердить' : 'Зарегистрироваться'),
                                         ),
                                         if (_awaitingCode) ...[
                                           const SizedBox(height: 8),

@@ -157,7 +157,7 @@ export default function RegisterPage() {
                 </p>
               )}
               <Button type="submit" className="w-full" size="lg" disabled={sending || form.formState.isSubmitting}>
-                Получить код
+                Зарегистрироваться
               </Button>
             </form>
           ) : (

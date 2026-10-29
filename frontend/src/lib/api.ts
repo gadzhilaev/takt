@@ -8,6 +8,39 @@ function csrfToken(): string | undefined {
 
 type ApiOptions = RequestInit & { json?: unknown };
 
+/** FastAPI `{detail:{error:{message}}}`, SlowAPI `{error:"…"}`, validation `detail:[]`. */
+export function messageFromApiError(err: unknown): string | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const body = err as Record<string, unknown>;
+
+  const nested = body.detail;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const detail = nested as Record<string, unknown>;
+    const error = detail.error;
+    if (error && typeof error === "object" && !Array.isArray(error)) {
+      const message = (error as Record<string, unknown>).message;
+      if (typeof message === "string" && message.trim()) return message;
+    }
+    if (typeof detail.message === "string" && detail.message.trim()) return detail.message;
+  }
+  if (typeof nested === "string" && nested.trim()) return nested;
+  if (Array.isArray(nested) && nested.length > 0) {
+    const first = nested[0] as { msg?: unknown };
+    if (typeof first?.msg === "string" && first.msg.trim()) return first.msg;
+  }
+
+  const top = body.error;
+  if (typeof top === "string" && top.trim()) {
+    if (/rate limit/i.test(top)) return "Слишком много попыток. Попробуйте через минуту";
+    return top;
+  }
+  if (top && typeof top === "object" && !Array.isArray(top)) {
+    const message = (top as Record<string, unknown>).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return undefined;
+}
+
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (options.json !== undefined) {
@@ -25,7 +58,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message ?? "Ошибка запроса");
+    throw new Error(messageFromApiError(err) ?? "Ошибка запроса");
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
