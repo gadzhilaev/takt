@@ -40,7 +40,8 @@ class TaktTaskCard extends StatelessWidget {
         side: BorderSide(color: borderColor),
       ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: IntrinsicHeight(
           child: Row(

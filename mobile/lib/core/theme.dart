@@ -88,6 +88,11 @@ ThemeData buildLightTheme() {
     scaffoldBackgroundColor: KanbanColors.boardBgLight,
   );
   return base.copyWith(
+    splashFactory: NoSplash.splashFactory,
+    splashColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    hoverColor: Colors.transparent,
+    focusColor: Colors.transparent,
     dividerColor: TaktColors.border,
     appBarTheme: const AppBarTheme(
       backgroundColor: TaktColors.surface,
@@ -114,6 +119,12 @@ ThemeData buildLightTheme() {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.pill)),
     ),
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        splashFactory: NoSplash.splashFactory,
+      ),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: TaktColors.accent,
@@ -121,6 +132,8 @@ ThemeData buildLightTheme() {
         minimumSize: const Size(64, 40),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.md)),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: Colors.transparent,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -130,10 +143,27 @@ ThemeData buildLightTheme() {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         side: const BorderSide(color: TaktColors.borderStrong),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.md)),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: Colors.transparent,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: TaktColors.accent),
+      style: TextButton.styleFrom(
+        foregroundColor: TaktColors.accent,
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: Colors.transparent,
+      ),
+    ),
+    listTileTheme: const ListTileThemeData(
+      dense: true,
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      titleTextStyle: TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
+        color: TaktColors.graphite,
+      ),
+      subtitleTextStyle: TextStyle(fontSize: 13, color: TaktColors.muted, height: 1.35),
+      enableFeedback: false,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -154,16 +184,6 @@ ThemeData buildLightTheme() {
       ),
       hintStyle: const TextStyle(fontSize: 14, color: TaktColors.muted),
       labelStyle: const TextStyle(fontSize: 14, color: TaktColors.muted),
-    ),
-    listTileTheme: const ListTileThemeData(
-      dense: true,
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      titleTextStyle: TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: TaktColors.graphite,
-      ),
-      subtitleTextStyle: TextStyle(fontSize: 13, color: TaktColors.muted, height: 1.35),
     ),
     cardTheme: CardThemeData(
       color: TaktColors.surface,
@@ -196,6 +216,11 @@ ThemeData buildDarkTheme() {
     scaffoldBackgroundColor: canvas,
   );
   return base.copyWith(
+    splashFactory: NoSplash.splashFactory,
+    splashColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    hoverColor: Colors.transparent,
+    focusColor: Colors.transparent,
     dividerColor: TaktColors.borderDark,
     appBarTheme: const AppBarTheme(
       backgroundColor: TaktColors.surfaceDark,
@@ -214,6 +239,12 @@ ThemeData buildDarkTheme() {
       toolbarHeight: 52,
       systemOverlayStyle: SystemUiOverlayStyle.light,
     ),
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        splashFactory: NoSplash.splashFactory,
+      ),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: TaktColors.accent,
@@ -221,6 +252,8 @@ ThemeData buildDarkTheme() {
         minimumSize: const Size(64, 40),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.md)),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: Colors.transparent,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -230,10 +263,16 @@ ThemeData buildDarkTheme() {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         side: const BorderSide(color: TaktColors.borderStrongDark),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.md)),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: Colors.transparent,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: TaktColors.accentDark),
+      style: TextButton.styleFrom(
+        foregroundColor: TaktColors.accentDark,
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: Colors.transparent,
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -261,6 +300,7 @@ ThemeData buildDarkTheme() {
         color: TaktColors.foregroundDark,
       ),
       subtitleTextStyle: TextStyle(fontSize: 13, color: TaktColors.mutedDark, height: 1.35),
+      enableFeedback: false,
     ),
   );
 }

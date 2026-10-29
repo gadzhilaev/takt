@@ -114,13 +114,10 @@ class TaktCard extends StatelessWidget {
       ),
     );
     if (onTap == null) return box;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: box,
-      ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: box,
     );
   }
 }
@@ -194,6 +191,7 @@ class TaktListTile extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       dense: dense,
+      enableFeedback: false,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       leading: leading,
       title: Text(

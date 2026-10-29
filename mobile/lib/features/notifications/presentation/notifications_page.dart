@@ -180,9 +180,9 @@ class _NotificationTile extends StatelessWidget {
           ? surface
           : (dark ? TaktColors.accentSoftDark : TaktColors.accentSoft),
       borderRadius: BorderRadius.circular(TaktRadii.md),
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(TaktRadii.md),
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           decoration: BoxDecoration(

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:app_settings/app_settings.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -171,13 +172,13 @@ class FcmBootstrap {
     }
   }
 
-  /// When permission is already denied, the OS will not show the prompt again.
-  /// Profile UI tells the user to enable notifications in system Settings.
-  /// (Opening Settings requires a dedicated plugin; we avoid re-prompting here.)
+  /// Opens the OS settings screen for this app (notifications, etc.).
   Future<void> openSystemSettings() async {
-    debugPrint(
-      'Push denied: enable notifications in system Settings → Takt',
-    );
+    try {
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+    } catch (_) {
+      await AppSettings.openAppSettings();
+    }
   }
 
   void dispose() {

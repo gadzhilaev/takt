@@ -67,9 +67,9 @@ class TaktSelectField<T> extends StatelessWidget {
             borderRadius: BorderRadius.circular(TaktRadii.md),
             side: BorderSide(color: border),
           ),
-          child: InkWell(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: enabled ? () => _open(context) : null,
-            borderRadius: BorderRadius.circular(TaktRadii.md),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 11, 8, 11),
               child: Row(

@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/push/fcm_bootstrap.dart';
-import '../../../shared/widgets/app_icon.dart';
+import '../../../core/takt_links.dart';
 import '../../../core/theme.dart';
 import '../../../core/theme_scope.dart';
+import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
+import '../../../shared/widgets/takt_sheet.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../auth/cubit/auth_cubit.dart';
@@ -179,7 +183,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               TaktSection(
-                title: 'Уведомления и проекты',
+                title: 'Уведомления',
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                 child: _SettingsGroup(
                   surface: surface,
@@ -187,7 +191,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     TaktListTile(
                       leading: AppIcon(AppIcons.notifications, size: 20, color: muted),
-                      title: 'Системные push',
+                      title: 'Push-уведомления',
                       subtitle: _pushLabel,
                       trailing: _pushBusy
                           ? const SizedBox(
@@ -195,15 +199,25 @@ class _ProfilePageState extends State<ProfilePage> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                          : AppIcon(AppIcons.settings, size: 20, color: muted),
                       onTap: _pushBusy ? null : () => _handlePushTap(context),
                     ),
                     TaktListTile(
-                      leading: AppIcon(AppIcons.notifications, size: 20, color: muted),
+                      leading: AppIcon(AppIcons.inbox, size: 20, color: muted),
                       title: 'Центр уведомлений',
                       trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
                       onTap: () => context.push('/notifications'),
                     ),
+                  ],
+                ),
+              ),
+              TaktSection(
+                title: 'Проекты',
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: _SettingsGroup(
+                  surface: surface,
+                  border: border,
+                  children: [
                     TaktListTile(
                       leading: AppIcon(AppIcons.invite, size: 20, color: muted),
                       title: 'Пригласить участника',
@@ -214,24 +228,46 @@ class _ProfilePageState extends State<ProfilePage> {
                   ],
                 ),
               ),
+              TaktSection(
+                title: 'О приложении',
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: _SettingsGroup(
+                  surface: surface,
+                  border: border,
+                  children: [
+                    TaktListTile(
+                      leading: AppIcon(AppIcons.message, size: 20, color: muted),
+                      title: 'Поддержка',
+                      subtitle: 'Написать в поддержку',
+                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                      onTap: () => _openSupport(context),
+                    ),
+                    TaktListTile(
+                      leading: AppIcon(AppIcons.lock, size: 20, color: muted),
+                      title: 'Конфиденциальность',
+                      subtitle: 'Политика обработки данных',
+                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                      onTap: () => _openPrivacy(context),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextButton.icon(
                   onPressed: () async {
-                    final ok = await showDialog<bool>(
+                    final ok = await showTaktSheet(
                       context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Выйти из аккаунта?'),
-                        content: const Text('Виджеты очистят данные текущего пользователя.'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: TextButton.styleFrom(foregroundColor: TaktColors.danger),
-                            child: const Text('Выйти'),
-                          ),
-                        ],
+                      title: 'Выйти из аккаунта?',
+                      confirmLabel: 'Выйти',
+                      body: Text(
+                        'Виджеты очистят данные текущего пользователя.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                        ),
                       ),
                     );
                     if (ok != true || !context.mounted) return;
@@ -249,19 +285,108 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<void> _openSupport(BuildContext context) async {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    await showTaktInfoSheet(
+      context: context,
+      title: 'Поддержка',
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Напишите нам, если что-то не работает или нужна помощь по Takt.',
+            style: TextStyle(fontSize: 14, height: 1.45, color: muted),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            TaktLinks.supportEmail,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TaktButton(
+            label: 'Написать письмо',
+            expand: true,
+            onPressed: () async {
+              final uri = Uri.parse(TaktLinks.supportMailto);
+              try {
+                await launchUrl(uri);
+              } catch (_) {
+                await Clipboard.setData(const ClipboardData(text: TaktLinks.supportEmail));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Email скопирован')),
+                  );
+                }
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+          TaktButton(
+            label: 'Скопировать email',
+            variant: TaktButtonVariant.secondary,
+            expand: true,
+            onPressed: () async {
+              await Clipboard.setData(const ClipboardData(text: TaktLinks.supportEmail));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Email скопирован')),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openPrivacy(BuildContext context) async {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
+    await showTaktInfoSheet(
+      context: context,
+      title: 'Конфиденциальность',
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Takt обрабатывает данные аккаунта и задач только для работы сервиса.',
+            style: TextStyle(fontSize: 14, height: 1.45, color: fg),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Мы храним имя, email, аватар, состав проектов и задач, а также '
+            'токены push-уведомлений на устройстве. Данные не продаём и не '
+            'передаём третьим лицам, кроме инфраструктуры, необходимой для '
+            'работы приложения (хостинг, доставка уведомлений).',
+            style: TextStyle(fontSize: 13.5, height: 1.45, color: muted),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Вы можете запросить удаление аккаунта через поддержку: ${TaktLinks.supportEmail}.',
+            style: TextStyle(fontSize: 13.5, height: 1.45, color: muted),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handlePushTap(BuildContext context) async {
     final fcm = context.read<FcmBootstrap>();
-    if (_pushStatus == PushPermission.denied) {
-      setState(() => _message = 'Разрешите уведомления в настройках устройства');
-      await fcm.openSystemSettings();
-      return;
-    }
     setState(() => _pushBusy = true);
     try {
-      await fcm.enablePush();
+      if (_pushStatus == PushPermission.notDetermined) {
+        await fcm.enablePush();
+        await _refreshPushStatus();
+        return;
+      }
+      await fcm.openSystemSettings();
       await _refreshPushStatus();
-      if (!mounted) return;
-      setState(() => _message = 'Запрос уведомлений обработан');
     } finally {
       if (mounted) setState(() => _pushBusy = false);
     }
@@ -270,21 +395,16 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _editProfile(BuildContext context) async {
     final name = TextEditingController(text: _name);
     final email = TextEditingController(text: _email);
-    final ok = await showDialog<bool>(
+    final ok = await showTaktSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Личные данные'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TaktTextField(controller: name, label: 'Имя'),
-            const SizedBox(height: 10),
-            TaktTextField(controller: email, label: 'Email', keyboardType: TextInputType.emailAddress),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Сохранить')),
+      title: 'Личные данные',
+      confirmLabel: 'Сохранить',
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TaktTextField(controller: name, label: 'Имя'),
+          const SizedBox(height: 10),
+          TaktTextField(controller: email, label: 'Email', keyboardType: TextInputType.emailAddress),
         ],
       ),
     );
@@ -312,23 +432,18 @@ class _ProfilePageState extends State<ProfilePage> {
     final current = TextEditingController();
     final next = TextEditingController();
     final confirm = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showTaktSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Смена пароля'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TaktTextField(controller: current, label: 'Текущий', obscureText: true),
-            const SizedBox(height: 8),
-            TaktTextField(controller: next, label: 'Новый', obscureText: true),
-            const SizedBox(height: 8),
-            TaktTextField(controller: confirm, label: 'Повтор', obscureText: true),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Сменить')),
+      title: 'Смена пароля',
+      confirmLabel: 'Сменить',
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TaktTextField(controller: current, label: 'Текущий', obscureText: true),
+          const SizedBox(height: 8),
+          TaktTextField(controller: next, label: 'Новый', obscureText: true),
+          const SizedBox(height: 8),
+          TaktTextField(controller: confirm, label: 'Повтор', obscureText: true),
         ],
       ),
     );
@@ -351,16 +466,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _inviteDialog(BuildContext context) async {
     final email = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showTaktSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Приглашение'),
-        content: TaktTextField(controller: email, label: 'Email', keyboardType: TextInputType.emailAddress),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Отправить')),
-        ],
-      ),
+      title: 'Приглашение',
+      confirmLabel: 'Отправить',
+      body: TaktTextField(controller: email, label: 'Email', keyboardType: TextInputType.emailAddress),
     );
     if (ok != true || !context.mounted) return;
     final projectsRepo = context.read<ProjectsRepository>();
@@ -400,9 +510,9 @@ class _ThemeChip extends StatelessWidget {
           ? (dark ? TaktColors.accentSoftDark : TaktColors.accentSoft)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(TaktRadii.md),
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(TaktRadii.md),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(

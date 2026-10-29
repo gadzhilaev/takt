@@ -34,9 +34,9 @@ kanban, задачи, проекты, доска, команда, productivity, 
 
 ## Поддержка / политика
 
-- Support URL: указать ваш домен Takt (например `https://takt.example/support`)
-- Privacy Policy URL: указать политику конфиденциальности
-- Контакт: email команды продукта
+- Support: `support@taktapp.ru` (в приложении — экран «Поддержка»)
+- Privacy: текст политики в приложении («Конфиденциальность»)
+- Контакт: `support@taktapp.ru`
 
 ## Скриншоты (чеклист)
 

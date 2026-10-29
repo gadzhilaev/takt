@@ -181,7 +181,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             ),
         ],
       ),
-      body: _loading
+      body: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 8),
+        child: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : _error != null
               ? TaktEmptyState(
@@ -206,7 +209,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       ),
                     )
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       children: [
                         Text(
                           task.title,
@@ -284,6 +287,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         ],
                       ],
                     ),
+      ),
     );
   }
 }
