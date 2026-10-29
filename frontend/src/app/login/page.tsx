@@ -1,7 +1,7 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/app-icon";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,6 +54,14 @@ function LoginForm() {
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
   const { data: oauthMeta } = useOAuthProviders();
   const emailPassword = oauthMeta?.email_password !== false;
+
+  // Показать OAuth-ошибку один раз, затем убрать её из URL — иначе refresh снова поднимает алерт.
+  useEffect(() => {
+    if (!searchParams.get("message") && !searchParams.get("oauth_error")) return;
+    const next = searchParams.get("next");
+    const qs = next ? `?next=${encodeURIComponent(next)}` : "";
+    router.replace(`${paths.login}${qs}`);
+  }, [router, searchParams]);
 
   async function onSubmit(values: z.infer<typeof schema>) {
     setError("");
