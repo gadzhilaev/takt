@@ -316,7 +316,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                                     color: Colors.white,
                                                   ),
                                                 )
-                                              : Text(_awaitingCode ? 'Подтвердить' : 'Зарегистрироваться'),
+                                              : Text(_awaitingCode ? 'Подтвердить' : 'Продолжить'),
                                         ),
                                         if (_awaitingCode) ...[
                                           const SizedBox(height: 8),
@@ -325,7 +325,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                             child: const Text('Отправить код ещё раз'),
                                           ),
                                         ],
-                                        if (!_awaitingCode) const OAuthButtons(register: true),
+                                        if (!_awaitingCode) const OAuthButtons(),
                                       ],
                                     ),
                                   ),

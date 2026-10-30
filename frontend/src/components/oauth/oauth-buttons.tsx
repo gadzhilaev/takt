@@ -37,7 +37,7 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" |
 
   const providers = data?.providers ?? {};
   const enabled = Object.values(providers).filter((p) => p.enabled && WEB_PROVIDERS.has(p.id));
-  const actionLabel = mode === "register" ? "Зарегистрироваться через" : "Продолжить с";
+  const actionLabel = "Продолжить с";
 
   async function start(provider: string) {
     setErr("");

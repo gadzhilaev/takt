@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/push/fcm_bootstrap.dart';
 import '../../../core/theme.dart';
-import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/app_icon.dart';
 
 class NotificationsIntroPage extends StatefulWidget {
@@ -43,7 +42,6 @@ class _NotificationsIntroPageState extends State<NotificationsIntroPage> {
 
     return Scaffold(
       backgroundColor: dark ? const Color(0xFF171C22) : const Color(0xFFF4F7F8),
-      appBar: const TaktAppBar(title: 'Уведомления'),
       body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(

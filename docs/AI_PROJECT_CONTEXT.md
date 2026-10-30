@@ -47,12 +47,14 @@ cd mobile && flutter analyze && flutter test
 # Android emulator: --dart-define=API_BASE=http://10.0.2.2:8000
 ```
 
-## Статус (обновлено 2026-10-29)
+## Статус (обновлено 2026-10-30)
 
-**Docs/architecture pass:** профессиональный README, `docs/**` (architecture/api/security/features/deployment/testing/decisions), CI workflow, EditorConfig; архив устаревших аудитов в `docs/archive/`.
+**README polish:** корневой README пересобран как продуктовая страница; скриншоты в `docs/screenshots/readme/` пересняты (web 1440×900, Flutter один симулятор); старые `01–13` — в `docs/screenshots/archive/readme-2026-10-30/`.
 
-**Security fix:** IDOR на `/tasks` — обязательный project membership для get/update/list scoped.
+**Docs/architecture pass (ранее):** `docs/**`, CI, EditorConfig; аудиты в `docs/archive/`.
 
-**OAuth:** VK/Яндекс на login+register (web+mobile); Apple mobile-only; admin toggles `oauth_login_methods`.
+**Security:** IDOR `/tasks` закрыт project membership.
+
+**OAuth:** VK/Яндекс web+mobile; Apple mobile-only; admin toggles.
 
 **Не делать без запроса:** commit/push/deploy; возврат report-dashboard UI; массовый Clean Architecture rewrite.

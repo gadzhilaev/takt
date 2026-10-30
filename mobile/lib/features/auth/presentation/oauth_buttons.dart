@@ -6,10 +6,9 @@ import '../data/oauth_repository.dart';
 
 /// Shows enabled OAuth providers from backend policy (env + admin toggles).
 class OAuthButtons extends StatefulWidget {
-  const OAuthButtons({super.key, this.link = false, this.register = false});
+  const OAuthButtons({super.key, this.link = false});
 
   final bool link;
-  final bool register;
 
   @override
   State<OAuthButtons> createState() => _OAuthButtonsState();
@@ -90,7 +89,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
         ),
       );
     }
-    final prefix = widget.register ? 'Зарегистрироваться через' : 'Продолжить с';
+    const prefix = 'Продолжить с';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
