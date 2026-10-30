@@ -17,6 +17,7 @@ class ProjectHub extends StatefulWidget {
     required this.onCreateProject,
     this.currentUserId,
     this.onProjectsChanged,
+    this.onRefresh,
   });
 
   final List<Project> projects;
@@ -24,6 +25,8 @@ class ProjectHub extends StatefulWidget {
   final ValueChanged<String> onOpenProject;
   final VoidCallback onCreateProject;
   final VoidCallback? onProjectsChanged;
+  /// Pull-to-refresh (explicit user reload).
+  final Future<void> Function()? onRefresh;
 
   @override
   State<ProjectHub> createState() => _ProjectHubState();
@@ -223,7 +226,10 @@ class _ProjectHubState extends State<ProjectHub> {
                     style: TextStyle(color: dark ? TaktColors.mutedDark : TaktColors.muted),
                   ),
                 )
-              : ListView.builder(
+              : RefreshIndicator(
+                  onRefresh: widget.onRefresh ?? () async {},
+                  child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                   itemCount: projects.length,
                   itemBuilder: (context, i) {
@@ -355,6 +361,7 @@ class _ProjectHubState extends State<ProjectHub> {
                     );
                   },
                 ),
+              ),
         ),
       ],
     );

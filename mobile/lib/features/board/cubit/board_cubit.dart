@@ -9,6 +9,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/project_visibility.dart';
 import '../../projects/data/projects_repository.dart';
 import '../../widget_sync/widget_sync.dart';
+import '../data/board_local_cache.dart';
 import '../data/board_repository.dart';
 
 class BoardState extends Equatable {
@@ -19,6 +20,7 @@ class BoardState extends Equatable {
     this.tasks = const [],
     this.columnIndex = 0,
     this.loading = false,
+    this.refreshing = false,
     this.offline = false,
     this.error,
   });
@@ -28,7 +30,10 @@ class BoardState extends Equatable {
   final List<StatusColumn> columns;
   final List<TaskItem> tasks;
   final int columnIndex;
+  /// Full-screen loader — only when there is nothing local to show.
   final bool loading;
+  /// Background / pull refresh without blanking the UI.
+  final bool refreshing;
   final bool offline;
   final String? error;
 
@@ -49,6 +54,7 @@ class BoardState extends Equatable {
     List<TaskItem>? tasks,
     int? columnIndex,
     bool? loading,
+    bool? refreshing,
     bool? offline,
     String? error,
     bool clearError = false,
@@ -61,13 +67,23 @@ class BoardState extends Equatable {
         tasks: clearProject ? const [] : (tasks ?? this.tasks),
         columnIndex: clearProject ? 0 : (columnIndex ?? this.columnIndex),
         loading: loading ?? this.loading,
+        refreshing: refreshing ?? this.refreshing,
         offline: offline ?? this.offline,
         error: clearError ? null : (error ?? this.error),
       );
 
   @override
-  List<Object?> get props =>
-      [projects, project, columns, tasks, columnIndex, loading, offline, error];
+  List<Object?> get props => [
+        projects,
+        project,
+        columns,
+        tasks,
+        columnIndex,
+        loading,
+        refreshing,
+        offline,
+        error,
+      ];
 }
 
 class BoardCubit extends Cubit<BoardState> {
@@ -76,12 +92,15 @@ class BoardCubit extends Cubit<BoardState> {
     required this.projects,
     required this.api,
     required this.widgetSync,
-  }) : super(const BoardState());
+    BoardLocalCache? cache,
+  })  : cache = cache ?? BoardLocalCache(),
+        super(const BoardState());
 
   final BoardRepository board;
   final ProjectsRepository projects;
   final ApiClient api;
   final WidgetSync widgetSync;
+  final BoardLocalCache cache;
 
   /// Set from AuthCubit so widgets only show tasks assigned to this user.
   String? currentUserId;
@@ -108,39 +127,74 @@ class BoardCubit extends Cubit<BoardState> {
     );
   }
 
-  Future<void> bootstrap({String? preferProjectId}) async {
-    emit(state.copyWith(loading: true, clearError: true));
+  Future<void> _persistBoard() async {
+    final project = state.project;
+    if (project == null || state.columns.isEmpty) return;
+    await cache.saveBoard(
+      project: project,
+      columns: state.columns,
+      tasks: state.tasks,
+    );
+  }
+
+  /// First open / cold start. Shows disk/memory cache immediately, then syncs.
+  /// [forceLoading] blanks the UI (pull-to-refresh / explicit reload).
+  Future<void> bootstrap({String? preferProjectId, bool forceLoading = false}) async {
+    var list = state.projects;
+    if (list.isEmpty) {
+      list = await cache.loadProjects();
+      if (list.isNotEmpty) {
+        emit(state.copyWith(projects: list, loading: false, clearError: true));
+      }
+    }
+
+    final hasLocal = list.isNotEmpty;
+    if (forceLoading || !hasLocal) {
+      emit(state.copyWith(loading: true, clearError: true));
+    } else {
+      emit(state.copyWith(refreshing: true, clearError: true));
+    }
+
     try {
       final projects = await this.projects.listProjects();
+      await cache.saveProjects(projects);
       final visible = projects.where((p) => !taktIsTestProject(p)).toList();
-      // Deep link / explicit project — open immediately; otherwise show hub.
       String? openId = preferProjectId;
       if (openId != null && openId.isNotEmpty) {
         final match = visible.where((p) => p.id == openId).toList();
         if (match.isEmpty) openId = null;
       }
       if (openId != null) {
-        await openProject(openId, projects: projects);
+        await openProject(openId, projects: projects, forceLoading: forceLoading);
         return;
       }
       emit(state.copyWith(
         projects: projects,
         loading: false,
+        refreshing: false,
         clearProject: true,
         offline: false,
       ));
     } catch (e) {
       emit(state.copyWith(
         loading: false,
+        refreshing: false,
         offline: true,
-        error: api.messageFromError(e),
+        error: hasLocal ? null : api.messageFromError(e),
       ));
     }
   }
 
-  Future<void> refreshProjects() async {
+  /// Silent by default — keeps hub content on screen.
+  Future<void> refreshProjects({bool forceLoading = false}) async {
+    if (forceLoading && state.projects.isEmpty) {
+      emit(state.copyWith(loading: true, clearError: true));
+    } else {
+      emit(state.copyWith(refreshing: true, clearError: true));
+    }
     try {
       final projects = await this.projects.listProjects();
+      await cache.saveProjects(projects);
       final currentId = state.project?.id;
       Project? project = state.project;
       if (currentId != null) {
@@ -148,12 +202,29 @@ class BoardCubit extends Cubit<BoardState> {
         project = matches.isEmpty ? null : matches.first;
       }
       if (project == null && currentId != null) {
-        emit(state.copyWith(projects: projects, clearProject: true));
+        emit(state.copyWith(
+          projects: projects,
+          clearProject: true,
+          loading: false,
+          refreshing: false,
+          offline: false,
+        ));
       } else {
-        emit(state.copyWith(projects: projects, project: project));
+        emit(state.copyWith(
+          projects: projects,
+          project: project,
+          loading: false,
+          refreshing: false,
+          offline: false,
+        ));
       }
     } catch (e) {
-      emit(state.copyWith(error: api.messageFromError(e)));
+      emit(state.copyWith(
+        loading: false,
+        refreshing: false,
+        offline: true,
+        error: state.projects.isEmpty ? api.messageFromError(e) : null,
+      ));
     }
   }
 
@@ -161,30 +232,116 @@ class BoardCubit extends Cubit<BoardState> {
     emit(state.copyWith(clearProject: true, clearError: true));
   }
 
-  Future<void> openProject(String projectId, {List<Project>? projects}) async {
-    emit(state.copyWith(loading: true, clearError: true));
+  /// Opens a project: hydrate from memory/disk first, then fetch in background.
+  /// Returns as soon as something is on screen (cache/memory); network may still run.
+  Future<void> openProject(
+    String projectId, {
+    List<Project>? projects,
+    bool forceLoading = false,
+  }) async {
+    final list = projects ?? state.projects;
+    Project? project;
+    for (final p in list) {
+      if (p.id == projectId) {
+        project = p;
+        break;
+      }
+    }
+
+    final memoryHit = state.project?.id == projectId && state.columns.isNotEmpty;
+    var hasLocal = memoryHit;
+
+    if (memoryHit && !forceLoading) {
+      emit(state.copyWith(refreshing: true, clearError: true));
+      unawaited(_fetchBoard(projectId: projectId, list: list, project: project));
+      return;
+    }
+
+    if (!memoryHit) {
+      final cached = await cache.loadBoard(projectId);
+      if (cached != null) {
+        final localProject = project ?? cached.project;
+        project = localProject;
+        hasLocal = true;
+        emit(state.copyWith(
+          projects: list.isEmpty ? [cached.project] : list,
+          project: localProject,
+          columns: cached.columns,
+          tasks: cached.tasks,
+          columnIndex: 0,
+          loading: false,
+          refreshing: true,
+          clearError: true,
+        ));
+        if (!forceLoading) {
+          unawaited(_fetchBoard(projectId: projectId, list: list, project: localProject));
+          return;
+        }
+      }
+    }
+
+    if (forceLoading || !hasLocal) {
+      emit(state.copyWith(loading: !hasLocal, refreshing: hasLocal, clearError: true));
+    }
+
+    await _fetchBoard(projectId: projectId, list: list, project: project);
+  }
+
+  Future<void> _fetchBoard({
+    required String projectId,
+    required List<Project> list,
+    Project? project,
+  }) async {
+    final hadLocal = state.project?.id == projectId && state.columns.isNotEmpty;
     try {
-      final list = projects ?? state.projects;
-      final project = list.firstWhere(
-        (p) => p.id == projectId,
-        orElse: () => list.isNotEmpty ? list.first : (throw StateError('no project')),
-      );
+      project ??= list.isNotEmpty
+          ? list.firstWhere(
+              (p) => p.id == projectId,
+              orElse: () => list.first,
+            )
+          : null;
+      if (project == null) {
+        throw StateError('no project');
+      }
       final loaded = await board.loadBoard(projectId);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastProjectKey, projectId);
+      final keepColumn = state.project?.id == projectId ? state.columnIndex : 0;
       emit(state.copyWith(
         projects: list.isEmpty ? [project] : list,
         project: project,
         columns: loaded.columns,
         tasks: loaded.tasks,
-        columnIndex: 0,
+        columnIndex: keepColumn.clamp(0, loaded.columns.isEmpty ? 0 : loaded.columns.length - 1),
         loading: false,
+        refreshing: false,
         offline: false,
       ));
+      await cache.saveBoard(
+        project: project,
+        columns: loaded.columns,
+        tasks: loaded.tasks,
+      );
       await _publishWidget();
     } catch (e) {
-      emit(state.copyWith(loading: false, offline: true, error: api.messageFromError(e)));
+      emit(state.copyWith(
+        loading: false,
+        refreshing: false,
+        offline: true,
+        error: hadLocal ? null : api.messageFromError(e),
+      ));
     }
+  }
+
+  /// Explicit user refresh of the open board (RefreshIndicator — content stays).
+  Future<void> refreshBoard({bool forceLoading = false}) async {
+    final project = state.project;
+    if (project == null) {
+      await refreshProjects(forceLoading: forceLoading);
+      return;
+    }
+    // Await network; local board stays visible (forceLoading + hasLocal → refreshing).
+    await openProject(project.id, forceLoading: true);
   }
 
   void selectColumn(int index) {
@@ -218,6 +375,7 @@ class BoardCubit extends Cubit<BoardState> {
       );
       final next = [task, ...state.tasks.where((t) => t.id != task.id)];
       emit(state.copyWith(tasks: next, clearError: true));
+      await _persistBoard();
       await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
@@ -242,6 +400,7 @@ class BoardCubit extends Cubit<BoardState> {
       );
       final next = state.tasks.map((t) => t.id == updated.id ? updated : t).toList();
       emit(state.copyWith(tasks: next, clearError: true));
+      await _persistBoard();
       await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
@@ -264,6 +423,7 @@ class BoardCubit extends Cubit<BoardState> {
       );
       final next = state.tasks.map((t) => t.id == saved.id ? saved : t).toList();
       emit(state.copyWith(tasks: next, clearError: true));
+      await _persistBoard();
       await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
@@ -274,6 +434,7 @@ class BoardCubit extends Cubit<BoardState> {
     try {
       final p = await projects.createProject(name: name);
       final list = [...state.projects, p];
+      await cache.saveProjects(list);
       emit(state.copyWith(projects: list));
       await openProject(p.id, projects: list);
     } catch (e) {
@@ -290,6 +451,7 @@ class BoardCubit extends Cubit<BoardState> {
       await board.deleteTask(taskId);
       final next = state.tasks.where((t) => t.id != taskId).toList();
       emit(state.copyWith(tasks: next, clearError: true));
+      await _persistBoard();
       await _publishWidget();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));

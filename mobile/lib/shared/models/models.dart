@@ -53,8 +53,16 @@ class ProjectMember extends Equatable {
         email: json['email'] as String?,
       );
 
+  Map<String, dynamic> toJson() => {
+        'user_id': userId,
+        'name': name,
+        'role': role,
+        'avatar_url': avatarUrl,
+        'email': email,
+      };
+
   @override
-  List<Object?> get props => [userId, name, role];
+  List<Object?> get props => [userId, name, role, avatarUrl, email];
 }
 
 class Project extends Equatable {
@@ -85,8 +93,17 @@ class Project extends Equatable {
             .toList(),
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'description': description,
+        'color': color,
+        'is_demo': isDemo,
+        'members': members.map((m) => m.toJson()).toList(),
+      };
+
   @override
-  List<Object?> get props => [id, name, isDemo];
+  List<Object?> get props => [id, name, description, color, isDemo, members];
 }
 
 class StatusColumn extends Equatable {
@@ -112,8 +129,16 @@ class StatusColumn extends Equatable {
         isDone: json['is_done'] as bool? ?? false,
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'position': position,
+        'color': color,
+        'is_done': isDone,
+      };
+
   @override
-  List<Object?> get props => [id, name, isDone];
+  List<Object?> get props => [id, name, position, color, isDone];
 }
 
 class TaskAssignee extends Equatable {
@@ -129,8 +154,14 @@ class TaskAssignee extends Equatable {
         avatarUrl: json['avatar_url'] as String?,
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'avatar_url': avatarUrl,
+      };
+
   @override
-  List<Object?> get props => [id, name];
+  List<Object?> get props => [id, name, avatarUrl];
 }
 
 class TaskItem extends Equatable {
@@ -215,6 +246,24 @@ class TaskItem extends Equatable {
         commentCount: commentCount,
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'status_id': statusId,
+        'priority': priority,
+        'position': position,
+        'project_id': projectId,
+        'description': description,
+        'assignees': assignees.map((a) => a.toJson()).toList(),
+        'closed_at': closedAt,
+        'status': statusName == null ? null : {'name': statusName},
+        'author_id': authorId,
+        'author': authorName == null && authorId == null
+            ? null
+            : {'id': authorId, 'name': authorName},
+        'comment_count': commentCount,
+      };
+
   Map<String, dynamic> toWidgetJson() => {
         'id': id,
         'title': title,
@@ -225,7 +274,8 @@ class TaskItem extends Equatable {
       };
 
   @override
-  List<Object?> get props => [id, title, statusId, priority, position, assignees, closedAt];
+  List<Object?> get props =>
+      [id, title, statusId, priority, position, description, assignees, closedAt, commentCount];
 }
 
 class AppNotification extends Equatable {

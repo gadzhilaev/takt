@@ -179,27 +179,31 @@ class _BoardPageState extends State<BoardPage> {
               Expanded(
                 child: _pageController == null
                     ? const SizedBox.shrink()
-                    : PageView.builder(
-                        controller: _pageController,
-                        itemCount: state.columns.length,
-                        padEnds: false,
-                        physics: const KanbanPagePhysics(parent: ClampingScrollPhysics()),
-                        onPageChanged: (i) {
-                          setState(() => _pageIndex = i);
-                          context.read<BoardCubit>().selectColumn(i);
-                        },
-                        itemBuilder: (context, i) {
-                          final col = state.columns[i];
-                          final tasks = state.tasks.where((t) => t.statusId == col.id).toList()
-                            ..sort((a, b) => a.position.compareTo(b.position));
-                          return KanbanColumnPane(
-                            column: col,
-                            tasks: tasks,
-                            dark: dark,
-                            onAdd: () => context.push('/task-create?status=${col.id}'),
-                            onOpenTask: (task) => context.push('/task/${task.id}'),
-                          );
-                        },
+                    : RefreshIndicator(
+                        notificationPredicate: (n) => n.depth == 0 || n.depth == 1,
+                        onRefresh: () => context.read<BoardCubit>().refreshBoard(),
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: state.columns.length,
+                          padEnds: false,
+                          physics: const KanbanPagePhysics(parent: ClampingScrollPhysics()),
+                          onPageChanged: (i) {
+                            setState(() => _pageIndex = i);
+                            context.read<BoardCubit>().selectColumn(i);
+                          },
+                          itemBuilder: (context, i) {
+                            final col = state.columns[i];
+                            final tasks = state.tasks.where((t) => t.statusId == col.id).toList()
+                              ..sort((a, b) => a.position.compareTo(b.position));
+                            return KanbanColumnPane(
+                              column: col,
+                              tasks: tasks,
+                              dark: dark,
+                              onAdd: () => context.push('/task-create?status=${col.id}'),
+                              onOpenTask: (task) => context.push('/task/${task.id}'),
+                            );
+                          },
+                        ),
                       ),
               ),
             ],

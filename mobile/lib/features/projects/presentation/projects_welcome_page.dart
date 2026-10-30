@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -23,7 +25,6 @@ class ProjectsWelcomePage extends StatefulWidget {
 }
 
 class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
-  bool _loading = true;
   int _unread = 0;
 
   @override
@@ -36,14 +37,14 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
   Future<void> _bootstrap() async {
     final cubit = context.read<BoardCubit>();
     // Always land on hub: clear active board until user picks a project.
+    cubit.clearProject();
     if (cubit.state.projects.isEmpty) {
+      // Cold path: may show spinner only until disk/network fills projects.
       await cubit.bootstrap();
     } else {
-      cubit.clearProject();
-      await cubit.refreshProjects();
+      // Local list already on screen — sync in background without blanking.
+      unawaited(cubit.refreshProjects());
     }
-    if (!mounted) return;
-    setState(() => _loading = false);
   }
 
   Future<void> _loadUnread() async {
@@ -55,10 +56,18 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
     }
   }
 
+  Future<void> _onUserRefresh() async {
+    await context.read<BoardCubit>().refreshProjects(forceLoading: true);
+    await _loadUnread();
+  }
+
   Future<void> _openProject(String id) async {
+    // openProject returns after cache/memory hydrate; network may still run.
     await context.read<BoardCubit>().openProject(id);
     if (!mounted) return;
-    context.go('/board');
+    if (context.read<BoardCubit>().state.project?.id == id) {
+      context.go('/board');
+    }
   }
 
   Future<void> _createProject() async {
@@ -87,6 +96,8 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
 
     return BlocBuilder<BoardCubit, BoardState>(
       builder: (context, state) {
+        final showBlockingLoader = state.loading && state.projects.isEmpty;
+
         return Scaffold(
           backgroundColor: bg,
           appBar: TaktAppBar(
@@ -120,7 +131,7 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
               const SizedBox(width: 4),
             ],
           ),
-          body: _loading || (state.loading && state.projects.isEmpty)
+          body: showBlockingLoader
               ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
               : state.projects.isEmpty
                   ? Center(
@@ -156,7 +167,9 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                       currentUserId: context.read<BoardCubit>().currentUserId,
                       onOpenProject: _openProject,
                       onCreateProject: _createProject,
-                      onProjectsChanged: () => context.read<BoardCubit>().refreshProjects(),
+                      onProjectsChanged: () =>
+                          context.read<BoardCubit>().refreshProjects(),
+                      onRefresh: _onUserRefresh,
                     ),
           // Без «Мои задачи», пока проект не выбран — только Главная / Профиль.
           bottomNavigationBar: TaktBottomNav(
