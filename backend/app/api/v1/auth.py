@@ -252,16 +252,10 @@ async def forgot_password_send_code(
     body: ForgotPasswordSendRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Отправить код сброса. Ответ одинаковый, даже если email не найден."""
+    """Отправить код сброса. Если аккаунта с таким email нет — явная ошибка."""
     from app.services.oauth_service import load_oauth_method_flags
 
-    settings = get_settings()
     email = str(body.email).lower().strip()
-    generic = {
-        "ok": True,
-        "expires_in": settings.EMAIL_CODE_TTL_MINUTES * 60,
-        "email": email,
-    }
 
     if not (await load_oauth_method_flags(db)).get("email_password", True):
         raise HTTPException(
@@ -271,7 +265,15 @@ async def forgot_password_send_code(
 
     user = await db.scalar(select(User).where(User.email == email))
     if not user or not user.is_active:
-        return generic
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "code": "email_not_found",
+                    "message": "Аккаунт с такой почтой не найден",
+                }
+            },
+        )
 
     try:
         result = await create_and_send_code(
@@ -282,14 +284,8 @@ async def forgot_password_send_code(
             user_id=user.id,
         )
     except EmailCodeError as e:
-        if e.code == "cooldown":
-            raise _http_from_email_code(e) from e
-        # Не раскрываем сбой доставки чужому email — тот же generic-ответ.
-        if e.code in {"email_not_configured", "email_send_failed"}:
-            raise _http_from_email_code(e) from e
         raise _http_from_email_code(e) from e
     await db.commit()
-    # Скрываем dev_code в ответе для неизвестных? Для тестов оставляем как есть.
     return result
 
 

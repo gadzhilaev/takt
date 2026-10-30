@@ -64,9 +64,8 @@ async def test_forgot_password_resets_with_email_code(client: AsyncClient):
         "/api/v1/auth/forgot-password/send-code",
         json={"email": "nobody-forgot@example.com"},
     )
-    assert unknown.status_code == 200, unknown.text
-    assert unknown.json()["ok"] is True
-    assert "dev_code" not in unknown.json()
+    assert unknown.status_code == 404, unknown.text
+    assert unknown.json()["detail"]["error"]["code"] == "email_not_found"
 
     send = await client.post(
         "/api/v1/auth/forgot-password/send-code",

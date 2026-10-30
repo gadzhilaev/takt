@@ -51,7 +51,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       setState(() {
         _awaitingCode = true;
         _busy = false;
-        _info = 'Если аккаунт существует, код отправлен на почту';
+        _info = 'Код отправлен на ${_email.text.trim()}';
       });
     } catch (e) {
       if (!mounted) return;
