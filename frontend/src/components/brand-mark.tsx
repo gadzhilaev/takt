@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 type BrandProps = {
   className?: string;
   title?: string;
+  /** Force light/dark asset (e.g. admin shell is always light even if html.dark). */
+  variant?: "auto" | "light" | "dark";
 };
 
 /** Display aspect for full logo (symbol + wordmark). Keep HTML attrs small so a
@@ -32,8 +34,34 @@ export function BrandMark({ className, title = "Takt" }: BrandProps) {
 }
 
 /** Full horizontal logo (symbol + wordmark). Swaps to on-dark asset for contrast. */
-export function BrandLogo({ className, title = "Takt" }: BrandProps) {
+export function BrandLogo({ className, title = "Takt", variant = "auto" }: BrandProps) {
   const imgClass = cn("h-6 w-auto max-w-[9rem] object-contain object-left", className);
+  if (variant === "light") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/brand/takt-logo.svg"
+        alt={title}
+        width={LOGO_W}
+        height={LOGO_H}
+        decoding="async"
+        className={imgClass}
+      />
+    );
+  }
+  if (variant === "dark") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/brand/takt-logo-on-dark.svg"
+        alt={title}
+        width={LOGO_W}
+        height={LOGO_H}
+        decoding="async"
+        className={imgClass}
+      />
+    );
+  }
   return (
     <span className="inline-grid max-w-full leading-none [grid-template-areas:'logo']">
       {/* eslint-disable-next-line @next/next/no-img-element */}

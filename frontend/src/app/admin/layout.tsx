@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { BrandLogo } from "@/components/brand-mark";
@@ -19,9 +21,27 @@ const NAV = [
   { href: "/admin/settings", label: "Настройки" },
 ];
 
+/** Admin chrome is light-only; hold next-themes on light while mounted. */
+function useForceLightTheme() {
+  const { theme, setTheme } = useTheme();
+  const prevTheme = useRef<string | undefined>();
+  useEffect(() => {
+    prevTheme.current = theme;
+    setTheme("light");
+    return () => {
+      if (prevTheme.current && prevTheme.current !== "light") {
+        setTheme(prevTheme.current);
+      }
+    };
+    // Intentionally once on mount/unmount — ignore theme churn while in admin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setTheme]);
+}
+
 export default function PlatformAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  useForceLightTheme();
   const me = useQuery({
     queryKey: ["platform-me"],
     queryFn: () =>
@@ -31,7 +51,7 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
 
   if (me.isLoading) {
     return (
-      <div className="platform-admin flex min-h-screen items-center justify-center text-sm text-[var(--muted)]">
+      <div className="platform-admin flex min-h-screen items-center justify-center text-sm text-[#5a6573]">
         Проверка доступа…
       </div>
     );
@@ -40,21 +60,21 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
   if (me.isError) {
     return (
       <div className="platform-admin flex min-h-screen flex-col items-center justify-center gap-3 px-4 text-center">
-        <p className="text-sm text-[var(--muted)]">Нет доступа к панели платформы Takt.</p>
-        <p className="max-w-sm text-[13px] text-[var(--muted)]">
+        <p className="text-sm text-[#5a6573]">Нет доступа к панели платформы Takt.</p>
+        <p className="max-w-sm text-[13px] text-[#5a6573]">
           Войдите обычным аккаунтом на /login. Ссылка на админку появится в профиле, если у вас есть
           роль платформы.
         </p>
         <button
           type="button"
-          className="text-sm font-semibold text-[var(--accent)]"
+          className="text-sm font-semibold text-[#315f72]"
           onClick={() => router.push("/app/projects")}
         >
           В рабочее пространство
         </button>
         <button
           type="button"
-          className="text-sm text-[var(--muted)] underline-offset-2 hover:underline"
+          className="text-sm text-[#5a6573] underline-offset-2 hover:underline"
           onClick={() => router.push("/login?next=/admin")}
         >
           Войти
@@ -64,22 +84,22 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
   }
 
   return (
-    <div className="platform-admin min-h-screen">
-      <header className="border-b border-[var(--border)] bg-[var(--surface)]">
+    <div className="platform-admin min-h-screen text-[#202938]">
+      <header className="border-b border-[#dce2e7] bg-white">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-3">
             <Link href="/admin" aria-label="Takt Admin">
-              <BrandLogo className="h-7 w-auto max-w-[8rem]" />
+              <BrandLogo variant="light" className="h-7 w-auto max-w-[8rem]" />
             </Link>
             <span className="rounded bg-[#202938] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
               Admin
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[13px] text-[var(--muted)]">
+          <div className="flex items-center gap-3 text-[13px] text-[#5a6573]">
             <span className="hidden sm:inline">
               {me.data?.name} · {platformRoleLabel(me.data?.platform_role)}
             </span>
-            <Link href="/app/projects" className="font-medium text-[var(--accent)]">
+            <Link href="/app/projects" className="font-medium text-[#315f72]">
               К доскам
             </Link>
           </div>
@@ -97,8 +117,8 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
                     className={cn(
                       "block rounded-[var(--radius)] px-3 py-2 text-[13px] font-medium",
                       active
-                        ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                        : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+                        ? "bg-[#e8eef1] text-[#315f72]"
+                        : "text-[#5a6573] hover:bg-white hover:text-[#202938]"
                     )}
                   >
                     {item.label}
@@ -108,7 +128,7 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
             })}
           </ul>
         </nav>
-        <main className="min-w-0 flex-1 text-[var(--foreground)]">{children}</main>
+        <main className="min-w-0 flex-1 text-[#202938]">{children}</main>
       </div>
     </div>
   );

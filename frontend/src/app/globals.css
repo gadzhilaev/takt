@@ -89,9 +89,10 @@ html.dark {
   background: var(--background);
 }
 
-/* Platform admin console is always light — ignore html.dark tokens
+/* Platform admin console is always light — override html.dark tokens
    so numbers/labels don't wash out on white cards. */
-.platform-admin {
+.platform-admin,
+html.dark .platform-admin {
   color-scheme: light;
   --background: #f7f8fa;
   --foreground: #202938;
@@ -107,16 +108,29 @@ html.dark {
   --danger: #b42318;
   --danger-soft: #f8e9e8;
   --ring: #315f72;
-  color: var(--foreground);
-  background: var(--background);
+  color: #202938;
+  background: #f7f8fa;
 }
 
-.platform-admin .dark\:hidden {
-  display: block !important;
+/* Hard colors — utilities that bake var(--*) still inherit these on the subtree */
+html.dark .platform-admin,
+.platform-admin {
+  color: #202938 !important;
 }
 
-.platform-admin .dark\:block {
-  display: none !important;
+html.dark .platform-admin .text-muted,
+html.dark .platform-admin .text-\[var\(--muted\)\],
+html.dark .platform-admin .text-\[var\(--muted-fg\)\],
+.platform-admin .text-muted {
+  color: #5a6573 !important;
+}
+
+html.dark .platform-admin .text-foreground,
+html.dark .platform-admin .text-\[var\(--foreground\)\],
+.platform-admin h1,
+.platform-admin h2,
+.platform-admin h3 {
+  color: #202938 !important;
 }
 
 html {
