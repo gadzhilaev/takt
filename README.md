@@ -30,7 +30,7 @@ Takt помогает небольшим командам вести проек�
 ## Возможности
 
 - Регистрация по email (OTP) и вход по паролю
-- OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только mobile (нужны credentials, см. [`docs/OAUTH_SETUP.md`](docs/OAUTH_SETUP.md))
+- OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только mobile (нужны credentials, см. [`docs/oauth.md`](docs/oauth.md))
 - Проекты с ролями `admin` / `member` / `viewer` и приглашениями in-app
 - Kanban: 4 стартовых столбца, drag-and-drop; новая задача всегда в начало столбца
 - Задача: название, описание, исполнители (0..n), приоритет, комментарии, чеклист
@@ -126,7 +126,7 @@ flowchart LR
 ```
 
 Три оси прав: project RBAC · legacy `UserRole.admin` · `platform_role` для `/admin`.  
-Подробнее: [`docs/architecture/overview.md`](docs/architecture/overview.md), [`docs/security/README.md`](docs/security/README.md).
+Подробнее: [`docs/architecture.md`](docs/architecture.md), [`docs/security.md`](docs/security.md).
 
 ```text
 takt/
@@ -168,7 +168,7 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 # Android emulator: API_BASE=http://10.0.2.2:8000
 ```
 
-Переменные: [`.env.example`](.env.example). OAuth: [`docs/OAUTH_SETUP.md`](docs/OAUTH_SETUP.md).  
+Переменные: [`.env.example`](.env.example). OAuth: [`docs/oauth.md`](docs/oauth.md).  
 Mobile: [`mobile/docs/MOBILE_SETUP.md`](mobile/docs/MOBILE_SETUP.md).  
 Prod: [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
 
@@ -183,7 +183,7 @@ cd mobile   && flutter analyze && flutter test
 ```
 
 E2E (нужны живые frontend + backend): `cd frontend && PW_CHANNEL=chrome npm run test:e2e`.  
-CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: [`docs/testing/`](docs/testing/).
+CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: [`docs/development.md`](docs/development.md).
 
 ## Документация
 
@@ -191,12 +191,13 @@ CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: 
 
 | Раздел | Содержание |
 |--------|------------|
-| [`docs/architecture/`](docs/architecture/) | Обзор, backend, frontend, mobile, БД |
-| [`docs/api/`](docs/api/) | API v1, auth, ошибки |
-| [`docs/features/`](docs/features/) | Проекты, Kanban, уведомления, OAuth, админка |
-| [`docs/deployment/`](docs/deployment/) | Local, Docker, production |
-| [`docs/security/README.md`](docs/security/README.md) | RBAC, CSRF, секреты |
-| [`docs/contributing.md`](docs/contributing.md) | Конвенции |
+| [`docs/architecture.md`](docs/architecture.md) | Web, Backend, Flutter, БД |
+| [`docs/api.md`](docs/api.md) | API v1, auth, ошибки |
+| [`docs/features.md`](docs/features.md) | Возможности продукта |
+| [`docs/security.md`](docs/security.md) | RBAC, CSRF, секреты |
+| [`docs/development.md`](docs/development.md) | Локальная разработка и тесты |
+| [`docs/deployment.md`](docs/deployment.md) | Docker и production |
+| [`docs/oauth.md`](docs/oauth.md) | Настройка OAuth |
 | [`AGENTS.md`](AGENTS.md) | Правила для AI-агентов |
 
 ## Статус и лицензия

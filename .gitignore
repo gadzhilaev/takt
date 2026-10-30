@@ -46,3 +46,6 @@ mobile/ios/Flutter/Flutter.podspec
 
 # Local agent / cursor noise
 .cursor/*.log
+
+# Ephemeral e2e screenshot dumps
+docs/screenshots/.e2e-capture/

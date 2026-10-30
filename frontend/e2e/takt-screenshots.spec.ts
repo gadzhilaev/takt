@@ -9,7 +9,8 @@ const ADMIN = {
   password: E2E_USER.password,
 };
 
-const OUT = path.join(__dirname, "../../docs/screenshots/takt-rebrand");
+/** Ephemeral capture dir — not committed; do not point at screenshots/readme. */
+const OUT = path.join(__dirname, "../../docs/screenshots/.e2e-capture");
 
 async function loginUi(page: Page) {
   await page.goto("/login");

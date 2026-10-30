@@ -1,16 +1,16 @@
-# Архив документации
+# Архив
 
-Материалы ниже **исторические**. Они полезны как журнал решений, но **не** являются источником истины по текущей архитектуре.
+Исторические аудиты (01–03), `TRACK_FINAL_POLISH`, `ux-polish-final`, `TAKT_REBRANDING`, `CROSS_PLATFORM_PLAN` и старые screenshot-каталоги **удалены** при уплотнении документации (2026-10-30): они дублировали уже принятые решения или устарели относительно кода.
 
-Актуальные документы: [`docs/README.md`](../README.md), [`docs/architecture/`](../architecture/), [`AGENTS.md`](../../AGENTS.md).
+Актуальные документы: [`../README.md`](../README.md), [`../../AGENTS.md`](../../AGENTS.md).  
+Архитектурные решения сохранены как ADR: [`../decisions/`](../decisions/).
 
-| Путь | Что это |
-|------|---------|
-| [`../task-tracker-audit/`](../task-tracker-audit/) | Аудиты 01–03 (ранний Task Tracker / UX) |
-| [`../TRACK_FINAL_POLISH.md`](../TRACK_FINAL_POLISH.md) | Финальный polish до упрощения Kanban; экраны report/list устарели |
-| [`../TRACK_FINAL_POLISH_screenshots/`](../TRACK_FINAL_POLISH_screenshots/) | Скриншоты с отчётами — не использовать в README |
-| [`../ux-polish-final/`](../ux-polish-final/) | UX-отчёт и скриншоты промежуточного этапа |
-| [`../TAKT_REBRANDING.md`](../TAKT_REBRANDING.md) | Ребрендинг Track → Takt; часть маршрутов `(app)` устарела |
-| [`../CROSS_PLATFORM_PLAN.md`](../CROSS_PLATFORM_PLAN.md) | План Flutter **до** появления `mobile/` — см. баннер в файле |
+Полезные зафиксированные выводы из истории:
 
-Актуальные скриншоты продукта: [`../screenshots/takt-rebrand/`](../screenshots/takt-rebrand/), [`../screenshots/mobile-ui/`](../screenshots/mobile-ui/).
+- Продукт = простой Kanban; report/dashboard UI не возвращать без запроса (ADR 0004).
+- Технические id `track` в Docker/БД сохранены ради volumes (ADR 0001).
+- Dual auth cookies + Bearer (ADR 0002); три оси RBAC (ADR 0003).
+- Apple Sign In только mobile (ADR 0005).
+- Flutter-клиент реализован в `mobile/` (план «ещё не начинать» устарел).
+
+Полные тексты аудитов при необходимости — в git history до уплотнения docs.
