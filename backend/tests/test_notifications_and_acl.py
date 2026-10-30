@@ -190,9 +190,10 @@ async def test_ru_assignment_copy():
         assignees=[("1", "Кадачиев Алибек"), ("2", "Рагимов Рахман")],
         task_title="Проверить",
     )
-    assert "вам" in title
+    assert "Вам" in title
     assert "назначила" in title
-    assert "Рагимову" in title
+    assert "Рагимов Рахман" in title
+    assert "Рагимову" not in title
     assert format_completed_title(actor_name="Кадачиев Алибек", task_title="X").startswith(
         "Кадачиев Алибек завершил"
     )
