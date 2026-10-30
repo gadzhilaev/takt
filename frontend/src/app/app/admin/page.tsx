@@ -7,6 +7,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { UserAvatar } from "@/components/user-avatar";
 
 type AdminUser = {
@@ -85,14 +86,15 @@ export default function AdminPage() {
         <div className="grid gap-2 md:grid-cols-2">
           <Input placeholder="Имя" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <select
-            className="rounded-lg border px-3 dark:bg-slate-900"
+          <Select
+            aria-label="Роль"
             value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="member">Участник</option>
-            <option value="admin">Администратор</option>
-          </select>
+            onValueChange={(role) => setForm({ ...form, role })}
+            options={[
+              { value: "member", label: "Участник" },
+              { value: "admin", label: "Администратор" },
+            ]}
+          />
           <div className="flex gap-2">
             <Input
               value={form.password}

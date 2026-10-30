@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { useSessionState } from "@/lib/use-session-state";
 
 type UserRow = {
   id: string;
@@ -19,11 +20,12 @@ type UserRow = {
 };
 
 const PAGE_SIZE = 20;
+const STATUS_ALL = "__all__";
 
 export default function AdminUsersPage() {
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(1);
+  const [q, setQ] = useSessionState<string>("takt-admin-users-q", "");
+  const [status, setStatus] = useSessionState<string>("takt-admin-users-status", "");
+  const [page, setPage] = useSessionState<number>("takt-admin-users-page", 1);
   const { data, isLoading } = useQuery({
     queryKey: ["platform-users", q, status, page],
     queryFn: () => {
@@ -51,19 +53,21 @@ export default function AdminUsersPage() {
           }}
           className="max-w-sm"
         />
-        <select
-          className="h-9 rounded-[var(--radius)] border border-[var(--border)] bg-white px-2 text-[13px]"
-          value={status}
-          onChange={(e) => {
+        <Select
+          aria-label="Статус"
+          value={status || STATUS_ALL}
+          onValueChange={(v) => {
             setPage(1);
-            setStatus(e.target.value);
+            setStatus(v === STATUS_ALL ? "" : v);
           }}
-        >
-          <option value="">Все статусы</option>
-          <option value="active">Активные</option>
-          <option value="blocked">Ограниченные</option>
-          <option value="inactive">Неактивные</option>
-        </select>
+          className="h-9 w-[11rem] max-w-full"
+          options={[
+            { value: STATUS_ALL, label: "Все статусы" },
+            { value: "active", label: "Активные" },
+            { value: "blocked", label: "Ограниченные" },
+            { value: "inactive", label: "Неактивные" },
+          ]}
+        />
       </div>
       {isLoading ? (
         <p className="text-sm text-muted">Загрузка…</p>
@@ -111,7 +115,7 @@ export default function AdminUsersPage() {
             variant="secondary"
             size="sm"
             disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => setPage(page - 1)}
           >
             Назад
           </Button>
@@ -123,7 +127,7 @@ export default function AdminUsersPage() {
             variant="secondary"
             size="sm"
             disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage(page + 1)}
           >
             Далее
           </Button>

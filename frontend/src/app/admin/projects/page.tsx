@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useSessionState } from "@/lib/use-session-state";
 
 type ProjectRow = {
   id: string;
@@ -19,8 +19,8 @@ type ProjectRow = {
 const PAGE_SIZE = 20;
 
 export default function AdminProjectsPage() {
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
+  const [q, setQ] = useSessionState<string>("takt-admin-projects-q", "");
+  const [page, setPage] = useSessionState<number>("takt-admin-projects-page", 1);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["platform-projects", q, page],
@@ -101,7 +101,7 @@ export default function AdminProjectsPage() {
             size="sm"
             variant="secondary"
             disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => setPage(Math.max(1, page - 1))}
           >
             Назад
           </Button>
@@ -113,7 +113,7 @@ export default function AdminProjectsPage() {
             size="sm"
             variant="secondary"
             disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage(page + 1)}
           >
             Далее
           </Button>

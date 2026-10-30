@@ -98,7 +98,7 @@ async def test_assignment_and_completion_notifications(client: AsyncClient):
     notes = (await client.get("/api/v1/notifications")).json()["items"]
     assign = [n for n in notes if n["kind"] == "task_assigned"]
     assert assign
-    assert "вам" in assign[0]["title"]
+    assert "Вам" in assign[0]["title"]
     assert "Исправить 1С" in assign[0]["title"]
 
     moved = await client.post(

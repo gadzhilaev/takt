@@ -161,7 +161,7 @@ export function ProfileDrawer({
           <div className="flex flex-col items-center gap-3 pt-2">
             <button
               type="button"
-              className="group relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="group relative rounded-full focus-visible:outline-none"
               onClick={() => fileRef.current?.click()}
               aria-label="Изменить аватар"
             >

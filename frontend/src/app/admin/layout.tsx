@@ -21,6 +21,8 @@ const NAV = [
   { href: "/admin/settings", label: "Настройки" },
 ];
 
+type PlatformMe = { platform_role: string; name: string; email: string };
+
 /** Admin chrome is light-only; hold next-themes on light while mounted. */
 function useForceLightTheme() {
   const { theme, setTheme } = useTheme();
@@ -42,22 +44,18 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
   const pathname = usePathname();
   const router = useRouter();
   useForceLightTheme();
+  /** Keep shell mounted after first success so HMR/refetch doesn't wipe form state. */
+  const allowedMe = useRef<PlatformMe | null>(null);
   const me = useQuery({
     queryKey: ["platform-me"],
-    queryFn: () =>
-      api<{ platform_role: string; name: string; email: string }>("/api/v1/platform/me"),
+    queryFn: () => api<PlatformMe>("/api/v1/platform/me"),
     retry: false,
   });
 
-  if (me.isLoading) {
-    return (
-      <div className="platform-admin flex min-h-screen items-center justify-center text-sm text-[#5a6573]">
-        Проверка доступа…
-      </div>
-    );
-  }
+  if (me.data) allowedMe.current = me.data;
+  const user = me.data ?? allowedMe.current;
 
-  if (me.isError) {
+  if (me.isError && !user) {
     return (
       <div className="platform-admin flex min-h-screen flex-col items-center justify-center gap-3 px-4 text-center">
         <p className="text-sm text-[#5a6573]">Нет доступа к панели платформы Takt.</p>
@@ -83,6 +81,14 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
     );
   }
 
+  if (!user) {
+    return (
+      <div className="platform-admin flex min-h-screen items-center justify-center text-sm text-[#5a6573]">
+        Проверка доступа…
+      </div>
+    );
+  }
+
   return (
     <div className="platform-admin min-h-screen text-[#202938]">
       <header className="border-b border-[#dce2e7] bg-white">
@@ -97,7 +103,7 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
           </div>
           <div className="flex items-center gap-3 text-[13px] text-[#5a6573]">
             <span className="hidden sm:inline">
-              {me.data?.name} · {platformRoleLabel(me.data?.platform_role)}
+              {user.name} · {platformRoleLabel(user.platform_role)}
             </span>
             <Link href="/app/projects" className="font-medium text-[#315f72]">
               К доскам

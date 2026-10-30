@@ -32,7 +32,9 @@ export function Select({
         aria-label={ariaLabel}
         className={cn(
           "field flex h-10 w-full items-center justify-between gap-2 px-3 text-left text-sm",
-          !value && "text-muted",
+          "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]",
+          "data-[placeholder]:text-[var(--muted)]",
+          !value && "text-[var(--muted)]",
           className
         )}
       >
