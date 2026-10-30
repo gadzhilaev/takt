@@ -15,6 +15,7 @@ Future<bool?> showTaktSheet({
   final dark = Theme.of(context).brightness == Brightness.dark;
   return showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
@@ -86,6 +87,7 @@ Future<void> showTaktInfoSheet({
   final dark = Theme.of(context).brightness == Brightness.dark;
   return showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,

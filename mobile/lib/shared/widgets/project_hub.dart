@@ -82,6 +82,7 @@ class _ProjectHubState extends State<ProjectHub> {
   Future<void> _removeMember(Project project, ProjectMember member) async {
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => AlertDialog(
         title: const Text('Удалить участника'),
         content: Text('Убрать ${member.name} из проекта «${project.name}»?'),
@@ -115,6 +116,7 @@ class _ProjectHubState extends State<ProjectHub> {
   Future<void> _requestLeave(Project project) async {
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => AlertDialog(
         title: const Text('Покинуть проект'),
         content: Text(

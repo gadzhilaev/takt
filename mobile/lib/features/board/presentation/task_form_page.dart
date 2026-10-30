@@ -126,6 +126,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final result = await showModalBottomSheet<Set<String>>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,

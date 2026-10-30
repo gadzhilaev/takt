@@ -107,6 +107,7 @@ Future<T?> showTaktSelectSheet<T>({
   final dark = Theme.of(context).brightness == Brightness.dark;
   return showModalBottomSheet<T>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,

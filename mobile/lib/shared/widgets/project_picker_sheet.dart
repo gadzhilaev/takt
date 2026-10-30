@@ -15,6 +15,7 @@ Future<String?> showProjectPickerSheet({
   final visible = taktVisibleProjects(projects);
   return showModalBottomSheet<String>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,

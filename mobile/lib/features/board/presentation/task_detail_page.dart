@@ -122,6 +122,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             ),
           if (task != null)
             PopupMenuButton<String>(
+              useRootNavigator: true,
               icon: AppIcon(AppIcons.more, size: 22, color: fg),
               onSelected: (v) async {
                 if (v == 'edit') {
@@ -137,6 +138,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   final boardCubit = context.read<BoardCubit>();
                   final ok = await showDialog<bool>(
                     context: context,
+                    useRootNavigator: true,
                     builder: (ctx) => AlertDialog(
                       title: const Text('Удалить задачу?'),
                       content: const Text('Действие нельзя отменить.'),

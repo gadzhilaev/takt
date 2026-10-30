@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/widgets/takt_select.dart';
 import '../../../shared/widgets/urgency_badge.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../cubit/board_cubit.dart';
@@ -114,26 +115,24 @@ class _TaskSheetState extends State<TaskSheet> {
                   decoration: const InputDecoration(labelText: 'Описание'),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  // ignore: deprecated_member_use
+                TaktSelectField<String>(
+                  label: 'Срочность',
                   value: _priority,
-                  decoration: const InputDecoration(labelText: 'Срочность'),
-                  items: const [
-                    DropdownMenuItem(value: 'urgent', child: Text('Срочно')),
-                    DropdownMenuItem(value: 'high', child: Text('Важно')),
-                    DropdownMenuItem(value: 'medium', child: Text('Обычная')),
+                  options: const [
+                    TaktSelectOption(value: 'urgent', label: 'Срочно'),
+                    TaktSelectOption(value: 'high', label: 'Важно'),
+                    TaktSelectOption(value: 'medium', label: 'Обычная'),
                   ],
-                  onChanged: (v) => setState(() => _priority = v ?? 'medium'),
+                  onChanged: (v) => setState(() => _priority = v),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  // ignore: deprecated_member_use
+                TaktSelectField<String>(
+                  label: 'Столбец',
                   value: _statusId,
-                  decoration: const InputDecoration(labelText: 'Столбец'),
-                  items: board.columns
-                      .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                  options: board.columns
+                      .map((c) => TaktSelectOption(value: c.id, label: c.name))
                       .toList(),
-                  onChanged: (v) => setState(() => _statusId = v ?? _statusId),
+                  onChanged: (v) => setState(() => _statusId = v),
                 ),
                 const SizedBox(height: 16),
                 Text('Исполнители', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
