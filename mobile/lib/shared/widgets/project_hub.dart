@@ -380,8 +380,9 @@ class _MemberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           TaktUserAvatar(name: member.name, avatarUrl: member.avatarUrl, size: 22),
@@ -393,6 +394,7 @@ class _MemberRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
+                height: 1.2,
                 color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
               ),
             ),
@@ -405,18 +407,18 @@ class _MemberRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                  color: muted,
                 ),
               ),
             ),
           if (canRemove)
-            IconButton(
-              tooltip: 'Удалить',
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: onRemove,
-              icon: AppIcon(AppIcons.delete, size: 16, color: dark ? TaktColors.mutedDark : TaktColors.muted,
+            // InkWell — без Material tooltip «Удалить», который всплывал поверх списка.
+            InkWell(
+              onTap: onRemove,
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: AppIcon(AppIcons.delete, size: 15, color: muted),
               ),
             ),
           if (canLeave)
@@ -452,7 +454,7 @@ class _LeaveRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           TaktUserAvatar(name: request.userName, avatarUrl: request.avatarUrl, size: 22),
@@ -464,6 +466,7 @@ class _LeaveRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
+                height: 1.2,
                 color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
               ),
             ),
@@ -487,7 +490,7 @@ class _LeaveRow extends StatelessWidget {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               foregroundColor: dark ? TaktColors.accentDark : TaktColors.accent,
             ),
-            child: const Text('Удалить', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            child: const Text('Одобрить', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
