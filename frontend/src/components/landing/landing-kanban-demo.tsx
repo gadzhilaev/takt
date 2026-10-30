@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { columnShellStyle } from "@/lib/column-colors";
 
 type DemoTask = {
   title: string;
@@ -9,9 +10,8 @@ type DemoTask = {
 
 type DemoColumn = {
   name: string;
+  /** Stored status.color — same presets as real board */
   accent: string;
-  surface: string;
-  border: string;
   tasks: DemoTask[];
 };
 
@@ -19,8 +19,6 @@ const COLUMNS: DemoColumn[] = [
   {
     name: "К выполнению",
     accent: "#607FA4",
-    surface: "#D2DDEB",
-    border: "#A8BBD0",
     tasks: [
       { title: "Собрать бриф по запуску", urgency: "Средняя", assignees: ["АК"] },
       { title: "Согласовать доступы команде", assignees: ["МИ", "ЕК"] },
@@ -29,8 +27,6 @@ const COLUMNS: DemoColumn[] = [
   {
     name: "В работе",
     accent: "#347FA4",
-    surface: "#C9E3F1",
-    border: "#7FB5CE",
     tasks: [
       { title: "Настроить доску проекта", urgency: "Высокая", assignees: ["АК"] },
       { title: "Описать статусы и правила", assignees: ["ЕК"] },
@@ -39,15 +35,11 @@ const COLUMNS: DemoColumn[] = [
   {
     name: "На проверке",
     accent: "#9062B8",
-    surface: "#E4D6F0",
-    border: "#C4A8DC",
     tasks: [{ title: "Проверить приглашения", urgency: "Средняя", assignees: ["МИ"] }],
   },
   {
     name: "Готово",
     accent: "#398A62",
-    surface: "#CDE6D8",
-    border: "#8EBEA4",
     tasks: [{ title: "Создать рабочий проект", assignees: ["АК"], done: true }],
   },
 ];
@@ -63,7 +55,7 @@ function UrgencyDot({ label }: { label: NonNullable<DemoTask["urgency"]> }) {
   );
 }
 
-/** Static, anonymized Kanban mock for the marketing page — not live user data. */
+/** Static, anonymized Kanban mock — column colors follow real board light/dark presets. */
 export function LandingKanbanDemo({ className }: { className?: string }) {
   return (
     <div
@@ -87,11 +79,15 @@ export function LandingKanbanDemo({ className }: { className?: string }) {
         {COLUMNS.map((col) => (
           <section
             key={col.name}
-            className="w-[min(72vw,15.5rem)] shrink-0 rounded-[var(--radius)] border p-2.5"
-            style={{ background: col.surface, borderColor: col.border }}
+            className="kanban-column-shell w-[min(72vw,15.5rem)] shrink-0 rounded-[var(--radius)] border p-2.5"
+            style={columnShellStyle(col.accent)}
           >
             <header className="mb-2.5 flex items-center gap-2 px-1">
-              <span className="h-2 w-2 rounded-full" style={{ background: col.accent }} aria-hidden />
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: "var(--kanban-col-accent)" }}
+                aria-hidden
+              />
               <h3 className="text-[12px] font-semibold tracking-tight text-[var(--foreground)]">{col.name}</h3>
               <span className="ml-auto text-[11px] tabular-nums text-muted">{col.tasks.length}</span>
             </header>
