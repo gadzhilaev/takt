@@ -181,6 +181,8 @@ class MobileOAuthBody(BaseModel):
     redirect_uri: str
     code_verifier: str | None = None
     device_id: str | None = None
+    state: str | None = None
+    display_name: str | None = None
     link: bool = False
 
 
@@ -202,6 +204,8 @@ async def oauth_mobile(
             redirect_uri=body.redirect_uri,
             code_verifier=body.code_verifier,
             device_id=body.device_id,
+            state=body.state,
+            display_name=body.display_name,
             link_user_id=user.id if body.link and user else None,
         )
         access, refresh = await oauth_service.issue_session(db, u)

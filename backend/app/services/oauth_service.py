@@ -201,6 +201,11 @@ async def start_oauth(
     state = secrets.token_urlsafe(32)
     nonce = secrets.token_urlsafe(32)
     verifier, challenge = _pkce_pair()
+    vk_device_id: str | None = None
+    if provider == OAuthProvider.vk:
+        # VK ID requires a stable device_id; store it in nonce (VK itself ignores OIDC nonce).
+        vk_device_id = secrets.token_urlsafe(24)
+        nonce = vk_device_id
     now = datetime.now(UTC)
     db.add(
         OAuthLoginState(
@@ -232,8 +237,6 @@ async def start_oauth(
         }
         url = f"{APPLE_AUTH}?{urlencode(params)}"
     elif provider == OAuthProvider.vk:
-        # VK ID requires a stable device_id for the PKCE web flow; echoed back on callback.
-        vk_device_id = secrets.token_urlsafe(24)
         params = {
             "client_id": settings.OAUTH_VK_CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -242,7 +245,7 @@ async def start_oauth(
             "state": state,
             "code_challenge": challenge,
             "code_challenge_method": "S256",
-            "device_id": vk_device_id,
+            "device_id": vk_device_id or nonce,
         }
         url = f"{VK_AUTH}?{urlencode(params)}"
     else:
@@ -481,11 +484,24 @@ async def mobile_complete(
     redirect_uri: str,
     code_verifier: str | None = None,
     device_id: str | None = None,
+    state: str | None = None,
+    display_name: str | None = None,
     link_user_id: uuid.UUID | None = None,
 ) -> tuple[User, bool]:
     settings = get_settings()
     if not await _provider_enabled(db, provider, settings):
         raise OAuthError("provider_disabled", f"Провайдер {provider.value} недоступен")
+
+    # PKCE state с сервера: verifier / redirect / device_id (VK nonce) / link.
+    if state:
+        row = await _consume_state(db, state, provider)
+        redirect_uri = row.redirect_uri
+        code_verifier = row.code_verifier
+        if not device_id and provider == OAuthProvider.vk:
+            device_id = row.nonce
+        if not link_user_id and row.link_user_id:
+            link_user_id = row.link_user_id
+
     assert_redirect_allowed(redirect_uri, settings)
     if id_token and provider == OAuthProvider.apple:
         claims = _decode_unverified_jwt_claims(id_token)
@@ -493,12 +509,13 @@ async def mobile_complete(
         if not sub:
             raise OAuthError("apple_claims", "Нет sub")
         email = claims.get("email")
+        name = (display_name or "").strip() or None
         profile = ProviderProfile(
             provider=OAuthProvider.apple,
             provider_user_id=str(sub),
             email=email.lower() if isinstance(email, str) else None,
             email_verified=str(claims.get("email_verified", "")).lower() in ("true", "1"),
-            display_name=None,
+            display_name=name,
             raw_claims={"iss": claims.get("iss"), "aud": claims.get("aud")},
         )
     elif code:

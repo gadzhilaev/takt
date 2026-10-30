@@ -46,6 +46,8 @@ dependencies:
   firebase_messaging: ^17.0.1
   url_launcher: ^6.3.3
   app_settings: 5.1.1
+  sign_in_with_apple: ^8.2.0
+  flutter_web_auth_2: ^5.1.0
 
 dev_dependencies:
   flutter_test:

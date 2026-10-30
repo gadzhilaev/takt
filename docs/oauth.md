@@ -43,7 +43,8 @@ Bundle ID приложения: `ru.gadzhilaev.takt`.
    OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR=true
    ```
 6. Рестарт backend. В админке `/admin/settings` включите **Apple**.
-7. В приложении кнопка появится после `enabled` у `/api/v1/auth/oauth/providers`. Native Sign in with Apple отдаёт `id_token` на `POST /api/v1/auth/oauth/mobile`. Private key **только** на сервере.
+7. В приложении кнопка появится после `enabled` у `/api/v1/auth/oauth/providers`.
+8. Mobile: **Apple** — нативный Sign in with Apple (системный sheet, не Safari) → `id_token` на `POST /api/v1/auth/oauth/mobile`. **VK / Яндекс** — `ASWebAuthenticationSession` (`flutter_web_auth_2`) с callback `takt://oauth/callback`, затем тот же `/mobile` с `code` + `state` (PKCE verifier на сервере). Private key **только** на сервере.
 
 Пока `OAUTH_OPERATOR_REGION=ru` и `OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR=false`, Apple останется выключенным политикой (149-ФЗ).
 

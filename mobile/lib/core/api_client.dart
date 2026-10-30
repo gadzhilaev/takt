@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'config.dart';
 import 'token_storage.dart';
@@ -13,6 +16,38 @@ class ApiClient {
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
           ),
         ) {
+    if (kDebugMode) {
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            debugPrint('── HTTP → ${options.method} ${options.uri}');
+            final q = options.queryParameters;
+            if (q.isNotEmpty) debugPrint('   query: $q');
+            final data = options.data;
+            if (data != null) debugPrint('   body: ${_preview(data)}');
+            handler.next(options);
+          },
+          onResponse: (response, handler) {
+            debugPrint(
+              '── HTTP ← ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}',
+            );
+            debugPrint('   body: ${_preview(response.data)}');
+            handler.next(response);
+          },
+          onError: (error, handler) {
+            debugPrint(
+              '── HTTP ✕ ${error.response?.statusCode ?? '-'} ${error.requestOptions.method} ${error.requestOptions.uri}',
+            );
+            if (error.response?.data != null) {
+              debugPrint('   body: ${_preview(error.response!.data)}');
+            } else {
+              debugPrint('   error: ${error.message}');
+            }
+            handler.next(error);
+          },
+        ),
+      );
+    }
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -41,6 +76,19 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  static String _preview(Object? data) {
+    try {
+      if (data == null) return 'null';
+      if (data is FormData) return '<FormData fields=${data.fields.length} files=${data.files.length}>';
+      final raw = data is String ? data : jsonEncode(data);
+      const max = 2000;
+      if (raw.length <= max) return raw;
+      return '${raw.substring(0, max)}…(+${raw.length - max})';
+    } catch (_) {
+      return data.toString();
+    }
   }
 
   final TokenStorage tokens;

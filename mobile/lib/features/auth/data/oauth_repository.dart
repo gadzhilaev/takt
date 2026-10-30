@@ -1,59 +1,165 @@
 import 'package:dio/dio.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/token_storage.dart';
+import '../../../shared/models/models.dart';
+import 'oauth_models.dart';
 
 class OAuthRepository {
   OAuthRepository(this._api);
 
   final ApiClient _api;
 
+  static const mobileRedirectUri = 'takt://oauth/callback';
+
+  TokenStorage get _tokens => _api.tokens;
+
   Future<Map<String, dynamic>> providers() async {
     final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/oauth/providers');
     return res.data ?? {};
   }
 
-  /// Opens system browser / ASWebAuthenticationSession via URL.
-  /// Real Apple native Sign in with Apple requires platform setup + id_token to /mobile.
-  Future<void> startWebOAuth(String provider, {bool link = false}) async {
+  /// Полный вход/регистрация через провайдера. Apple — системный sheet;
+  /// VK / Яндекс — ASWebAuthenticationSession (не внешний Safari).
+  Future<UserProfile> signIn(String provider, {bool link = false}) async {
+    if (provider == OAuthProviderId.apple) {
+      return _signInApple(link: link);
+    }
+    return _signInBrowserProvider(provider, link: link);
+  }
+
+  Future<UserProfile> _signInApple({bool link = false}) async {
+    late final AuthorizationCredentialAppleID credential;
+    try {
+      credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw const OAuthException('Вход отменён', cancelled: true);
+      }
+      throw OAuthException(e.message);
+    }
+
+    final idToken = credential.identityToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const OAuthException('Apple не вернул токен');
+    }
+
+    final parts = <String>[
+      if ((credential.givenName ?? '').trim().isNotEmpty) credential.givenName!.trim(),
+      if ((credential.familyName ?? '').trim().isNotEmpty) credential.familyName!.trim(),
+    ];
+    final displayName = parts.isEmpty ? null : parts.join(' ');
+
+    return _completeMobile(
+      provider: OAuthProviderId.apple,
+      idToken: idToken,
+      displayName: displayName,
+      link: link,
+    );
+  }
+
+  Future<UserProfile> _signInBrowserProvider(String provider, {bool link = false}) async {
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/api/v1/auth/oauth/$provider/start',
       queryParameters: {
         'client': 'mobile',
+        'redirect_uri': mobileRedirectUri,
         if (link) 'link': 'true',
       },
     );
     final url = res.data?['authorize_url'] as String?;
-    if (url == null || url.isEmpty) {
-      throw StateError('Нет authorize_url');
+    final state = res.data?['state'] as String?;
+    if (url == null || url.isEmpty || state == null || state.isEmpty) {
+      throw const OAuthException('Сервер вернул некорректный ответ для входа');
     }
-    final uri = Uri.parse(url);
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok) throw StateError('Не удалось открыть страницу входа');
+
+    late final String callback;
+    try {
+      callback = await FlutterWebAuth2.authenticate(
+        url: url,
+        callbackUrlScheme: 'takt',
+      );
+    } on Exception catch (e) {
+      final text = e.toString().toLowerCase();
+      if (text.contains('cancel') || text.contains('cancell')) {
+        throw const OAuthException('Вход отменён', cancelled: true);
+      }
+      throw OAuthException(_api.messageFromError(e));
+    }
+
+    final uri = Uri.parse(callback);
+    final error = uri.queryParameters['error'] ?? uri.queryParameters['oauth_error'];
+    if (error != null && error.isNotEmpty) {
+      final msg = uri.queryParameters['message']?.trim();
+      throw OAuthException(
+        (msg != null && msg.isNotEmpty) ? msg : error,
+      );
+    }
+    final code = uri.queryParameters['code'];
+    final returnedState = uri.queryParameters['state'] ?? state;
+    final deviceId = uri.queryParameters['device_id'];
+    if (code == null || code.isEmpty) {
+      throw const OAuthException('Провайдер не вернул код авторизации');
+    }
+
+    return _completeMobile(
+      provider: provider,
+      code: code,
+      state: returnedState,
+      deviceId: deviceId,
+      link: link,
+    );
   }
 
-  Future<Map<String, dynamic>> completeMobile({
+  Future<UserProfile> _completeMobile({
     required String provider,
     String? code,
     String? idToken,
-    required String redirectUri,
-    String? codeVerifier,
+    String? state,
     String? deviceId,
+    String? displayName,
     bool link = false,
   }) async {
     final res = await _api.dio.post<Map<String, dynamic>>(
       '/api/v1/auth/oauth/mobile',
       data: {
         'provider': provider,
+        'redirect_uri': mobileRedirectUri,
         'code': ?code,
         'id_token': ?idToken,
-        'redirect_uri': redirectUri,
-        'code_verifier': ?codeVerifier,
+        'state': ?state,
         'device_id': ?deviceId,
+        'display_name': ?displayName,
         'link': link,
       },
     );
-    return res.data ?? {};
+    final data = res.data;
+    if (data == null) throw const OAuthException('Пустой ответ сервера');
+    if (!link) {
+      await _persistTokens(data);
+    }
+    final userJson = data['user'];
+    if (userJson is! Map<String, dynamic>) {
+      throw const OAuthException('Сервер не вернул профиль пользователя');
+    }
+    return UserProfile.fromJson(userJson);
+  }
+
+  Future<void> _persistTokens(Map<String, dynamic> data) async {
+    final access = data['access_token'] as String?;
+    final refresh = data['refresh_token'] as String?;
+    if (access == null || refresh == null) {
+      throw const OAuthException('Сервер не вернул токены');
+    }
+    await _tokens.saveTokens(access: access, refresh: refresh);
   }
 
   Future<List<Map<String, dynamic>>> identities() async {
@@ -71,14 +177,21 @@ class OAuthRepository {
 }
 
 bool isOAuthCancel(Object e) {
+  if (e is OAuthException && e.cancelled) return true;
   if (e is DioException) {
     final data = e.response?.data;
     String? code;
     if (data is Map) {
+      final detail = data['detail'];
+      if (detail is Map) {
+        final err = detail['error'];
+        if (err is Map) code = err['code'] as String?;
+      }
       final err = data['error'];
       if (err is Map) code = err['code'] as String?;
     }
     return code == 'access_denied' || e.type == DioExceptionType.cancel;
   }
+  if (kDebugMode && e.toString().toLowerCase().contains('cancel')) return true;
   return false;
 }

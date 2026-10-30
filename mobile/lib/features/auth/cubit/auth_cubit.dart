@@ -121,4 +121,7 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   void setUser(UserProfile user) => emit(AuthAuthenticated(user));
+
+  /// Успешный OAuth (токены уже сохранены в [OAuthRepository]).
+  void acceptOAuthUser(UserProfile user) => emit(AuthAuthenticated(user));
 }

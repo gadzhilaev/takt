@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/api_client.dart';
+import '../cubit/auth_cubit.dart';
+import '../data/oauth_models.dart';
 import '../data/oauth_repository.dart';
 
 /// Shows enabled OAuth providers from backend policy (env + admin toggles).
@@ -49,16 +51,25 @@ class _OAuthButtonsState extends State<OAuthButtons> {
     }
   }
 
-  Future<void> _start(String id, String label) async {
+  Future<void> _start(String id) async {
     setState(() {
       _busy = id;
       _error = null;
     });
     try {
-      await _repo.startWebOAuth(id, link: widget.link);
+      final user = await _repo.signIn(id, link: widget.link);
+      if (!mounted) return;
+      if (!widget.link) {
+        context.read<AuthCubit>().acceptOAuthUser(user);
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = context.read<ApiClient>().messageFromError(e));
+      if (isOAuthCancel(e) || (e is OAuthException && e.cancelled)) {
+        setState(() => _busy = null);
+        return;
+      }
+      final msg = e is OAuthException ? e.message : context.read<ApiClient>().messageFromError(e);
+      setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -68,7 +79,6 @@ class _OAuthButtonsState extends State<OAuthButtons> {
   Widget build(BuildContext context) {
     final map = _providers;
     if (map == null && _error == null) {
-      // Без спиннера — кнопки появятся после ответа API.
       return const SizedBox.shrink();
     }
     final enabled = <MapEntry<String, dynamic>>[];
@@ -103,9 +113,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
                 shape: const StadiumBorder(),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
-              onPressed: _busy != null
-                  ? null
-                  : () => _start(e.key, (e.value as Map)['label'] as String? ?? e.key),
+              onPressed: _busy != null ? null : () => _start(e.key),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -129,7 +137,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
                   Flexible(
                     child: Text(
                       _busy == e.key
-                          ? 'Открываем…'
+                          ? 'Входим…'
                           : '$prefix ${(e.value as Map)['label']}',
                       textAlign: TextAlign.center,
                     ),
