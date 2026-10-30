@@ -92,6 +92,30 @@ class AuthRepository {
     await tokens.clear();
   }
 
+  Future<void> sendForgotPasswordCode({required String email}) async {
+    await api.dio.post(
+      '/api/v1/auth/forgot-password/send-code',
+      data: {'email': email.trim()},
+    );
+  }
+
+  Future<void> confirmForgotPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+    required String newPasswordConfirm,
+  }) async {
+    await api.dio.post(
+      '/api/v1/auth/forgot-password/confirm',
+      data: {
+        'email': email.trim(),
+        'code': code.trim(),
+        'new_password': newPassword,
+        'new_password_confirm': newPasswordConfirm,
+      },
+    );
+  }
+
   Future<void> _persistTokens(Map<String, dynamic> data) async {
     final access = data['access_token'] as String?;
     final refresh = data['refresh_token'] as String?;

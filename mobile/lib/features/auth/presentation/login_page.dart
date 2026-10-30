@@ -166,6 +166,25 @@ class _LoginPageState extends State<LoginPage> {
                                             validator: (v) =>
                                                 (v == null || v.isEmpty) ? 'Введите пароль' : null,
                                           ),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: TextButton(
+                                              onPressed: () => context.push('/forgot-password'),
+                                              style: TextButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              child: Text(
+                                                'Забыли пароль?',
+                                                style: TextStyle(
+                                                  color: Theme.of(context).colorScheme.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                           if (_localError != null) ...[
                                             const SizedBox(height: 14),
                                             DecoratedBox(

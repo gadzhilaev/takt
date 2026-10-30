@@ -54,3 +54,43 @@ async def test_change_password_requires_email_code(client: AsyncClient):
         json={"email": "otp-pwd@example.com", "password": "NewSecurePass123!"},
     )
     assert login.status_code == 200, login.text
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_resets_with_email_code(client: AsyncClient):
+    await register_verified(client, name="Forgot", email="otp-forgot@example.com")
+    await client.post("/api/v1/auth/logout")
+    unknown = await client.post(
+        "/api/v1/auth/forgot-password/send-code",
+        json={"email": "nobody-forgot@example.com"},
+    )
+    assert unknown.status_code == 200, unknown.text
+    assert unknown.json()["ok"] is True
+    assert "dev_code" not in unknown.json()
+
+    send = await client.post(
+        "/api/v1/auth/forgot-password/send-code",
+        json={"email": "otp-forgot@example.com"},
+    )
+    assert send.status_code == 200, send.text
+    code = send.json()["dev_code"]
+    confirm = await client.post(
+        "/api/v1/auth/forgot-password/confirm",
+        json={
+            "email": "otp-forgot@example.com",
+            "code": code,
+            "new_password": "ResetSecurePass123!",
+            "new_password_confirm": "ResetSecurePass123!",
+        },
+    )
+    assert confirm.status_code == 200, confirm.text
+    old = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "otp-forgot@example.com", "password": "SecurePass123!"},
+    )
+    assert old.status_code == 401
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "otp-forgot@example.com", "password": "ResetSecurePass123!"},
+    )
+    assert login.status_code == 200, login.text

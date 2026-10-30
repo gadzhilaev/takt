@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/cubit/auth_cubit.dart';
+import '../features/auth/presentation/forgot_password_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/notifications_intro_page.dart';
 import '../features/auth/presentation/register_page.dart';
@@ -35,7 +36,7 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
       final auth = authCubit.state;
       final loc = state.matchedLocation;
       final onSplash = loc == '/splash';
-      final loggingIn = loc == '/login' || loc == '/register';
+      final loggingIn = loc == '/login' || loc == '/register' || loc == '/forgot-password';
       final onPushIntro = loc == '/enable-notifications';
 
       if (auth is AuthUnknown) {
@@ -65,7 +66,11 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
         if (loggingIn) {
           // Prefer pending widget/push deep link over project hub.
           final pending = PendingDeepLink.value;
-          if (pending != null && pending.isNotEmpty && pending != '/login' && pending != '/register') {
+          if (pending != null &&
+              pending.isNotEmpty &&
+              pending != '/login' &&
+              pending != '/register' &&
+              pending != '/forgot-password') {
             return pending.startsWith('/') ? pending : WidgetSync.routeFromAny(pending);
           }
           return '/projects';
@@ -85,6 +90,7 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
       GoRoute(path: '/splash', builder: (_, _) => const SplashPage()),
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterPage()),
+      GoRoute(path: '/forgot-password', builder: (_, _) => const ForgotPasswordPage()),
       GoRoute(path: '/enable-notifications', builder: (_, _) => const NotificationsIntroPage()),
       GoRoute(
         path: '/projects',

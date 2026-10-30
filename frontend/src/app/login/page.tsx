@@ -47,21 +47,31 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [show, setShow] = useState(false);
-  const oauthErr = oauthErrorText(searchParams.get("message"), searchParams.get("oauth_error"));
+  const rawMessage = searchParams.get("message");
+  const oauthErr = oauthErrorText(rawMessage, searchParams.get("oauth_error"));
+  const infoMessage =
+    rawMessage && !searchParams.get("oauth_error") && !/^[a-z][a-z0-9_]+$/i.test(rawMessage.trim())
+      ? rawMessage.trim()
+      : "";
   const [error, setError] = useState(
-    searchParams.get("message") || searchParams.get("oauth_error") ? oauthErr : ""
+    searchParams.get("oauth_error") || (rawMessage && !infoMessage) ? oauthErr : ""
   );
+  const [info, setInfo] = useState(infoMessage);
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
   const { data: oauthMeta } = useOAuthProviders();
   const emailPassword = oauthMeta?.email_password !== false;
 
-  // Показать OAuth-ошибку один раз, затем убрать её из URL — иначе refresh снова поднимает алерт.
+  // Показать сообщение один раз, затем убрать его из URL — иначе refresh снова поднимает алерт.
   useEffect(() => {
     if (!searchParams.get("message") && !searchParams.get("oauth_error")) return;
     const next = searchParams.get("next");
     const qs = next ? `?next=${encodeURIComponent(next)}` : "";
     router.replace(`${paths.login}${qs}`);
   }, [router, searchParams]);
+
+  useEffect(() => {
+    if (infoMessage) setInfo(infoMessage);
+  }, [infoMessage]);
 
   async function onSubmit(values: z.infer<typeof schema>) {
     setError("");
@@ -105,9 +115,17 @@ function LoginForm() {
                 <Input id="login-email" type="email" autoComplete="email" {...form.register("email")} />
               </div>
               <div>
-                <label className="label-text" htmlFor="login-password">
-                  Пароль
-                </label>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <label className="label-text mb-0" htmlFor="login-password">
+                    Пароль
+                  </label>
+                  <Link
+                    href={paths.forgotPassword}
+                    className="text-[12px] font-medium text-[var(--accent)] hover:underline"
+                  >
+                    Забыли пароль?
+                  </Link>
+                </div>
                 <div className="relative">
                   <Input
                     id="login-password"
@@ -125,6 +143,11 @@ function LoginForm() {
                   </button>
                 </div>
               </div>
+              {info && !error && (
+                <p className="rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] px-3 py-2 text-sm text-[var(--accent)]">
+                  {info}
+                </p>
+              )}
               {error && (
                 <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]" role="alert">
                   {error}

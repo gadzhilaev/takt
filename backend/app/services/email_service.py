@@ -47,6 +47,9 @@ def _otp_bodies(*, app_name: str, code: str, purpose: str) -> tuple[str, str, st
     elif purpose == "change_password":
         subject = f"{app_name} — код смены пароля"
         action = "смены пароля"
+    elif purpose == "reset_password":
+        subject = f"{app_name} — код сброса пароля"
+        action = "сброса пароля"
     else:
         subject = f"{app_name} — код подтверждения"
         action = "подтверждения"
@@ -55,16 +58,33 @@ def _otp_bodies(*, app_name: str, code: str, purpose: str) -> tuple[str, str, st
         f"Код действует ограниченное время. Если вы не запрашивали его — "
         f"просто игнорируйте это письмо.\n"
     )
+    font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"
+    card = (
+        "max-width:420px;background:#ffffff;border-radius:16px;"
+        "padding:28px 24px;border:1px solid #e6ecef;"
+    )
     html_body = (
-        f"<p>Ваш код подтверждения для {action} в <b>{app_name}</b>:</p>"
-        f'<p style="font-size:28px;letter-spacing:6px;font-weight:700">{code}</p>'
-        f"<p>Код действует ограниченное время. Если вы не запрашивали его — "
-        f"просто игнорируйте это письмо.</p>"
+        "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width\"></head>"
+        f"<body style=\"margin:0;padding:0;background:#f4f7f8;font-family:{font};\">"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" "
+        "style=\"background:#f4f7f8;padding:32px 16px;\"><tr><td align=\"center\">"
+        f"<table role=\"presentation\" width=\"100%\" style=\"{card}\">"
+        "<tr><td style=\"font-size:20px;font-weight:700;color:#1a2330;"
+        f"padding-bottom:8px;\">{app_name}</td></tr>"
+        "<tr><td style=\"font-size:14px;line-height:1.5;color:#5b6775;"
+        f"padding-bottom:20px;\">Ваш код подтверждения для {action}:</td></tr>"
+        "<tr><td align=\"center\" style=\"font-size:32px;letter-spacing:8px;"
+        f"font-weight:700;color:#1a2330;padding:12px 0 24px;\">{code}</td></tr>"
+        "<tr><td style=\"font-size:13px;line-height:1.5;color:#8a94a0;\">"
+        "Код действует ограниченное время. Если вы не запрашивали его — "
+        "просто игнорируйте это письмо.</td></tr>"
+        "</table></td></tr></table></body></html>"
     )
     return subject, text_body, html_body
 
 
-def _send_via_smtp(*, to: str, subject: str, text_body: str) -> str:
+def _send_via_smtp(*, to: str, subject: str, text_body: str, html_body: str) -> str:
     settings = get_settings()
     from_raw = settings.SMTP_FROM_EMAIL.strip() or settings.SMTP_USER.strip()
     from_email, from_name = _parse_from_header(from_raw)
@@ -73,6 +93,7 @@ def _send_via_smtp(*, to: str, subject: str, text_body: str) -> str:
     msg["From"] = f"{from_name} <{from_email}>"
     msg["To"] = to
     msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
     try:
         with smtplib.SMTP(settings.SMTP_HOST.strip(), settings.SMTP_PORT, timeout=30) as smtp:
             if settings.SMTP_USE_TLS:
@@ -163,7 +184,12 @@ async def send_otp_email(*, to: str, code: str, purpose: str) -> str | None:
 
     # Prefer classic SMTP when host is set (works with connect.smtp.bz login).
     if settings.SMTP_HOST.strip() and settings.SMTP_USER.strip():
-        return _send_via_smtp(to=destination, subject=subject, text_body=text_body)
+        return _send_via_smtp(
+            to=destination,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+        )
 
     return await _send_via_smtp_bz_api(
         to=destination,

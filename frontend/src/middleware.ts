@@ -50,7 +50,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Already signed in — skip auth forms.
-  if ((pathname === "/login" || pathname === "/register") && authed) {
+  if ((pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") && authed) {
     const url = request.nextUrl.clone();
     url.pathname = "/app/projects";
     url.search = "";
@@ -89,6 +89,7 @@ export const config = {
     "/",
     "/login",
     "/register",
+    "/forgot-password",
     "/change-password",
     "/app",
     "/app/:path*",

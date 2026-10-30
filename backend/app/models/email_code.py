@@ -12,6 +12,7 @@ from app.models.base import Base, TimestampMixin
 class EmailCodePurpose(str, enum.Enum):
     register = "register"
     change_password = "change_password"
+    reset_password = "reset_password"
 
 
 class EmailCode(Base, TimestampMixin):
