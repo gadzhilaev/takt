@@ -40,43 +40,54 @@ def is_email_configured() -> bool:
     return bool(settings.SMTP_BZ_API_KEY.strip())
 
 
-def _otp_bodies(*, app_name: str, code: str, purpose: str) -> tuple[str, str, str]:
+def _otp_copy(purpose: str) -> tuple[str, str, str]:
+    """subject suffix, heading, short body line — same HTML chrome for every purpose."""
     if purpose == "register":
-        subject = f"{app_name} — код регистрации"
-        action = "регистрации"
-    elif purpose == "change_password":
-        subject = f"{app_name} — код смены пароля"
-        action = "смены пароля"
-    elif purpose == "reset_password":
-        subject = f"{app_name} — код сброса пароля"
-        action = "сброса пароля"
-    else:
-        subject = f"{app_name} — код подтверждения"
-        action = "подтверждения"
+        return "код регистрации", "Код регистрации", "Подтвердите регистрацию в Takt:"
+    if purpose == "change_password":
+        return "код смены пароля", "Код смены пароля", "Подтвердите смену пароля:"
+    if purpose == "reset_password":
+        return "код сброса пароля", "Код сброса пароля", "Подтвердите сброс пароля:"
+    return "код подтверждения", "Код подтверждения", "Ваш код подтверждения:"
+
+
+def _otp_bodies(*, app_name: str, code: str, purpose: str) -> tuple[str, str, str]:
+    subject_suffix, heading, lead = _otp_copy(purpose)
+    subject = f"{app_name} — {subject_suffix}"
     text_body = (
-        f"Ваш код подтверждения для {action} в {app_name}: {code}\n\n"
+        f"{heading}\n\n{lead}\n\n{code}\n\n"
         f"Код действует ограниченное время. Если вы не запрашивали его — "
         f"просто игнорируйте это письмо.\n"
     )
-    font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"
+    # Единый HTML-шаблон для register / change_password / reset_password.
+    font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+    wrap = "background:#f4f7f8;padding:32px 16px;"
     card = (
         "max-width:420px;background:#ffffff;border-radius:16px;"
         "padding:28px 24px;border:1px solid #e6ecef;"
     )
     html_body = (
         "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"utf-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width\"></head>"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        f"<title>{subject}</title></head>"
         f"<body style=\"margin:0;padding:0;background:#f4f7f8;font-family:{font};\">"
         "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" "
-        "style=\"background:#f4f7f8;padding:32px 16px;\"><tr><td align=\"center\">"
+        f"style=\"{wrap}\"><tr><td align=\"center\">"
         f"<table role=\"presentation\" width=\"100%\" style=\"{card}\">"
-        "<tr><td style=\"font-size:20px;font-weight:700;color:#1a2330;"
-        f"padding-bottom:8px;\">{app_name}</td></tr>"
+        "<tr><td style=\"font-size:13px;font-weight:600;letter-spacing:0.04em;"
+        "text-transform:uppercase;color:#315f72;padding-bottom:10px;\">"
+        f"{app_name}</td></tr>"
+        "<tr><td style=\"font-size:22px;font-weight:700;color:#1a2330;"
+        f"padding-bottom:8px;line-height:1.25;\">{heading}</td></tr>"
         "<tr><td style=\"font-size:14px;line-height:1.5;color:#5b6775;"
-        f"padding-bottom:20px;\">Ваш код подтверждения для {action}:</td></tr>"
-        "<tr><td align=\"center\" style=\"font-size:32px;letter-spacing:8px;"
-        f"font-weight:700;color:#1a2330;padding:12px 0 24px;\">{code}</td></tr>"
-        "<tr><td style=\"font-size:13px;line-height:1.5;color:#8a94a0;\">"
+        f"padding-bottom:22px;\">{lead}</td></tr>"
+        "<tr><td align=\"center\" style=\"background:#f4f7f8;border-radius:12px;"
+        "padding:18px 12px;\">"
+        "<span style=\"font-size:32px;letter-spacing:8px;font-weight:700;"
+        f"color:#1a2330;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;\">"
+        f"{code}</span></td></tr>"
+        "<tr><td style=\"font-size:13px;line-height:1.5;color:#8a94a0;"
+        "padding-top:22px;\">"
         "Код действует ограниченное время. Если вы не запрашивали его — "
         "просто игнорируйте это письмо.</td></tr>"
         "</table></td></tr></table></body></html>"
