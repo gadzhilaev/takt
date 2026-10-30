@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { platformRoleLabel } from "@/lib/types";
 
 const NAV = [
-  { href: "/admin", label: "Dashboard", exact: true },
+  { href: "/admin", label: "Обзор", exact: true },
   { href: "/admin/users", label: "Пользователи" },
   { href: "/admin/projects", label: "Проекты" },
   { href: "/admin/moderation", label: "Модерация" },

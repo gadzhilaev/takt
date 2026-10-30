@@ -18,6 +18,8 @@ type UserRow = {
   blocked_until: string | null;
 };
 
+const PAGE_SIZE = 20;
+
 export default function AdminUsersPage() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
@@ -25,12 +27,16 @@ export default function AdminUsersPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["platform-users", q, status, page],
     queryFn: () => {
-      const sp = new URLSearchParams({ page: String(page), page_size: "20" });
+      const sp = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
       if (q.trim()) sp.set("q", q.trim());
       if (status) sp.set("status", status);
       return api<{ items: UserRow[]; total: number }>(`/api/v1/platform/users?${sp}`);
     },
   });
+
+  const total = data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const showPager = total > PAGE_SIZE;
 
   return (
     <div className="space-y-4">
@@ -98,23 +104,31 @@ export default function AdminUsersPage() {
           </table>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <Button type="button" variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-          Назад
-        </Button>
-        <span className="text-[12px] text-muted">
-          стр. {page} · всего {data?.total ?? 0}
-        </span>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={(data?.items.length ?? 0) < 20}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Далее
-        </Button>
-      </div>
+      {showPager && (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Назад
+          </Button>
+          <span className="text-[12px] text-muted">
+            стр. {page} из {pageCount} · всего {total}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={page >= pageCount}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Далее
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
