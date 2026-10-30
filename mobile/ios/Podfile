@@ -1,4 +1,5 @@
 platform :ios, '15.0'
+install! 'cocoapods', warn_for_unused_master_specs_repo: false
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -26,6 +27,9 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+# Firebase / home_widget и другие pods — варнинги из pub-cache, не из нашего кода.
+inhibit_all_warnings!
+
 target 'Runner' do
   use_frameworks!
 
@@ -35,8 +39,50 @@ target 'Runner' do
   end
 end
 
+def patch_firebase_core_dummy!
+  # firebase_core ships an empty dummy.m → Xcode: "'dummy.o' has no symbols"
+  Dir.glob(File.expand_path('~/.pub-cache/hosted/pub.dev/firebase_core-*/ios/**/dummy.m')).each do |path|
+    contents = File.read(path)
+    next if contents.include?('takt_firebase_core_dummy_symbol')
+    File.write(path, <<~OBJC)
+      // Copyright 2023, the Chromium project authors.  Please see the AUTHORS file
+      // for details. All rights reserved. Use of this source code is governed by a
+      // BSD-style license that can be found in the LICENSE file.
+
+      // Non-empty translation unit so libtool/ld do not warn "dummy.o has no symbols".
+      void takt_firebase_core_dummy_symbol(void) {}
+    OBJC
+    puts "Patched empty firebase_core dummy.m: #{path}"
+  end
+end
+
 post_install do |installer|
+  patch_firebase_core_dummy!
+
+  # Dismiss Xcode "Update to recommended settings" for Pods.
+  installer.pods_project.root_object.attributes['LastUpgradeCheck'] = '9999'
+  installer.pods_project.root_object.attributes['LastSwiftUpdateCheck'] = '9999'
+
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+    config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
+  end
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+      flags = Array(config.build_settings['OTHER_CFLAGS']).flatten
+      flags = ['$(inherited)'] if flags.empty?
+      flags << '-w' unless flags.include?('-w')
+      config.build_settings['OTHER_CFLAGS'] = flags
+      swift_flags = Array(config.build_settings['OTHER_SWIFT_FLAGS']).flatten
+      swift_flags = ['$(inherited)'] if swift_flags.empty?
+      swift_flags << '-suppress-warnings' unless swift_flags.include?('-suppress-warnings')
+      config.build_settings['OTHER_SWIFT_FLAGS'] = swift_flags
+    end
   end
+  installer.pods_project.save
 end

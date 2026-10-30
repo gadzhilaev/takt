@@ -7,7 +7,7 @@ require 'xcodeproj'
 IOS = File.expand_path('..', __dir__)
 PROJECT_PATH = File.join(IOS, 'Runner.xcodeproj')
 WIDGET_NAME = 'TaktHomeWidget'
-TEAM = '3NQ93DY69B'
+TEAM = 'XVY5J3FMS2'
 MAIN_BUNDLE = 'ru.gadzhilaev.takt'
 WIDGET_BUNDLE = "#{MAIN_BUNDLE}.#{WIDGET_NAME}"
 
