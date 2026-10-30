@@ -113,7 +113,17 @@ class _OAuthButtonsState extends State<OAuthButtons> {
                   if (_icons.containsKey(e.key)) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(7),
-                      child: SvgPicture.asset(_icons[e.key]!, width: 22, height: 22),
+                      child: SvgPicture.asset(
+                        _icons[e.key]!,
+                        width: 22,
+                        height: 22,
+                        colorFilter: e.key == 'apple'
+                            ? ColorFilter.mode(
+                                Theme.of(context).colorScheme.onSurface,
+                                BlendMode.srcIn,
+                              )
+                            : null,
+                      ),
                     ),
                     const SizedBox(width: 10),
                   ],
