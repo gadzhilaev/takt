@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/brand/takt-logo.svg" alt="Takt" width="220" />
+  <img src="docs/brand/takt-logo-readme.png" alt="Takt" width="240" />
 </p>
 
 <h1 align="center">Takt</h1>
@@ -41,15 +41,19 @@ Takt — это минималистичный Kanban для небольших 
 
 ### Web
 
-| Вход | Доска (светлая) | Доска (тёмная) |
-|------|-----------------|----------------|
-| ![Login](docs/screenshots/takt-rebrand/01-login-light-desktop.png) | ![Kanban light](docs/screenshots/takt-rebrand/02-kanban-light-desktop.png) | ![Kanban dark](docs/screenshots/takt-rebrand/04-kanban-dark-desktop.png) |
+| Лендинг | Вход | Доска |
+|---------|------|-------|
+| ![Landing](docs/screenshots/readme/01-landing-light-desktop.png) | ![Login](docs/screenshots/readme/03-login-light-desktop.png) | ![Kanban](docs/screenshots/readme/04-kanban-light-desktop.png) |
 
-### Mobile
+| Лендинг (тёмная) | Доска (тёмная) | Доска (mobile web) |
+|------------------|----------------|--------------------|
+| ![Landing dark](docs/screenshots/readme/02-landing-dark-desktop.png) | ![Kanban dark](docs/screenshots/readme/05-kanban-dark-desktop.png) | ![Kanban mobile](docs/screenshots/readme/06-kanban-light-mobile.png) |
 
-| Доска | Мои задачи | Профиль |
-|-------|------------|---------|
-| ![Board](docs/screenshots/mobile-ui/01-board-light.png) | ![My tasks](docs/screenshots/mobile-ui/02-my-tasks-light.png) | ![Profile](docs/screenshots/mobile-ui/05-profile-light.png) |
+### Mobile (Flutter)
+
+| Вход | Доска | Мои задачи | Профиль |
+|------|-------|------------|---------|
+| ![Login](docs/screenshots/readme/09-mobile-login-light.png) | ![Board](docs/screenshots/readme/10-mobile-board-light.png) | ![My tasks](docs/screenshots/readme/11-mobile-my-tasks-light.png) | ![Profile](docs/screenshots/readme/12-mobile-profile-light.png) |
 
 ## Технологический стек
 
