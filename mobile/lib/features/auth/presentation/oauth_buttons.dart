@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -36,7 +37,13 @@ class _OAuthButtonsState extends State<OAuthButtons> {
     super.didChangeDependencies();
     if (!_loaded) {
       _loaded = true;
-      _load();
+      // Кэш с splash — кнопки сразу; иначе догружаем без спиннера экрана.
+      final cached = _repo.cachedProviderMap;
+      if (cached != null) {
+        _providers = cached;
+      } else {
+        _load();
+      }
     }
   }
 
@@ -62,13 +69,23 @@ class _OAuthButtonsState extends State<OAuthButtons> {
       if (!widget.link) {
         context.read<AuthCubit>().acceptOAuthUser(user);
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('── OAuth UI ✕ $id: $e');
+      debugPrint('$st');
       if (!mounted) return;
       if (isOAuthCancel(e) || (e is OAuthException && e.cancelled)) {
         setState(() => _busy = null);
         return;
       }
-      final msg = e is OAuthException ? e.message : context.read<ApiClient>().messageFromError(e);
+      final String msg;
+      if (e is OAuthException) {
+        msg = e.message;
+      } else if (e is MissingPluginException) {
+        msg =
+            'Плагин не подключён. Полностью остановите приложение (q в терминале) и снова запустите flutter run.';
+      } else {
+        msg = context.read<ApiClient>().messageFromError(e);
+      }
       setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _busy = null);
@@ -102,7 +119,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Text('или', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 10),
         for (final e in enabled)

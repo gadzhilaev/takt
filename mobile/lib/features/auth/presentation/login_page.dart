@@ -228,7 +228,7 @@ class _LoginPageState extends State<LoginPage> {
                                               ),
                                             ),
                                           ],
-                                          const SizedBox(height: 22),
+                                          const SizedBox(height: 8),
                                           FilledButton(
                                             onPressed: loading ? null : _submit,
                                             child: loading

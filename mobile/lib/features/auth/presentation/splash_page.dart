@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -5,7 +7,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/push/fcm_bootstrap.dart';
 import '../../../core/theme.dart';
+import '../../board/cubit/board_cubit.dart';
 import '../cubit/auth_cubit.dart';
+import '../data/oauth_repository.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -19,6 +23,8 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   late final Animation<double> _fade;
   late final Animation<double> _rise;
   bool _minElapsed = false;
+  bool _warmDone = false;
+  bool _warmStarted = false;
 
   @override
   void initState() {
@@ -35,19 +41,69 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_warmStarted) return;
+    _warmStarted = true;
+    unawaited(_warm());
+  }
+
+  @override
   void dispose() {
     _motion.dispose();
     super.dispose();
   }
 
-  void _leaveIfReady(AuthState state) {
-    if (!_minElapsed || !mounted) return;
+  /// Пока виден splash — сессия, способы входа и (если залогинен) проекты.
+  Future<void> _warm() async {
+    final auth = context.read<AuthCubit>();
+    final oauth = context.read<OAuthRepository>();
+    final board = context.read<BoardCubit>();
+
+    await Future.wait<void>([
+      oauth.prefetchProviders(),
+      _waitAuth(auth),
+    ]);
+
+    final state = auth.state;
     if (state is AuthAuthenticated) {
-      final seen = context.read<FcmBootstrap>().promptSeen;
-      context.go(seen ? '/projects' : '/enable-notifications');
-    } else if (state is AuthGuest || state is AuthFailure) {
-      context.go('/login');
+      board.setCurrentUserId(state.user.id);
+      if (board.state.projects.isEmpty) {
+        try {
+          await board.bootstrap();
+        } catch (e) {
+          debugPrint('── splash board warm ✕ $e');
+        }
+      }
     }
+
+    if (!mounted) return;
+    setState(() => _warmDone = true);
+    _leaveIfReady(auth.state);
+  }
+
+  Future<void> _waitAuth(AuthCubit auth) async {
+    final current = auth.state;
+    if (current is AuthAuthenticated || current is AuthGuest || current is AuthFailure) {
+      return;
+    }
+    await auth.stream.firstWhere(
+      (s) => s is AuthAuthenticated || s is AuthGuest || s is AuthFailure,
+    );
+  }
+
+  void _leaveIfReady(AuthState state) {
+    if (!_minElapsed || !_warmDone || !mounted) return;
+    // Не вызывать go() прямо из build/listener — иначе Router markNeedsBuild mid-build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (state is AuthAuthenticated) {
+        final seen = context.read<FcmBootstrap>().promptSeen;
+        context.go(seen ? '/projects' : '/enable-notifications');
+      } else if (state is AuthGuest || state is AuthFailure) {
+        context.go('/login');
+      }
+    });
   }
 
   @override

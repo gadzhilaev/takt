@@ -142,13 +142,17 @@ class _TaktAppState extends State<TaktApp> {
               if (state is AuthAuthenticated) {
                 final board = context.read<BoardCubit>();
                 board.setCurrentUserId(state.user.id);
-                // Прогрев кэша проектов ещё на splash — без спиннера после входа.
+                // Проекты уже греются на splash; здесь только виджет / повторный вход.
                 if (board.state.projects.isEmpty) {
                   unawaited(board.bootstrap());
                 } else if (board.state.project != null) {
                   unawaited(_republish(board));
                 }
-                _consumeDeepLink();
+                // go() не из listener mid-build — после кадра.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  _consumeDeepLink();
+                });
               } else if (state is AuthGuest) {
                 context.read<BoardCubit>().setCurrentUserId(null);
               }

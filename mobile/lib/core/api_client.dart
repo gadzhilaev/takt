@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'config.dart';
 import 'token_storage.dart';
@@ -11,7 +12,8 @@ class ApiClient {
       : dio = Dio(
           BaseOptions(
             baseUrl: baseUrl ?? AppConfig.apiBase,
-            connectTimeout: const Duration(seconds: 15),
+            // Симулятор/Wi‑Fi иногда долго устанавливает TLS до prod.
+            connectTimeout: const Duration(seconds: 25),
             receiveTimeout: const Duration(seconds: 30),
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
           ),
@@ -124,6 +126,9 @@ class ApiClient {
 
   /// Текст ошибки только с сервера (`detail.error.message`). Без локальных словарей.
   String messageFromError(Object error) {
+    if (error is MissingPluginException) {
+      return 'Плагин не подключён. Полностью перезапустите приложение (stop + flutter run).';
+    }
     if (error is DioException) {
       final data = error.response?.data;
       if (data is Map) {

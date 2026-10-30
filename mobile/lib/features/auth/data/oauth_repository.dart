@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -17,34 +18,78 @@ class OAuthRepository {
 
   TokenStorage get _tokens => _api.tokens;
 
-  Future<Map<String, dynamic>> providers() async {
-    final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/oauth/providers');
-    return res.data ?? {};
+  Map<String, dynamic>? _providersCache;
+  Future<Map<String, dynamic>>? _providersInflight;
+
+  /// Уже загруженный ответ `/providers` (или null, если ещё не грели).
+  Map<String, dynamic>? get cachedProviders => _providersCache;
+
+  /// Карта `providers` для кнопок — без повторного запроса, если кэш есть.
+  Map<String, dynamic>? get cachedProviderMap {
+    final raw = _providersCache?['providers'];
+    return raw is Map<String, dynamic> ? raw : null;
+  }
+
+  /// Прогрев на splash: один inflight на всех потребителей.
+  Future<void> prefetchProviders() async {
+    try {
+      await providers();
+    } catch (e) {
+      debugPrint('── OAuth providers prefetch ✕ $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> providers({bool force = false}) async {
+    if (!force && _providersCache != null) return _providersCache!;
+    return _providersInflight ??= () async {
+      try {
+        final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/oauth/providers');
+        _providersCache = res.data ?? {};
+        return _providersCache!;
+      } finally {
+        _providersInflight = null;
+      }
+    }();
   }
 
   /// Полный вход/регистрация через провайдера. Apple — системный sheet;
   /// VK / Яндекс — ASWebAuthenticationSession (не внешний Safari).
   Future<UserProfile> signIn(String provider, {bool link = false}) async {
-    if (provider == OAuthProviderId.apple) {
-      return _signInApple(link: link);
+    debugPrint('── OAuth → start provider=$provider link=$link');
+    try {
+      final user = provider == OAuthProviderId.apple
+          ? await _signInApple(link: link)
+          : await _signInBrowserProvider(provider, link: link);
+      debugPrint('── OAuth ← ok provider=$provider user=${user.email}');
+      return user;
+    } catch (e, st) {
+      debugPrint('── OAuth ✕ provider=$provider error=$e');
+      debugPrint('$st');
+      rethrow;
     }
-    return _signInBrowserProvider(provider, link: link);
   }
 
   Future<UserProfile> _signInApple({bool link = false}) async {
     late final AuthorizationCredentialAppleID credential;
     try {
+      debugPrint('── OAuth Apple → native SignInWithApple sheet');
       credential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
       );
+      debugPrint('── OAuth Apple ← credential (hasToken=${credential.identityToken != null})');
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
         throw const OAuthException('Вход отменён', cancelled: true);
       }
       throw OAuthException(e.message);
+    } on MissingPluginException catch (e) {
+      debugPrint('── OAuth Apple ✕ MissingPluginException: $e');
+      throw const OAuthException(
+        'Плагин Apple не подключён. Полностью остановите приложение и снова запустите flutter run.',
+      );
     }
 
     final idToken = credential.identityToken;
@@ -67,6 +112,7 @@ class OAuthRepository {
   }
 
   Future<UserProfile> _signInBrowserProvider(String provider, {bool link = false}) async {
+    debugPrint('── OAuth $provider → /start (in-app browser)');
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/api/v1/auth/oauth/$provider/start',
       queryParameters: {
