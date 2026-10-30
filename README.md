@@ -29,8 +29,8 @@ Takt помогает небольшим командам вести проек�
 
 ## Возможности
 
-- Регистрация по email (OTP) и вход по паролю
-- OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только mobile (нужны credentials, см. [`docs/oauth.md`](docs/oauth.md))
+- Регистрация по email (OTP), вход по паролю, сброс забытого пароля кодом из письма
+- OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только в мобильном приложении (см. [`docs/oauth.md`](docs/oauth.md))
 - Проекты с ролями `admin` / `member` / `viewer` и приглашениями in-app
 - Kanban: 4 стартовых столбца, drag-and-drop; новая задача всегда в начало столбца
 - Задача: название, описание, исполнители (0..n), приоритет, комментарии, чеклист
@@ -64,7 +64,7 @@ Takt помогает небольшим командам вести проек�
 
 ### Mobile
 
-Flutter-клиент: вход, доска, мои задачи, профиль.
+Flutter-клиент: вход (email + VK / Яндекс / Apple), доска, мои задачи, профиль.
 
 <p align="center">
   <img src="docs/screenshots/readme/mobile-login.png" alt="Вход" width="230" />
@@ -172,7 +172,7 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 Mobile: [`mobile/docs/MOBILE_SETUP.md`](mobile/docs/MOBILE_SETUP.md).  
 Prod: [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
 
-Миграции Alembic **001–012** (head `012_platform_admin_oauth`). При старте backend выполняет `alembic upgrade head`.
+Миграции Alembic **001–013** (head `013_email_code_reset_password`). При старте backend выполняет `alembic upgrade head`.
 
 ## Тестирование
 
@@ -202,7 +202,11 @@ CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: 
 
 ## Статус и лицензия
 
-Активная разработка. Production: **https://taktapp.ru**.  
-OAuth VK / Яндекс работают при настроенных credentials; Apple — только mobile и может быть ограничен политикой оператора.
+Активная разработка. Production: **https://taktapp.ru**.
+
+- Web: Kanban, проекты, участники, единый вход `/login`, платформенная админка `/admin` (light-only)
+- Mobile: доска, мои задачи, профиль, home widgets; OAuth VK / Яндекс / Apple на экране входа
+- OAuth на prod: VK ID и Яндекс ID (web + mobile), Sign in with Apple — только mobile  
+  Политика оператора и 149-ФЗ: [`docs/oauth.md`](docs/oauth.md)
 
 Исходный код принадлежит [@gadzhilaev](https://github.com/gadzhilaev). Явная open-source лицензия пока не опубликована.

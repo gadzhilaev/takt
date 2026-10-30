@@ -11,7 +11,7 @@ Health: `GET /health`. WebSocket: `WS /ws`.
 | Web | httpOnly cookies `access_token`, `refresh_token` + `csrf_token`; CSRF-заголовок на POST/PATCH/DELETE |
 | Mobile | JSON `access_token` / `refresh_token`; `Authorization: Bearer …` (CSRF не нужен) |
 
-Эндпоинты: `POST /auth/login`, `POST /auth/register/send-code`, `POST /auth/register/confirm`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`.  
+Эндпоинты: `POST /auth/login`, `POST /auth/register/send-code`, `POST /auth/register/confirm`, `POST /auth/forgot-password/send-code`, `POST /auth/forgot-password/confirm`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`.  
 OAuth: `GET /auth/oauth/providers`, `GET /auth/oauth/{provider}/start`, callback, `POST /auth/oauth/mobile`.
 
 ## Ресурсы

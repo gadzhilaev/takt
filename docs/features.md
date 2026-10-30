@@ -41,6 +41,12 @@ API: `/api/v1/projects`. Web: `/app/projects`. Mobile: hub + board.
 - App Group `group.ru.gadzhilaev.takt`
 - Snapshot v3; **JWT в виджет не пишется**; после logout snapshot очищается
 
+## Auth email
+
+- Регистрация: OTP на email (`/auth/register/send-code` → `confirm`)
+- Смена пароля (в сессии): OTP (`/auth/change-password/*`)
+- Сброс забытого пароля: OTP без сессии (`/auth/forgot-password/send-code` → `confirm`); web `/forgot-password`, mobile тот же поток
+
 ## OAuth
 
 | Клиент | VK | Яндекс | Apple |
