@@ -114,8 +114,8 @@ async def dashboard_stats(db: AsyncSession) -> dict:
             for r in activity_by_day
         ],
         "metrics_note": (
-            "DAU/WAU/MAU считаются по user_activity_events (login*) с запасным "
-            "вариантом last_login_at. Нет выдуманных показателей."
+            "Активность — уникальные пользователи, которые входили в систему "
+            "(события входа или поле «последний вход»). Цифры из базы, без заглушек."
         ),
     }
 
