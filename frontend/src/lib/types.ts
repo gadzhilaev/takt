@@ -1,11 +1,34 @@
+export type PlatformRole = "none" | "support" | "moderator" | "admin" | "super_admin";
+
 export type User = {
   id: string;
   email: string;
   name: string;
   role: "admin" | "member";
+  /** Platform console access (`/admin`). Independent of project role. */
+  platform_role?: PlatformRole | string;
   avatar_url: string | null;
   must_change_password: boolean;
 };
+
+export function hasPlatformAccess(role: string | null | undefined): boolean {
+  return Boolean(role && role !== "none");
+}
+
+export function platformRoleLabel(role: string | null | undefined): string {
+  switch (role) {
+    case "support":
+      return "Поддержка";
+    case "moderator":
+      return "Модератор";
+    case "admin":
+      return "Администратор";
+    case "super_admin":
+      return "Суперадмин";
+    default:
+      return "Платформа";
+  }
+}
 
 export type Status = {
   id: string;

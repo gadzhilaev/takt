@@ -5,12 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { User } from "@/lib/types";
+import { hasPlatformAccess, platformRoleLabel, type User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
 import { disableWebPush, enableWebPush, getPushStatus } from "@/lib/web-push";
 import { OAuthButtons } from "@/components/oauth/oauth-buttons";
+import Link from "next/link";
 
 export function ProfileDrawer({
   open,
@@ -213,6 +214,22 @@ export function ProfileDrawer({
               Сохранить
             </Button>
           </form>
+
+          {hasPlatformAccess(user.platform_role) && (
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
+              <p className="text-[12px] font-medium text-muted">Роль платформы</p>
+              <p className="mt-0.5 text-[14px] font-semibold text-[var(--foreground)]">
+                {platformRoleLabel(user.platform_role)}
+              </p>
+              <Link
+                href="/admin"
+                onClick={onClose}
+                className="mt-2 inline-flex text-[13px] font-semibold text-[var(--accent)] hover:underline"
+              >
+                Открыть панель администратора
+              </Link>
+            </div>
+          )}
 
           <div className="border-t border-hairline pt-4">
             <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">

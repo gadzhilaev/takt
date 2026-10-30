@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { Project, User as AppUser } from "@/lib/types";
+import { hasPlatformAccess, type Project, type User as AppUser } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
@@ -332,6 +332,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <AppIcon name="add" size={16} /> Создать проект
         </Button>
+        {user && hasPlatformAccess(user.platform_role) && (
+          <Link
+            href="/admin"
+            className="mb-2 flex w-full items-center gap-2 rounded-[var(--radius)] px-2 py-1.5 text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+          >
+            <AppIcon name="settings" size={16} />
+            Админка платформы
+          </Link>
+        )}
         {user && (
           <button
             type="button"
