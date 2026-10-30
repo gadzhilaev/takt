@@ -286,6 +286,7 @@ async def forgot_password_send_code(
     except EmailCodeError as e:
         raise _http_from_email_code(e) from e
     await db.commit()
+    result["message"] = "Код отправлен на почту"
     return result
 
 
@@ -324,7 +325,7 @@ async def forgot_password_confirm(
     user.must_change_password = False
     await auth_service.revoke_all_user_tokens(db, user.id)
     await db.commit()
-    return {"ok": True}
+    return {"ok": True, "message": "Пароль обновлён. Войдите с новым паролем."}
 
 
 @router.post("/change-password/send-code", dependencies=[Depends(verify_csrf)])

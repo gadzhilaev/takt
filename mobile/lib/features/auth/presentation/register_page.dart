@@ -65,18 +65,20 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  void _confirmCode() {
+  Future<void> _confirmCode() async {
     setState(() => _error = null);
     final code = _code.text.trim();
-    if (code.length < 4) {
-      setState(() => _error = 'Введите код из письма');
-      return;
-    }
+    if (code.isEmpty) return;
     FocusScope.of(context).unfocus();
-    context.read<AuthCubit>().confirmRegister(
-          email: _email.text.trim(),
-          code: code,
-        );
+    setState(() => _localBusy = true);
+    try {
+      await context.read<AuthCubit>().confirmRegister(
+            email: _email.text.trim(),
+            code: code,
+          );
+    } finally {
+      if (mounted) setState(() => _localBusy = false);
+    }
   }
 
   @override
@@ -105,7 +107,7 @@ class _RegisterPageState extends State<RegisterPage> {
               if (state is AuthFailure) setState(() => _error = state.message);
             },
             builder: (context, state) {
-              final loading = _localBusy || state is AuthLoading;
+              final loading = _localBusy;
               return LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
@@ -199,7 +201,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                               ),
                                             ),
                                             validator: (v) =>
-                                                (v == null || v.trim().isEmpty) ? 'Укажите имя' : null,
+                                                (v == null || v.trim().isEmpty) ? '' : null,
                                           ),
                                           const SizedBox(height: 12),
                                           TextFormField(
@@ -215,8 +217,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                             ),
                                             validator: (v) {
                                               final value = (v ?? '').trim();
-                                              if (value.isEmpty) return 'Введите email';
-                                              if (!value.contains('@')) return 'Некорректный email';
+                                              if (value.isEmpty || !value.contains('@')) return '';
                                               return null;
                                             },
                                           ),
@@ -240,8 +241,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                               ),
                                             ),
                                             validator: (v) {
-                                              if (v == null || v.isEmpty) return 'Введите пароль';
-                                              if (v.length < 8) return 'Минимум 8 символов';
+                                              if (v == null || v.length < 8) return '';
                                               return null;
                                             },
                                           ),
@@ -259,8 +259,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                               ),
                                             ),
                                             validator: (v) {
-                                              if (v == null || v.isEmpty) return 'Повторите пароль';
-                                              if (v != _password.text) return 'Пароли не совпадают';
+                                              if (v == null || v.isEmpty || v != _password.text) {
+                                                return '';
+                                              }
                                               return null;
                                             },
                                           ),

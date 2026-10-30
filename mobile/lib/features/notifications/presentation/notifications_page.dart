@@ -103,19 +103,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
       body: RefreshIndicator(
         onRefresh: _reload,
         child: _loading
-            ? ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                ],
-              )
+            ? ListView(children: const [SizedBox(height: 1)])
             : _error != null
                 ? ListView(
                     children: [
                       const SizedBox(height: 80),
                       TaktEmptyState(
-                        title: 'Не удалось загрузить',
-                        subtitle: _error,
+                        title: _error!,
+                        subtitle: null,
                         icon: AppIcons.alert,
                         action: TaktButton(
                           label: 'Повторить',

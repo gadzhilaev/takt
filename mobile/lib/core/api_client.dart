@@ -74,31 +74,7 @@ class ApiClient {
     }
   }
 
-  static const _codeRu = <String, String>{
-    'missing_params': 'Не удалось завершить вход. Попробуйте ещё раз.',
-    'invalid_state': 'Сессия входа устарела. Начните вход заново.',
-    'state_expired': 'Сессия входа истекла. Начните вход заново.',
-    'state_reuse': 'Этот вход уже был использован. Начните заново.',
-    'provider_disabled': 'Этот способ входа сейчас недоступен.',
-    'method_disabled': 'Этот способ входа отключён.',
-    'access_denied': 'Вход отменён.',
-    'email_owned': 'Email уже занят. Войдите и привяжите провайдера в профиле.',
-    'email_taken': 'Email уже зарегистрирован',
-    'invalid_credentials': 'Неверный email или пароль',
-    'inactive': 'Учётная запись отключена',
-    'blocked': 'Учётная запись временно ограничена',
-    'locked': 'Слишком много попыток. Попробуйте позже.',
-  };
-
-  String _ru(String? message, [String? code]) {
-    final msg = (message ?? '').trim();
-    if (msg.isNotEmpty && !RegExp(r'^[a-z][a-z0-9_]+$', caseSensitive: false).hasMatch(msg)) {
-      return msg;
-    }
-    final key = (code ?? msg).trim();
-    return _codeRu[key] ?? (msg.isNotEmpty ? msg : 'Не удалось выполнить запрос');
-  }
-
+  /// Текст ошибки только с сервера (`detail.error.message`). Без локальных словарей.
   String messageFromError(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
@@ -107,31 +83,33 @@ class ApiClient {
         if (detail is Map) {
           final err = detail['error'];
           if (err is Map) {
-            return _ru(err['message'] as String?, err['code'] as String?);
+            final message = err['message'];
+            if (message is String && message.trim().isNotEmpty) return message.trim();
           }
-          if (detail['message'] is String) return _ru(detail['message'] as String);
+          final nested = detail['message'];
+          if (nested is String && nested.trim().isNotEmpty) return nested.trim();
         }
-        if (detail is String && detail.trim().isNotEmpty) return _ru(detail);
+        if (detail is String && detail.trim().isNotEmpty) return detail.trim();
         if (detail is List && detail.isNotEmpty) {
           final first = detail.first;
-          if (first is Map && first['msg'] is String) return first['msg'] as String;
+          if (first is Map) {
+            final msg = first['msg'];
+            if (msg is String && msg.trim().isNotEmpty) return msg.trim();
+          }
         }
         final top = data['error'];
-        if (top is String && top.trim().isNotEmpty) {
-          if (top.toLowerCase().contains('rate limit')) {
-            return 'Слишком много попыток. Попробуйте через минуту';
-          }
-          return _ru(top);
+        if (top is Map) {
+          final message = top['message'];
+          if (message is String && message.trim().isNotEmpty) return message.trim();
         }
-        if (top is Map && top['message'] is String) {
-          return _ru(top['message'] as String, top['code'] as String?);
-        }
+        if (top is String && top.trim().isNotEmpty) return top.trim();
       }
       if (error.type == DioExceptionType.connectionError ||
           error.type == DioExceptionType.connectionTimeout) {
         return 'Нет соединения с сервером';
       }
-      return 'Ошибка запроса (${error.response?.statusCode ?? 'сеть'})';
+      final code = error.response?.statusCode;
+      return code != null ? 'Ошибка $code' : 'Ошибка сети';
     }
     return error.toString();
   }

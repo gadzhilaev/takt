@@ -46,12 +46,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     setState(() => _busy = true);
     final cubit = context.read<AuthCubit>();
     try {
-      await cubit.auth.sendForgotPasswordCode(email: _email.text.trim());
+      final message = await cubit.auth.sendForgotPasswordCode(email: _email.text.trim());
       if (!mounted) return;
       setState(() {
         _awaitingCode = true;
         _busy = false;
-        _info = 'Код отправлен на ${_email.text.trim()}';
+        _info = message;
       });
     } catch (e) {
       if (!mounted) return;
@@ -72,7 +72,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     setState(() => _busy = true);
     final cubit = context.read<AuthCubit>();
     try {
-      await cubit.auth.confirmForgotPassword(
+      final message = await cubit.auth.confirmForgotPassword(
         email: _email.text.trim(),
         code: _code.text.trim(),
         newPassword: _password.text,
@@ -80,10 +80,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       );
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
-      context.go('/login');
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Пароль обновлён. Войдите с новым паролем.')),
-      );
+      final go = Uri(
+        path: '/login',
+        queryParameters: message == null || message.isEmpty ? null : {'message': message},
+      ).toString();
+      context.go(go);
+      if (message != null && message.isNotEmpty) {
+        messenger.showSnackBar(SnackBar(content: Text(message)));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -187,8 +191,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                               ),
                                               validator: (v) {
                                                 final value = (v ?? '').trim();
-                                                if (value.isEmpty) return 'Введите email';
-                                                if (!value.contains('@')) return 'Некорректный email';
+                                                if (value.isEmpty || !value.contains('@')) return '';
                                                 return null;
                                               },
                                             ),
@@ -253,7 +256,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                               autofillHints: const [AutofillHints.oneTimeCode],
                                               decoration: const InputDecoration(labelText: 'Код из письма'),
                                               validator: (v) =>
-                                                  (v == null || v.trim().length < 4) ? 'Введите код' : null,
+                                                  (v == null || v.trim().isEmpty) ? '' : null,
                                             ),
                                             const SizedBox(height: 14),
                                             TextFormField(
@@ -276,9 +279,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                                 ),
                                               ),
                                               validator: (v) {
-                                                if (v == null || v.length < 8) {
-                                                  return 'Минимум 8 символов';
-                                                }
+                                                if (v == null || v.length < 8) return '';
                                                 return null;
                                               },
                                             ),
@@ -292,7 +293,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                                 labelText: 'Подтверждение пароля',
                                               ),
                                               validator: (v) {
-                                                if (v != _password.text) return 'Пароли не совпадают';
+                                                if (v != _password.text) return '';
                                                 return null;
                                               },
                                             ),

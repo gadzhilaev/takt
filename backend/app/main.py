@@ -4,17 +4,16 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-
-from app.core.limiter import limiter
 
 from app.api.v1.router import api_router
 from app.api.v1.ws import router as ws_router
 from app.core.config import get_settings
+from app.core.limiter import limiter
 from app.db.session import AsyncSessionLocal
 from app.services.bootstrap import bootstrap_db
 
@@ -66,7 +65,48 @@ settings = get_settings()
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+async def _rate_limit_ru_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": {
+                "error": {
+                    "code": "rate_limit",
+                    "message": "Слишком много попыток. Попробуйте через минуту",
+                }
+            }
+        },
+    )
+
+
+async def _validation_ru_handler(request: Request, exc: RequestValidationError):
+    first = exc.errors()[0] if exc.errors() else {}
+    loc = ".".join(str(x) for x in first.get("loc", ()) if x != "body")
+    typ = str(first.get("type") or "")
+    raw = str(first.get("msg") or "").strip()
+    # Pydantic ValueError из model_validator: "Value error, Пароли не совпадают"
+    if raw.startswith("Value error, "):
+        raw = raw[len("Value error, ") :].strip()
+    if raw and typ == "value_error":
+        message = raw
+    elif typ.endswith("missing") or typ == "missing":
+        message = "Заполните обязательные поля"
+    elif "email" in loc.lower() or "email" in typ:
+        message = "Введите корректный email"
+    elif "password" in loc.lower():
+        message = "Проверьте пароль"
+    else:
+        message = raw if raw else "Некорректные данные запроса"
+    return JSONResponse(
+        status_code=422,
+        content={"detail": {"error": {"code": "validation_error", "message": message}}},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_ru_handler)
+app.add_exception_handler(RequestValidationError, _validation_ru_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(

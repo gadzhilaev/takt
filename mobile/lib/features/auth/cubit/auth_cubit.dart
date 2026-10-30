@@ -53,7 +53,7 @@ class AuthCubit extends Cubit<AuthState> {
   final FcmBootstrap? fcm;
 
   Future<void> bootstrap() async {
-    emit(const AuthLoading());
+    // Остаёмся на AuthUnknown → splash, без AuthLoading и повторных спиннеров.
     try {
       final user = await auth.restoreSession();
       if (user == null) {
@@ -70,7 +70,7 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> login(String email, String password) async {
-    emit(const AuthLoading());
+    // Без AuthLoading → без повторного splash / полноэкранных лоадеров.
     try {
       final user = await auth.login(email: email, password: password);
       emit(AuthAuthenticated(user));
@@ -86,7 +86,6 @@ class AuthCubit extends Cubit<AuthState> {
     required String password,
     required String passwordConfirm,
   }) async {
-    emit(const AuthLoading());
     try {
       await auth.sendRegisterCode(
         name: name,
@@ -105,7 +104,6 @@ class AuthCubit extends Cubit<AuthState> {
     required String email,
     required String code,
   }) async {
-    emit(const AuthLoading());
     try {
       final user = await auth.confirmRegister(email: email, code: code);
       emit(AuthAuthenticated(user));

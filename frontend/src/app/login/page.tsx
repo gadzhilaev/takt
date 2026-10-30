@@ -14,28 +14,11 @@ import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
 import { paths } from "@/lib/paths";
 
+// Клиентская валидация без текстов — сообщения ошибок только с API.
 const schema = z.object({
-  email: z.string().email("Введите корректный email"),
-  password: z.string().min(1, "Введите пароль"),
+  email: z.string().email(),
+  password: z.string().min(1),
 });
-
-const OAUTH_ERROR_RU: Record<string, string> = {
-  missing_params: "Не удалось завершить вход: нет кода подтверждения. Попробуйте ещё раз.",
-  invalid_state: "Сессия входа устарела. Начните вход заново.",
-  state_expired: "Сессия входа истекла. Начните вход заново.",
-  state_reuse: "Этот вход уже был использован. Начните заново.",
-  provider_disabled: "Этот способ входа сейчас недоступен.",
-  access_denied: "Вход отменён.",
-  email_owned: "Email уже занят. Войдите в существующий аккаунт и привяжите провайдера в профиле.",
-  method_disabled: "Этот способ входа отключён.",
-};
-
-function oauthErrorText(message: string | null, code: string | null): string {
-  const msg = (message || "").trim();
-  if (msg && !/^[a-z][a-z0-9_]+$/i.test(msg)) return msg;
-  const key = (code || msg || "").trim();
-  return OAUTH_ERROR_RU[key] || (msg && !/^[a-z][a-z0-9_]+$/i.test(msg) ? msg : "Не удалось выполнить вход. Попробуйте ещё раз.");
-}
 
 function safeNext(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return paths.projects;
@@ -43,20 +26,23 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
+function serverFacingText(raw: string | null): string {
+  const msg = (raw || "").trim();
+  if (!msg) return "";
+  // Код ошибки без текста — не показываем сырой snake_case.
+  if (/^[a-z][a-z0-9_]+$/i.test(msg)) return "";
+  return msg;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [show, setShow] = useState(false);
   const rawMessage = searchParams.get("message");
-  const oauthErr = oauthErrorText(rawMessage, searchParams.get("oauth_error"));
-  const infoMessage =
-    rawMessage && !searchParams.get("oauth_error") && !/^[a-z][a-z0-9_]+$/i.test(rawMessage.trim())
-      ? rawMessage.trim()
-      : "";
-  const [error, setError] = useState(
-    searchParams.get("oauth_error") || (rawMessage && !infoMessage) ? oauthErr : ""
-  );
-  const [info, setInfo] = useState(infoMessage);
+  const hasOauthError = Boolean(searchParams.get("oauth_error"));
+  const fromServer = serverFacingText(rawMessage);
+  const [error, setError] = useState(hasOauthError ? fromServer : "");
+  const [info, setInfo] = useState(!hasOauthError ? fromServer : "");
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
   const { data: oauthMeta } = useOAuthProviders();
   const emailPassword = oauthMeta?.email_password !== false;
@@ -70,11 +56,13 @@ function LoginForm() {
   }, [router, searchParams]);
 
   useEffect(() => {
-    if (infoMessage) setInfo(infoMessage);
-  }, [infoMessage]);
+    if (!hasOauthError && fromServer) setInfo(fromServer);
+    if (hasOauthError && fromServer) setError(fromServer);
+  }, [fromServer, hasOauthError]);
 
   async function onSubmit(values: z.infer<typeof schema>) {
     setError("");
+    setInfo("");
     try {
       const res = await api<{ user: { must_change_password: boolean } }>("/api/v1/auth/login", {
         method: "POST",
@@ -83,7 +71,7 @@ function LoginForm() {
       if (res.user.must_change_password) router.push(paths.changePassword);
       else router.push(safeNext(searchParams.get("next")));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка входа");
+      setError(e instanceof Error ? e.message : "");
     }
   }
 

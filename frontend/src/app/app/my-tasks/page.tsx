@@ -44,7 +44,12 @@ export default function MyTasksPage() {
 
   if (me.isLoading || projects.isLoading) return <Skeleton className="h-48 w-full" />;
   if (me.isError || projects.isError) {
-    return <ErrorState message="Не удалось загрузить задачи" onRetry={() => projects.refetch()} />;
+    return (
+      <ErrorState
+        message={(me.error as Error)?.message || (projects.error as Error)?.message || ""}
+        onRetry={() => projects.refetch()}
+      />
+    );
   }
   if (!projectId) return null;
 

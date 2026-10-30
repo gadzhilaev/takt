@@ -48,7 +48,7 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" |
       );
       window.location.href = res.authorize_url;
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Не удалось начать вход");
+      setErr(e instanceof Error ? e.message : "");
       setBusy(null);
     }
   }

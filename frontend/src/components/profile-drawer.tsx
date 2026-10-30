@@ -128,7 +128,8 @@ export function ProfileDrawer({
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setErr(body?.error?.message || "Не удалось загрузить аватар");
+      const detail = body?.detail?.error?.message || body?.error?.message;
+      setErr(typeof detail === "string" ? detail : "");
       return;
     }
     qc.invalidateQueries({ queryKey: ["me"] });
@@ -274,7 +275,7 @@ export function ProfileDrawer({
                       }
                       setPushState(await getPushStatus());
                     } catch (e) {
-                      setPushMsg((e as Error).message || "Не удалось изменить уведомления");
+                      setPushMsg((e as Error).message || "");
                     } finally {
                       setPushBusy(false);
                     }

@@ -107,11 +107,11 @@ class _MyTasksPageState extends State<MyTasksPage> {
         final boardBg = dark ? KanbanColors.boardBgDark : KanbanColors.boardBgLight;
         final project = state.project;
 
-        if (project == null || (!_bootstrapped && state.loading)) {
+        if (project == null) {
           return Scaffold(
             backgroundColor: boardBg,
             appBar: const TaktAppBar(title: 'Мои задачи'),
-            body: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            body: const SizedBox.shrink(),
           );
         }
 
@@ -151,7 +151,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
                 ),
               Expanded(
                 child: _pageController == null
-                    ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox.shrink()
                     : PageView.builder(
                         controller: _pageController,
                         itemCount: state.columns.length,

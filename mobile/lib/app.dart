@@ -140,10 +140,12 @@ class _TaktAppState extends State<TaktApp> {
           child: BlocListener<AuthCubit, AuthState>(
             listener: (context, state) {
               if (state is AuthAuthenticated) {
-                context.read<BoardCubit>().setCurrentUserId(state.user.id);
                 final board = context.read<BoardCubit>();
-                if (board.state.project != null) {
-                  board.setCurrentUserId(state.user.id);
+                board.setCurrentUserId(state.user.id);
+                // Прогрев кэша проектов ещё на splash — без спиннера после входа.
+                if (board.state.projects.isEmpty) {
+                  unawaited(board.bootstrap());
+                } else if (board.state.project != null) {
                   unawaited(_republish(board));
                 }
                 _consumeDeepLink();

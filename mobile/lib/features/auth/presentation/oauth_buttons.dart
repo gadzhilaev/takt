@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/api_client.dart';
 import '../data/oauth_repository.dart';
 
 /// Shows enabled OAuth providers from backend policy (env + admin toggles).
@@ -42,9 +43,9 @@ class _OAuthButtonsState extends State<OAuthButtons> {
       final data = await _repo.providers();
       if (!mounted) return;
       setState(() => _providers = data['providers'] as Map<String, dynamic>?);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Не удалось загрузить способы входа');
+      setState(() => _error = context.read<ApiClient>().messageFromError(e));
     }
   }
 
@@ -55,9 +56,9 @@ class _OAuthButtonsState extends State<OAuthButtons> {
     });
     try {
       await _repo.startWebOAuth(id, link: widget.link);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Не удалось открыть $label');
+      setState(() => _error = context.read<ApiClient>().messageFromError(e));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -67,10 +68,8 @@ class _OAuthButtonsState extends State<OAuthButtons> {
   Widget build(BuildContext context) {
     final map = _providers;
     if (map == null && _error == null) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))),
-      );
+      // Без спиннера — кнопки появятся после ответа API.
+      return const SizedBox.shrink();
     }
     final enabled = <MapEntry<String, dynamic>>[];
     if (map != null) {

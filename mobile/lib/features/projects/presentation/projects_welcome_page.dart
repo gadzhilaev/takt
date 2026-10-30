@@ -96,8 +96,7 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
 
     return BlocBuilder<BoardCubit, BoardState>(
       builder: (context, state) {
-        final showBlockingLoader = state.loading && state.projects.isEmpty;
-
+        // После splash — без полноэкранных лоадеров: пустой хаб или список сразу.
         return Scaffold(
           backgroundColor: bg,
           appBar: TaktAppBar(
@@ -131,46 +130,44 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
               const SizedBox(width: 4),
             ],
           ),
-          body: showBlockingLoader
-              ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-              : state.projects.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Создайте первый проект',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Доска откроется сразу: четыре стандартных столбца.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: muted, height: 1.4),
-                            ),
-                            const SizedBox(height: 24),
-                            FilledButton(
-                              onPressed: _createProject,
-                              child: const Text('Новый проект'),
-                            ),
-                          ],
+          body: state.projects.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Создайте первый проект',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
-                      ),
-                    )
-                  : ProjectHub(
-                      projects: state.projects,
-                      currentUserId: context.read<BoardCubit>().currentUserId,
-                      onOpenProject: _openProject,
-                      onCreateProject: _createProject,
-                      onProjectsChanged: () =>
-                          context.read<BoardCubit>().refreshProjects(),
-                      onRefresh: _onUserRefresh,
+                        const SizedBox(height: 8),
+                        Text(
+                          'Доска откроется сразу: четыре стандартных столбца.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: muted, height: 1.4),
+                        ),
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: state.loading ? null : _createProject,
+                          child: const Text('Новый проект'),
+                        ),
+                      ],
                     ),
+                  ),
+                )
+              : ProjectHub(
+                  projects: state.projects,
+                  currentUserId: context.read<BoardCubit>().currentUserId,
+                  onOpenProject: _openProject,
+                  onCreateProject: _createProject,
+                  onProjectsChanged: () =>
+                      context.read<BoardCubit>().refreshProjects(),
+                  onRefresh: _onUserRefresh,
+                ),
           // Без «Мои задачи», пока проект не выбран — только Главная / Профиль.
           bottomNavigationBar: TaktBottomNav(
             items: [

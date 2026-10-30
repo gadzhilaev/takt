@@ -43,9 +43,9 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
         return onSplash ? null : '/splash';
       }
 
+      // AuthLoading больше не гоняет на splash — остаёмся на текущем экране.
       if (auth is AuthLoading) {
-        if (onSplash || loggingIn) return null;
-        return '/splash';
+        return null;
       }
 
       if (auth is AuthGuest) {

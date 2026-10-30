@@ -3,82 +3,64 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandLogo } from "@/components/brand-mark";
 import { paths } from "@/lib/paths";
 
-const emailSchema = z.object({
-  email: z.string().email("Введите корректный email"),
-});
-
-const resetSchema = z
-  .object({
-    code: z.string().min(4, "Введите код из письма"),
-    new_password: z.string().min(8, "Минимум 8 символов"),
-    new_password_confirm: z.string().min(8, "Минимум 8 символов"),
-  })
-  .refine((v) => v.new_password === v.new_password_confirm, {
-    message: "Пароли не совпадают",
-    path: ["new_password_confirm"],
-  });
-
-type EmailValues = z.infer<typeof emailSchema>;
-type ResetValues = z.infer<typeof resetSchema>;
+type SendCodeResponse = { ok?: boolean; message?: string; email?: string };
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [step, setStep] = useState<"email" | "reset">("email");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [sending, setSending] = useState(false);
 
-  const emailForm = useForm({
-    resolver: zodResolver(emailSchema),
-    defaultValues: { email: "" },
-  });
-  const resetForm = useForm({
-    resolver: zodResolver(resetSchema),
-    defaultValues: { code: "", new_password: "", new_password_confirm: "" },
-  });
-
-  async function onSend(values: EmailValues) {
+  async function onSend(e: React.FormEvent) {
+    e.preventDefault();
     setError("");
+    setInfo("");
     setSending(true);
     try {
-      await api("/api/v1/auth/forgot-password/send-code", {
+      const res = await api<SendCodeResponse>("/api/v1/auth/forgot-password/send-code", {
         method: "POST",
-        json: { email: values.email.trim() },
+        json: { email: email.trim() },
       });
-      setEmail(values.email.trim());
+      setEmail((res.email || email).trim());
+      setInfo(res.message || "");
       setStep("reset");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось отправить код");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "");
     } finally {
       setSending(false);
     }
   }
 
-  async function onConfirm(values: ResetValues) {
+  async function onConfirm(e: React.FormEvent) {
+    e.preventDefault();
     setError("");
+    setInfo("");
     setSending(true);
     try {
-      await api("/api/v1/auth/forgot-password/confirm", {
+      const res = await api<{ ok?: boolean; message?: string }>("/api/v1/auth/forgot-password/confirm", {
         method: "POST",
         json: {
           email,
-          code: values.code.trim(),
-          new_password: values.new_password,
-          new_password_confirm: values.new_password_confirm,
+          code: code.trim(),
+          new_password: password,
+          new_password_confirm: passwordConfirm,
         },
       });
-      router.push(`${paths.login}?message=${encodeURIComponent("Пароль обновлён. Войдите с новым паролем.")}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось сбросить пароль");
+      const msg = res.message || "";
+      router.push(msg ? `${paths.login}?message=${encodeURIComponent(msg)}` : paths.login);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "");
     } finally {
       setSending(false);
     }
@@ -87,14 +69,16 @@ export default function ForgotPasswordPage() {
   async function resend() {
     if (!email) return;
     setError("");
+    setInfo("");
     setSending(true);
     try {
-      await api("/api/v1/auth/forgot-password/send-code", {
+      const res = await api<SendCodeResponse>("/api/v1/auth/forgot-password/send-code", {
         method: "POST",
         json: { email },
       });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось отправить код");
+      setInfo(res.message || "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "");
     } finally {
       setSending(false);
     }
@@ -125,27 +109,36 @@ export default function ForgotPasswordPage() {
           </div>
 
           {step === "email" ? (
-            <form className="space-y-3.5" onSubmit={emailForm.handleSubmit(onSend)}>
+            <form className="space-y-3.5" onSubmit={onSend}>
               <div>
                 <label className="label-text" htmlFor="forgot-email">
                   Email
                 </label>
-                <Input id="forgot-email" type="email" autoComplete="email" {...emailForm.register("email")} />
-                {emailForm.formState.errors.email && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">{emailForm.formState.errors.email.message}</p>
-                )}
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(ev) => setEmail(ev.target.value)}
+                  required
+                />
               </div>
-              {error && (
+              {error ? (
                 <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
                   {error}
                 </p>
-              )}
+              ) : null}
               <Button type="submit" className="w-full" size="lg" disabled={sending}>
-                {sending ? "Отправляем…" : "Отправить код"}
+                {sending ? "…" : "Отправить код"}
               </Button>
             </form>
           ) : (
-            <form className="space-y-3.5" onSubmit={resetForm.handleSubmit(onConfirm)}>
+            <form className="space-y-3.5" onSubmit={onConfirm}>
+              {info ? (
+                <p className="rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] px-3 py-2 text-sm text-[var(--accent)]">
+                  {info}
+                </p>
+              ) : null}
               <div>
                 <label className="label-text" htmlFor="forgot-code">
                   Код из письма
@@ -154,11 +147,10 @@ export default function ForgotPasswordPage() {
                   id="forgot-code"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  {...resetForm.register("code")}
+                  value={code}
+                  onChange={(ev) => setCode(ev.target.value)}
+                  required
                 />
-                {resetForm.formState.errors.code && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">{resetForm.formState.errors.code.message}</p>
-                )}
               </div>
               <div>
                 <label className="label-text" htmlFor="forgot-pass">
@@ -168,13 +160,11 @@ export default function ForgotPasswordPage() {
                   id="forgot-pass"
                   type="password"
                   autoComplete="new-password"
-                  {...resetForm.register("new_password")}
+                  value={password}
+                  onChange={(ev) => setPassword(ev.target.value)}
+                  minLength={8}
+                  required
                 />
-                {resetForm.formState.errors.new_password && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">
-                    {resetForm.formState.errors.new_password.message}
-                  </p>
-                )}
               </div>
               <div>
                 <label className="label-text" htmlFor="forgot-pass2">
@@ -184,21 +174,19 @@ export default function ForgotPasswordPage() {
                   id="forgot-pass2"
                   type="password"
                   autoComplete="new-password"
-                  {...resetForm.register("new_password_confirm")}
+                  value={passwordConfirm}
+                  onChange={(ev) => setPasswordConfirm(ev.target.value)}
+                  minLength={8}
+                  required
                 />
-                {resetForm.formState.errors.new_password_confirm && (
-                  <p className="mt-1 text-xs text-[var(--danger)]">
-                    {resetForm.formState.errors.new_password_confirm.message}
-                  </p>
-                )}
               </div>
-              {error && (
+              {error ? (
                 <p className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
                   {error}
                 </p>
-              )}
+              ) : null}
               <Button type="submit" className="w-full" size="lg" disabled={sending}>
-                {sending ? "Сохраняем…" : "Сбросить пароль"}
+                {sending ? "…" : "Сбросить пароль"}
               </Button>
               <button
                 type="button"

@@ -12,15 +12,16 @@ import { Input } from "@/components/ui/input";
 import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
 
+// Без клиентских текстов ошибок — тексты приходят с API (validation + auth).
 const schema = z
   .object({
-    name: z.string().min(1, "Укажите имя"),
-    email: z.string().email("Введите корректный email"),
-    password: z.string().min(8, "Минимум 8 символов"),
-    password_confirm: z.string().min(8, "Минимум 8 символов"),
+    name: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(8),
+    password_confirm: z.string().min(8),
   })
   .refine((v) => v.password === v.password_confirm, {
-    message: "Пароли не совпадают",
+    message: " ",
     path: ["password_confirm"],
   });
 
@@ -48,7 +49,7 @@ export default function RegisterPage() {
       setPending(values);
       setStep("code");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка отправки кода");
+      setError(e instanceof Error ? e.message : "");
     } finally {
       setSending(false);
     }
@@ -66,7 +67,7 @@ export default function RegisterPage() {
       });
       router.push("/app/projects"); // workspace after verified registration
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Неверный код");
+      setError(err instanceof Error ? err.message : "");
     } finally {
       setSending(false);
     }
@@ -79,7 +80,7 @@ export default function RegisterPage() {
     try {
       await api("/api/v1/auth/register/send-code", { method: "POST", json: pending });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось отправить код");
+      setError(e instanceof Error ? e.message : "");
     } finally {
       setSending(false);
     }

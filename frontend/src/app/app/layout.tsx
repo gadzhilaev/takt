@@ -31,7 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [me.isError, me.data, router]);
 
   useEffect(() => {
-    if (projects.isError) setBootError((projects.error as Error)?.message || "Не удалось загрузить проекты");
+    if (projects.isError) setBootError((projects.error as Error)?.message || null);
     else setBootError(null);
   }, [projects.isError, projects.error]);
 

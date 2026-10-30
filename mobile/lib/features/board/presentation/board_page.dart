@@ -123,11 +123,12 @@ class _BoardPageState extends State<BoardPage> {
         final boardBg = dark ? KanbanColors.boardBgDark : KanbanColors.boardBgLight;
         final project = state.project;
 
-        if (project == null || (!_bootstrapped && state.loading)) {
+        if (project == null) {
+          // Редирект на хаб в listener / bootstrap — без спиннера после splash.
           return Scaffold(
             backgroundColor: boardBg,
             appBar: const TaktAppBar(title: 'Доска'),
-            body: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            body: const SizedBox.shrink(),
           );
         }
 

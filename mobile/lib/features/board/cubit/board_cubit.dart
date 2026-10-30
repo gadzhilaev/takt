@@ -149,11 +149,12 @@ class BoardCubit extends Cubit<BoardState> {
     }
 
     final hasLocal = list.isNotEmpty;
-    if (forceLoading || !hasLocal) {
-      emit(state.copyWith(loading: true, clearError: true));
-    } else {
-      emit(state.copyWith(refreshing: true, clearError: true));
-    }
+    // После splash не бланкуем UI: loading только если совсем пусто и нужен флаг для кнопки.
+    emit(state.copyWith(
+      loading: !hasLocal,
+      refreshing: hasLocal,
+      clearError: true,
+    ));
 
     try {
       final projects = await this.projects.listProjects();

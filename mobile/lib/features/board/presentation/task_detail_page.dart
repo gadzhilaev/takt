@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/widgets/app_icon.dart';
+import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../../../shared/widgets/urgency_badge.dart';
@@ -55,10 +56,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         _task = remote;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Не удалось загрузить задачу';
+        _error = context.read<ApiClient>().messageFromError(e);
         _loading = false;
       });
     }
@@ -186,8 +187,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       body: SafeArea(
         top: false,
         minimum: const EdgeInsets.only(bottom: 8),
-        child: _loading
-          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+        child: _loading && task == null
+          ? const SizedBox.shrink()
           : _error != null
               ? TaktEmptyState(
                   title: _error!,

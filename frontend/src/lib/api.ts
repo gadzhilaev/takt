@@ -31,7 +31,6 @@ export function messageFromApiError(err: unknown): string | undefined {
 
   const top = body.error;
   if (typeof top === "string" && top.trim()) {
-    if (/rate limit/i.test(top)) return "Слишком много попыток. Попробуйте через минуту";
     return top;
   }
   if (top && typeof top === "object" && !Array.isArray(top)) {
@@ -58,7 +57,8 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(messageFromApiError(err) ?? "Ошибка запроса");
+    const fromServer = messageFromApiError(err);
+    throw new Error(fromServer || `Ошибка ${res.status}`);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

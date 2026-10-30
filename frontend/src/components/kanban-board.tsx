@@ -454,7 +454,7 @@ export function KanbanBoard({
         message={
           (statusesQuery.error as Error)?.message ||
           (tasksQuery.error as Error)?.message ||
-          "Ошибка загрузки доски"
+          ""
         }
         onRetry={() => {
           statusesQuery.refetch();

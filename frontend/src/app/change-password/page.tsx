@@ -18,7 +18,7 @@ export default function ChangePasswordPage() {
       await api("/api/v1/auth/force-change-password", { method: "POST", json: { new_password: pwd } });
       router.push("/login");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Ошибка");
+      setErr(e instanceof Error ? e.message : "");
     }
   }
 

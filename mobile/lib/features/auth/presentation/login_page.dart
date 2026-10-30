@@ -21,6 +21,21 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   String? _localError;
   bool _obscure = true;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final msg = GoRouterState.of(context).uri.queryParameters['message']?.trim();
+      if (msg != null && msg.isNotEmpty) {
+        setState(() => _localError = null);
+        // Информационное сообщение с сервера после сброса пароля.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -29,11 +44,16 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     setState(() => _localError = null);
     if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
-    context.read<AuthCubit>().login(_email.text.trim(), _password.text);
+    setState(() => _busy = true);
+    try {
+      await context.read<AuthCubit>().login(_email.text.trim(), _password.text);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -64,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
                 if (state is AuthFailure) setState(() => _localError = state.message);
               },
               builder: (context, state) {
-                final loading = state is AuthLoading;
+                final loading = _busy;
                 return LayoutBuilder(
                   builder: (context, constraints) {
                     return SingleChildScrollView(
@@ -136,8 +156,7 @@ class _LoginPageState extends State<LoginPage> {
                                             ),
                                             validator: (v) {
                                               final value = (v ?? '').trim();
-                                              if (value.isEmpty) return 'Введите email';
-                                              if (!value.contains('@')) return 'Некорректный email';
+                                              if (value.isEmpty || !value.contains('@')) return '';
                                               return null;
                                             },
                                           ),
@@ -164,7 +183,7 @@ class _LoginPageState extends State<LoginPage> {
                                               ),
                                             ),
                                             validator: (v) =>
-                                                (v == null || v.isEmpty) ? 'Введите пароль' : null,
+                                                (v == null || v.isEmpty) ? '' : null,
                                           ),
                                           Align(
                                             alignment: Alignment.centerRight,
