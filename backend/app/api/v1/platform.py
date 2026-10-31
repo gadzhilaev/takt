@@ -57,6 +57,8 @@ async def users(
     registered_to: datetime | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    sort: str | None = Query(None, pattern="^(name|email|role|created_at|last_login_at)$"),
+    sort_dir: str | None = Query(None, pattern="^(asc|desc)$"),
 ):
     return await pas.list_users(
         db,
@@ -66,6 +68,8 @@ async def users(
         registered_to=registered_to,
         page=page,
         page_size=page_size,
+        sort=sort,
+        sort_dir=sort_dir,
     )
 
 
@@ -141,8 +145,14 @@ async def projects(
     q: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    sort: str | None = Query(
+        None, pattern="^(name|created_at|member_count|task_count|restricted)$"
+    ),
+    sort_dir: str | None = Query(None, pattern="^(asc|desc)$"),
 ):
-    return await pas.list_projects(db, q=q, page=page, page_size=page_size)
+    return await pas.list_projects(
+        db, q=q, page=page, page_size=page_size, sort=sort, sort_dir=sort_dir
+    )
 
 
 class RestrictBody(BaseModel):
@@ -158,6 +168,20 @@ async def restrict_project(
 ):
     try:
         result = await pas.restrict_project(db, admin, project_id, body.reason)
+    except pas.PlatformError as e:
+        raise _err(e)
+    await db.commit()
+    return result
+
+
+@router.post("/projects/{project_id}/unrestrict")
+async def unrestrict_project(
+    project_id: uuid.UUID,
+    admin: Annotated[User, Depends(require_platform_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        result = await pas.unrestrict_project(db, admin, project_id)
     except pas.PlatformError as e:
         raise _err(e)
     await db.commit()

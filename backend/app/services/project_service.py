@@ -4,10 +4,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.platform import ProjectRestriction
 from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.task import Task
 from app.models.team import TaskStatus
-from app.models.user import User
+from app.models.user import PLATFORM_ROLE_RANK, PlatformRole, User
 from app.services.bootstrap import DEFAULT_STATUSES
 
 DEFAULT_STATUS_TEMPLATE = [
@@ -68,6 +69,16 @@ async def ensure_project_access(
     *,
     min_role: ProjectMemberRole = ProjectMemberRole.viewer,
 ) -> ProjectMemberRole:
+    restricted = await db.scalar(
+        select(ProjectRestriction.id).where(
+            ProjectRestriction.project_id == project_id,
+            ProjectRestriction.active.is_(True),
+        )
+    )
+    if restricted:
+        pr = user.platform_role or PlatformRole.none
+        if PLATFORM_ROLE_RANK.get(pr, 0) < PLATFORM_ROLE_RANK[PlatformRole.admin]:
+            raise PermissionError("project_restricted")
     role = await user_project_role(db, user, project_id)
     if role is None:
         raise PermissionError("no_access")

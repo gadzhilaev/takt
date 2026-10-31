@@ -25,9 +25,25 @@ export function platformRoleLabel(role: string | null | undefined): string {
       return "Администратор";
     case "super_admin":
       return "Суперадмин";
+    case "none":
+    case null:
+    case undefined:
+    case "":
+      return "Пользователь";
     default:
-      return "Платформа";
+      return "Пользователь";
   }
+}
+
+export function loginMethodsLabel(methods: string[] | null | undefined): string {
+  if (!methods?.length) return "—";
+  const map: Record<string, string> = {
+    email: "Email",
+    vk: "VK ID",
+    yandex: "Яндекс",
+    apple: "Apple",
+  };
+  return methods.map((m) => map[m] ?? m).join(", ");
 }
 
 export type Status = {

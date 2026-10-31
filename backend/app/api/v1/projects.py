@@ -102,8 +102,21 @@ async def get_project(
 ):
     try:
         await project_service.ensure_project_access(db, user, project_id)
-    except PermissionError:
-        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет доступа к проекту"}})
+    except PermissionError as e:
+        if str(e) == "project_restricted":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": {
+                        "code": "project_restricted",
+                        "message": "Проект ограничен администратором платформы",
+                    }
+                },
+            )
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "forbidden", "message": "Нет доступа к проекту"}},
+        )
     project = await project_service.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Проект не найден"}})

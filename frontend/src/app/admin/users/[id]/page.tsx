@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { loginMethodsLabel, platformRoleLabel } from "@/lib/types";
 
 type UserCard = {
   user: {
@@ -18,6 +19,7 @@ type UserCard = {
     has_password: boolean;
     is_active: boolean;
     blocked_until: string | null;
+    login_methods?: string[];
   };
   identities: { provider: string; email?: string | null }[];
   projects: { id: string; name: string; role: string; is_demo?: boolean }[];
@@ -60,8 +62,12 @@ export default function AdminUserDetailPage() {
           <dd className="font-mono text-[12px]">{u.id}</dd>
         </div>
         <div>
-          <dt className="text-muted">Platform role</dt>
-          <dd>{u.platform_role}</dd>
+          <dt className="text-muted">Роль</dt>
+          <dd>{platformRoleLabel(u.platform_role)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted">Вход</dt>
+          <dd>{loginMethodsLabel(u.login_methods)}</dd>
         </div>
         <div>
           <dt className="text-muted">Регистрация</dt>

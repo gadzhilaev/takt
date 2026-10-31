@@ -120,6 +120,15 @@ async def dashboard_stats(db: AsyncSession) -> dict:
     }
 
 
+_USER_SORT = {
+    "name": User.name,
+    "email": User.email,
+    "role": User.platform_role,
+    "created_at": User.created_at,
+    "last_login_at": User.last_login_at,
+}
+
+
 async def list_users(
     db: AsyncSession,
     *,
@@ -129,6 +138,8 @@ async def list_users(
     registered_to: datetime | None,
     page: int,
     page_size: int,
+    sort: str | None = None,
+    sort_dir: str | None = None,
 ) -> dict:
     page = max(1, page)
     page_size = min(100, max(1, page_size))
@@ -153,20 +164,42 @@ async def list_users(
         stmt = stmt.where(User.created_at <= registered_to)
 
     total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    col = _USER_SORT.get(sort or "created_at", User.created_at)
+    ascending = (sort_dir or "desc").lower() == "asc"
+    order = col.asc().nulls_last() if ascending else col.desc().nulls_last()
     rows = (
-        await db.execute(
-            stmt.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
-        )
+        await db.execute(stmt.order_by(order).offset((page - 1) * page_size).limit(page_size))
     ).scalars().all()
+
+    providers_by_user: dict[uuid.UUID, list[str]] = {u.id: [] for u in rows}
+    if rows:
+        idents = (
+            await db.execute(
+                select(UserIdentity).where(UserIdentity.user_id.in_([u.id for u in rows]))
+            )
+        ).scalars().all()
+        for ident in idents:
+            providers_by_user.setdefault(ident.user_id, []).append(ident.provider.value)
+
     return {
-        "items": [_user_row(u) for u in rows],
+        "items": [
+            _user_row(u, oauth_providers=providers_by_user.get(u.id, [])) for u in rows
+        ],
         "page": page,
         "page_size": page_size,
         "total": total,
+        "sort": sort or "created_at",
+        "sort_dir": "asc" if ascending else "desc",
     }
 
 
-def _user_row(u: User) -> dict:
+def _user_row(u: User, *, oauth_providers: list[str] | None = None) -> dict:
+    methods: list[str] = []
+    if u.password_hash:
+        methods.append("email")
+    for p in oauth_providers or []:
+        if p not in methods:
+            methods.append(p)
     return {
         "id": str(u.id),
         "email": u.email,
@@ -180,6 +213,7 @@ def _user_row(u: User) -> dict:
         "blocked_until": u.blocked_until.isoformat() if u.blocked_until else None,
         "block_reason": u.block_reason,
         "has_password": bool(u.password_hash),
+        "login_methods": methods,
     }
 
 
@@ -206,7 +240,7 @@ async def user_detail(db: AsyncSession, user_id: uuid.UUID) -> dict:
         )
     ).scalars().all()
     return {
-        "user": _user_row(user),
+        "user": _user_row(user, oauth_providers=[i.provider.value for i in identities]),
         "identities": [
             {
                 "provider": i.provider.value,
@@ -314,12 +348,20 @@ async def set_platform_role(db: AsyncSession, admin: User, target_id: uuid.UUID,
     return target
 
 
+_PROJECT_SORT = {
+    "name": Project.name,
+    "created_at": Project.created_at,
+}
+
+
 async def list_projects(
     db: AsyncSession,
     *,
     q: str | None,
     page: int,
     page_size: int,
+    sort: str | None = None,
+    sort_dir: str | None = None,
 ) -> dict:
     page = max(1, page)
     page_size = min(100, max(1, page_size))
@@ -328,10 +370,43 @@ async def list_projects(
         like = f"%{q.strip()}%"
         stmt = stmt.where(Project.name.ilike(like))
     total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+    member_count_sq = (
+        select(func.count())
+        .select_from(ProjectMember)
+        .where(ProjectMember.project_id == Project.id)
+        .correlate(Project)
+        .scalar_subquery()
+    )
+    task_count_sq = (
+        select(func.count())
+        .select_from(Task)
+        .where(Task.project_id == Project.id, Task.deleted_at.is_(None))
+        .correlate(Project)
+        .scalar_subquery()
+    )
+    restricted_sq = (
+        select(func.count())
+        .select_from(ProjectRestriction)
+        .where(ProjectRestriction.project_id == Project.id, ProjectRestriction.active.is_(True))
+        .correlate(Project)
+        .scalar_subquery()
+    )
+
+    sort_key = sort or "created_at"
+    ascending = (sort_dir or "desc").lower() == "asc"
+    if sort_key == "member_count":
+        col = member_count_sq
+    elif sort_key == "task_count":
+        col = task_count_sq
+    elif sort_key == "restricted":
+        col = restricted_sq
+    else:
+        col = _PROJECT_SORT.get(sort_key, Project.created_at)
+    order = col.asc().nulls_last() if ascending else col.desc().nulls_last()
+
     projects = (
-        await db.execute(
-            stmt.order_by(Project.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
-        )
+        await db.execute(stmt.order_by(order).offset((page - 1) * page_size).limit(page_size))
     ).scalars().all()
     items = []
     for p in projects:
@@ -367,12 +442,23 @@ async def list_projects(
                 "task_count": task_count,
                 "restricted": bool(restriction),
                 "restriction_reason": restriction.reason if restriction else None,
-                "owner": {"id": str(owner.id), "name": owner.name, "email": owner.email} if owner else None,
+                "owner": (
+                    {"id": str(owner.id), "name": owner.name, "email": owner.email}
+                    if owner
+                    else None
+                ),
                 # Explicitly no task titles/bodies
                 "content_access": "metadata_only",
             }
         )
-    return {"items": items, "page": page, "page_size": page_size, "total": total}
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "sort": sort_key,
+        "sort_dir": "asc" if ascending else "desc",
+    }
 
 
 async def restrict_project(db: AsyncSession, admin: User, project_id: uuid.UUID, reason: str) -> dict:
@@ -399,6 +485,23 @@ async def restrict_project(db: AsyncSession, admin: User, project_id: uuid.UUID,
         )
     await admin_service.audit(db, admin.id, "project_restricted", None, f"project={project_id}")
     await db.flush()
+    return {"ok": True}
+
+
+async def unrestrict_project(db: AsyncSession, admin: User, project_id: uuid.UUID) -> dict:
+    project = await db.get(Project, project_id)
+    if not project:
+        raise PlatformError("not_found", "Проект не найден", 404)
+    existing = await db.scalar(
+        select(ProjectRestriction).where(ProjectRestriction.project_id == project_id)
+    )
+    if existing and existing.active:
+        existing.active = False
+        existing.lifted_at = datetime.now(UTC)
+        await admin_service.audit(
+            db, admin.id, "project_unrestricted", None, f"project={project_id}"
+        )
+        await db.flush()
     return {"ok": True}
 
 

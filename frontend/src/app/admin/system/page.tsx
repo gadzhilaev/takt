@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Health = {
@@ -32,20 +33,24 @@ function Row({
   hint,
   ok,
   detail,
+  okLabel = "Работает",
+  badLabel = "Не настроено",
 }: {
   title: string;
   hint: string;
   ok: boolean;
   detail?: string | null;
+  okLabel?: string;
+  badLabel?: string;
 }) {
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dce2e7] py-3 last:border-0">
+    <li className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] py-3 last:border-0">
       <div className="min-w-0">
-        <p className="text-[14px] font-medium text-[#202938]">{title}</p>
-        <p className="mt-0.5 text-[12px] text-[#5a6573]">{hint}</p>
-        {detail ? <p className="mt-1 text-[12px] text-[#202938]">{detail}</p> : null}
+        <p className="text-[14px] font-medium">{title}</p>
+        <p className="mt-0.5 text-[12px] text-muted">{hint}</p>
+        {detail ? <p className="mt-1 text-[12px]">{detail}</p> : null}
       </div>
-      <StatusPill ok={ok} label={ok ? "Работает" : "Не настроено"} />
+      <StatusPill ok={ok} label={ok ? okLabel : badLabel} />
     </li>
   );
 }
@@ -57,28 +62,59 @@ const OAUTH_LABELS: Record<string, string> = {
 };
 
 export default function AdminSystemPage() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ["platform-health"],
     queryFn: () => api<Health>("/api/v1/platform/system/health"),
   });
 
-  if (isLoading) return <p className="text-sm text-[#5a6573]">Загрузка…</p>;
+  if (isLoading) return <p className="text-sm text-muted">Загрузка…</p>;
   if (error) return <p className="text-sm text-[var(--danger)]">{(error as Error).message}</p>;
   if (!data) return null;
 
   const oauthEntries = Object.entries(data.oauth ?? {});
+  const coreOk = data.backend === "ok" && data.database === "ok";
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-[#202938]">Система</h1>
-        <p className="mt-1 text-[13px] text-[#5a6573]">
-          Проверка, что сервер, почта, пуши и входы через соцсети подключены. Секреты и ключи сюда не
-          попадают.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Система</h1>
+          <p className="mt-1 text-[13px] text-muted">
+            Состояние API, почты, пушей и OAuth. Секреты сюда не попадают.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {dataUpdatedAt ? (
+            <span className="text-[11px] text-muted">
+              {new Date(dataUpdatedAt).toLocaleTimeString("ru-RU")}
+            </span>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={isFetching}
+            onClick={() => refetch()}
+          >
+            Проверить снова
+          </Button>
+        </div>
       </div>
 
-      <section className="rounded-[var(--radius)] border border-[#dce2e7] bg-white px-4">
+      <div
+        className={cn(
+          "rounded-[var(--radius)] border px-4 py-3 text-[13px]",
+          coreOk
+            ? "border-[#cfe3d6] bg-[#f3faf6] text-[#2f6b4f]"
+            : "border-[#f0d6d6] bg-[#fdf6f6] text-[var(--danger)]"
+        )}
+      >
+        {coreOk
+          ? "Ядро в порядке: API и база данных отвечают."
+          : "Проблема с ядром: проверьте API или PostgreSQL."}
+      </div>
+
+      <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white px-4">
         <ul>
           <Row
             title="Сервер API"
@@ -92,7 +128,7 @@ export default function AdminSystemPage() {
           />
           <Row
             title="Почта (SMTP)"
-            hint="Отправка писем (коды, приглашения)"
+            hint="Коды регистрации, сброс пароля, приглашения"
             ok={Boolean(data.email?.configured)}
             detail={data.email?.from ? `Отправитель: ${data.email.from}` : null}
           />
@@ -109,27 +145,33 @@ export default function AdminSystemPage() {
         </ul>
       </section>
 
-      <section className="rounded-[var(--radius)] border border-[#dce2e7] bg-white p-4">
-        <h2 className="text-[14px] font-semibold text-[#202938]">Вход через соцсети</h2>
+      <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
+        <h2 className="text-[14px] font-semibold">Вход через соцсети</h2>
+        <p className="mt-1 text-[12px] text-muted">
+          «Включён» = credentials есть и метод не выключен в настройках платформы.
+        </p>
         <ul className="mt-2">
           {oauthEntries.map(([key, v]) => {
             const ready = Boolean(v.enabled && v.configured);
             return (
               <li
                 key={key}
-                className="flex items-center justify-between gap-3 border-b border-[#dce2e7] py-2.5 last:border-0"
+                className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-2.5 last:border-0"
               >
-                <span className="text-[13px] text-[#202938]">{OAUTH_LABELS[key] ?? key}</span>
-                <StatusPill ok={ready} label={ready ? "Включён" : "Выключен"} />
+                <span className="text-[13px]">{OAUTH_LABELS[key] ?? key}</span>
+                <StatusPill
+                  ok={ready}
+                  label={ready ? "Включён" : v.configured ? "Выключен" : "Нет credentials"}
+                />
               </li>
             );
           })}
         </ul>
       </section>
 
-      <section className="rounded-[var(--radius)] border border-[#dce2e7] bg-white p-4">
-        <h2 className="text-[14px] font-semibold text-[#202938]">Фоновые задачи</h2>
-        <p className="mt-2 text-[13px] text-[#5a6573]">
+      <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
+        <h2 className="text-[14px] font-semibold">Фоновые задачи</h2>
+        <p className="mt-2 text-[13px] text-muted">
           {data.background_jobs?.note ??
             "Отдельной очереди ошибок пока нет — показатель не придумываем."}
         </p>
