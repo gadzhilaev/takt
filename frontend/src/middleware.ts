@@ -49,11 +49,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Already signed in — skip auth forms.
+  // Already signed in — skip auth forms (respect ?next= for invite links).
   if ((pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") && authed) {
+    const next = request.nextUrl.searchParams.get("next");
     const url = request.nextUrl.clone();
-    url.pathname = "/app/projects";
-    url.search = "";
+    if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") && !next.startsWith("/register")) {
+      try {
+        const dest = new URL(next, request.nextUrl.origin);
+        url.pathname = dest.pathname;
+        url.search = dest.search;
+      } catch {
+        url.pathname = "/app/projects";
+        url.search = "";
+      }
+    } else {
+      url.pathname = "/app/projects";
+      url.search = "";
+    }
     return NextResponse.redirect(url);
   }
 

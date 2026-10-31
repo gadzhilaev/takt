@@ -17,6 +17,7 @@ export const paths = {
   adminSettings: "/app/admin/settings",
   platformAdmin: "/admin",
   task: (id: string) => `/app/tasks/${id}`,
+  invite: (token: string) => `/invite/${token}`,
 } as const;
 
 export function loginWithNext(nextPath?: string | null) {

@@ -22,16 +22,38 @@ async def create_invite(
     db: AsyncSession,
     *,
     project: Project,
-    email: str,
+    email: str | None,
     invited_by: User,
 ) -> ProjectInvite:
-    email_norm = email.strip().lower()
-    if not email_norm:
-        raise InviteError("invalid_email", "Укажите email")
-
     await project_service.ensure_project_access(
         db, invited_by, project.id, min_role=ProjectMemberRole.admin
     )
+
+    email_norm = email.strip().lower() if email and email.strip() else None
+
+    # Открытая ссылка: переиспользуем одно pending-приглашение без email.
+    if email_norm is None:
+        open_pending = await db.scalar(
+            select(ProjectInvite).where(
+                ProjectInvite.project_id == project.id,
+                ProjectInvite.email.is_(None),
+                ProjectInvite.status == ProjectInviteStatus.pending,
+            )
+        )
+        if open_pending:
+            return open_pending
+        invite = ProjectInvite(
+            project_id=project.id,
+            email=None,
+            invited_by_id=invited_by.id,
+            invitee_user_id=None,
+            token=secrets.token_urlsafe(32),
+            status=ProjectInviteStatus.pending,
+            created_at=datetime.now(UTC),
+        )
+        db.add(invite)
+        await db.flush()
+        return invite
 
     existing_user = (
         await db.execute(select(User).where(User.email == email_norm))
@@ -80,6 +102,13 @@ async def create_invite(
     return invite
 
 
+async def get_invite_by_token(db: AsyncSession, token: str) -> ProjectInvite | None:
+    token = (token or "").strip()
+    if not token:
+        return None
+    return await db.scalar(select(ProjectInvite).where(ProjectInvite.token == token))
+
+
 async def cancel_invite(db: AsyncSession, invite: ProjectInvite, user: User) -> None:
     await project_service.ensure_project_access(
         db, user, invite.project_id, min_role=ProjectMemberRole.admin
@@ -93,7 +122,7 @@ async def cancel_invite(db: AsyncSession, invite: ProjectInvite, user: User) -> 
 async def accept_invite(db: AsyncSession, invite: ProjectInvite, user: User) -> None:
     if invite.status != ProjectInviteStatus.pending:
         raise InviteError("not_pending", "Приглашение уже обработано")
-    if invite.email.lower() != user.email.lower():
+    if invite.email and invite.email.lower() != user.email.lower():
         raise InviteError("wrong_user", "Приглашение предназначено другому email")
     role = await project_service.user_project_role(db, user, invite.project_id)
     if role is None:
@@ -104,6 +133,11 @@ async def accept_invite(db: AsyncSession, invite: ProjectInvite, user: User) -> 
                 role=ProjectMemberRole.member,
             )
         )
+    # Открытая ссылка остаётся активной для следующих людей.
+    if invite.email is None:
+        invite.invitee_user_id = user.id
+        await db.flush()
+        return
     invite.status = ProjectInviteStatus.accepted
     invite.invitee_user_id = user.id
     invite.responded_at = datetime.now(UTC)
@@ -113,6 +147,11 @@ async def accept_invite(db: AsyncSession, invite: ProjectInvite, user: User) -> 
 async def decline_invite(db: AsyncSession, invite: ProjectInvite, user: User) -> None:
     if invite.status != ProjectInviteStatus.pending:
         raise InviteError("not_pending", "Приглашение уже обработано")
+    if invite.email is None:
+        raise InviteError(
+            "open_invite",
+            "Открытую ссылку нельзя отклонить — просто не открывайте её",
+        )
     if invite.email.lower() != user.email.lower():
         raise InviteError("wrong_user", "Приглашение предназначено другому email")
     invite.status = ProjectInviteStatus.declined

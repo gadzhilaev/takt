@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
+import { paths } from "@/lib/paths";
+
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return paths.projects;
+  if (raw.startsWith("/login") || raw.startsWith("/register")) return paths.projects;
+  return raw;
+}
 
 // Без клиентских текстов ошибок — тексты приходят с API (validation + auth).
 const schema = z
@@ -27,8 +34,9 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [step, setStep] = useState<"form" | "code">("form");
   const [pending, setPending] = useState<FormValues | null>(null);
@@ -65,7 +73,7 @@ export default function RegisterPage() {
         method: "POST",
         json: { email: pending.email, code: code.trim() },
       });
-      router.push("/app/projects"); // workspace after verified registration
+      router.push(safeNext(searchParams.get("next")));
     } catch (err) {
       setError(err instanceof Error ? err.message : "");
     } finally {
@@ -217,12 +225,27 @@ export default function RegisterPage() {
 
           <p className="mt-5 text-center text-sm text-muted">
             Уже есть аккаунт?{" "}
-            <Link href="/login" className="font-medium text-[var(--accent)]">
+            <Link
+              href={
+                searchParams.get("next")
+                  ? `${paths.login}?next=${encodeURIComponent(searchParams.get("next")!)}`
+                  : paths.login
+              }
+              className="font-medium text-[var(--accent)]"
+            >
               Войти
             </Link>
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }

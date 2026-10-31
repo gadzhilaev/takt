@@ -17,15 +17,17 @@ import { NotificationsMenu } from "@/components/notifications-menu";
 import { ProfileDrawer } from "@/components/profile-drawer";
 import { ThemeMenu } from "@/components/ui/theme-menu";
 import { clearLastProjectId, getLastProjectId, setLastProjectId } from "@/lib/last-project";
+import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
 type InviteItem = {
   id: string;
   project_id: string;
   project_name: string | null;
-  email: string;
+  email: string | null;
   status: string;
   invited_by_name: string | null;
+  token?: string | null;
 };
 
 type LeaveRequest = {
@@ -51,7 +53,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [projectDesc, setProjectDesc] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteNote, setInviteNote] = useState("");
-  const [inviteSearch, setInviteSearch] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [copiedHint, setCopiedHint] = useState("");
 
   const { data } = useQuery({
     queryKey: ["me"],
@@ -136,11 +139,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         method: "POST",
         json: { email: inviteEmail.trim() },
       }),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       setInviteNote(res.note || "Приглашение создано");
       setInviteEmail("");
+      qc.invalidateQueries({ queryKey: ["project-invites", inviteOpen] });
       qc.invalidateQueries({ queryKey: ["project", inviteOpen] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+      if (res.invite.token) {
+        await copyInviteLink(res.invite.token);
+      }
     },
   });
 
@@ -150,14 +157,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => api<{ items: InviteItem[] }>(`/api/v1/projects/${inviteOpen}/invites`),
   });
 
-  const userSearch = useQuery({
-    queryKey: ["user-search", inviteOpen, inviteSearch],
-    enabled: !!inviteOpen && inviteSearch.trim().length >= 2,
-    queryFn: () =>
-      api<{ items: { id: string; name: string; email: string }[] }>(
-        `/api/v1/users?q=${encodeURIComponent(inviteSearch.trim())}&exclude_project_id=${inviteOpen}`
-      ),
-  });
+  function inviteUrl(token: string) {
+    if (typeof window === "undefined") return paths.invite(token);
+    return `${window.location.origin}${paths.invite(token)}`;
+  }
+
+  async function copyInviteLink(token: string) {
+    const url = inviteUrl(token);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedHint("Ссылка скопирована");
+      window.setTimeout(() => setCopiedHint(""), 2500);
+    } catch {
+      setCopiedHint(url);
+    }
+  }
+
+  async function ensureOpenInviteLink() {
+    if (!inviteOpen) return;
+    setLinkBusy(true);
+    setInviteNote("");
+    try {
+      const existing = pendingInvites?.items.find((i) => !i.email && i.token);
+      if (existing?.token) {
+        await copyInviteLink(existing.token);
+        return;
+      }
+      const res = await api<{ invite: InviteItem; note?: string }>(
+        `/api/v1/projects/${inviteOpen}/invites`,
+        { method: "POST", json: {} }
+      );
+      qc.invalidateQueries({ queryKey: ["project-invites", inviteOpen] });
+      if (res.invite.token) await copyInviteLink(res.invite.token);
+      setInviteNote(res.note || "");
+    } catch (e) {
+      setInviteNote(e instanceof Error ? e.message : "Не удалось создать ссылку");
+    } finally {
+      setLinkBusy(false);
+    }
+  }
 
   function toggleExpand(id: string, e: React.MouseEvent) {
     e.preventDefault();
@@ -319,7 +357,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     setInviteOpen(p.id);
                     setInviteEmail("");
                     setInviteNote("");
-                    setInviteSearch("");
+                    setCopiedHint("");
                   }}
                   onRemove={(m) => removeMember(p.id, m)}
                   onLeave={() => requestLeave(p.id, p.name)}
@@ -441,7 +479,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <Dialog
         open={!!inviteOpen}
-        onOpenChange={(v) => !v && setInviteOpen(null)}
+        onOpenChange={(v) => {
+          if (!v) {
+            setInviteOpen(null);
+            setInviteEmail("");
+            setInviteNote("");
+            setCopiedHint("");
+          }
+        }}
         title="Пригласить участника"
       >
         <form
@@ -452,39 +497,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }}
         >
           <div>
-            <label className="label-text" htmlFor="inv-search">
-              Найти зарегистрированного
-            </label>
-            <Input
-              id="inv-search"
-              value={inviteSearch}
-              onChange={(e) => setInviteSearch(e.target.value)}
-              placeholder="Имя или email"
-              autoFocus
-            />
-            {(userSearch.data?.items?.length ?? 0) > 0 && (
-              <ul className="mt-1 max-h-36 overflow-y-auto rounded-[var(--radius)] border border-hairline">
-                {userSearch.data!.items.map((u) => (
-                  <li key={u.id}>
-                    <button
-                      type="button"
-                      className="flex w-full flex-col px-2.5 py-1.5 text-left text-sm hover:bg-[var(--surface-2)]"
-                      onClick={() => setInviteEmail(u.email)}
-                    >
-                      <span className="font-medium">{u.name}</span>
-                      <span className="text-xs text-muted">{u.email}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {inviteSearch.trim().length >= 2 && userSearch.isFetched && !(userSearch.data?.items?.length) && (
-              <p className="mt-1 text-xs text-muted">Никого не найдено. Укажите email вручную ниже.</p>
-            )}
-          </div>
-          <div>
             <label className="label-text" htmlFor="inv-email">
-              Email
+              Email сотрудника
             </label>
             <Input
               id="inv-email"
@@ -492,31 +506,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="colleague@example.com"
+              autoFocus
             />
           </div>
           <Button type="submit" className="w-full" disabled={!inviteEmail.trim() || inviteMut.isPending}>
             Пригласить
           </Button>
-          {inviteNote && <p className="text-xs text-muted">{inviteNote}</p>}
+
+          <div className="relative py-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted">
+            <span className="relative z-[1] bg-[var(--surface)] px-2">или</span>
+            <span className="absolute inset-x-0 top-1/2 h-px bg-[var(--hairline)]" />
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            disabled={linkBusy}
+            onClick={() => void ensureOpenInviteLink()}
+          >
+            {linkBusy ? "Готовим ссылку…" : "Скопировать ссылку для вступления"}
+          </Button>
+          <p className="text-xs text-muted">
+            Отправьте ссылку в мессенджер — после входа или регистрации человек попадёт в проект.
+          </p>
+
+          {(copiedHint || inviteNote) && (
+            <p className="text-xs text-muted">{copiedHint || inviteNote}</p>
+          )}
           {inviteMut.isError && (
             <p className="text-sm text-[var(--danger)]">{(inviteMut.error as Error).message}</p>
           )}
           {(pendingInvites?.items?.length ?? 0) > 0 && (
-            <div className="space-y-1 border-t border-hairline pt-3">
-              <p className="text-xs font-semibold text-muted">Ожидают ответа</p>
+            <div className="space-y-1.5 border-t border-hairline pt-3">
+              <p className="text-xs font-semibold text-muted">Активные приглашения</p>
               {pendingInvites!.items.map((inv) => (
                 <div key={inv.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate">{inv.email}</span>
-                  <button
-                    type="button"
-                    className="text-[var(--danger)]"
-                    onClick={async () => {
-                      await api(`/api/v1/projects/${inviteOpen}/invites/${inv.id}`, { method: "DELETE" });
-                      qc.invalidateQueries({ queryKey: ["project-invites", inviteOpen] });
-                    }}
-                  >
-                    Отменить
-                  </button>
+                  <span className="truncate">{inv.email || "Открытая ссылка"}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {inv.token && (
+                      <button
+                        type="button"
+                        className="text-[var(--accent)]"
+                        onClick={() => void copyInviteLink(inv.token!)}
+                      >
+                        Копировать
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="text-[var(--danger)]"
+                      onClick={async () => {
+                        await api(`/api/v1/projects/${inviteOpen}/invites/${inv.id}`, { method: "DELETE" });
+                        qc.invalidateQueries({ queryKey: ["project-invites", inviteOpen] });
+                      }}
+                    >
+                      Отменить
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

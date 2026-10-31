@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,7 +23,8 @@ class ProjectInvite(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
-    email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    # None = открытая ссылка-приглашение (любой вошедший пользователь).
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
     invited_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
     )

@@ -101,3 +101,53 @@ async def test_invite_accept_flow(admin_client: AsyncClient):
         projects = await invitee.get("/api/v1/projects")
         ids = [p["id"] for p in projects.json()["items"]]
         assert pid in ids
+
+
+@pytest.mark.asyncio
+async def test_open_invite_link_flow(admin_client: AsyncClient):
+    project = await admin_client.post(
+        "/api/v1/projects",
+        json={
+            "name": "Link Proj",
+            "description": None,
+            "color": "#315F72",
+            "icon": "folder",
+            "member_ids": [],
+        },
+    )
+    assert project.status_code == 200, project.text
+    pid = project.json()["project"]["id"]
+
+    inv = await admin_client.post(f"/api/v1/projects/{pid}/invites", json={})
+    assert inv.status_code == 200, inv.text
+    token = inv.json()["invite"]["token"]
+    assert token
+    assert inv.json()["invite"]["email"] is None
+
+    # Reuse same open invite
+    again = await admin_client.post(f"/api/v1/projects/{pid}/invites", json={})
+    assert again.status_code == 200
+    assert again.json()["invite"]["token"] == token
+
+    public = await admin_client.get(f"/api/v1/invites/token/{token}")
+    assert public.status_code == 200
+    assert public.json()["requires_email_match"] is False
+
+    async def override_get_db():
+        async with TestSession() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = override_get_db
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as joiner:
+        await register_verified(joiner, name="Joiner", email="joiner@example.com")
+        acc = await joiner.post(f"/api/v1/invites/token/{token}/accept")
+        assert acc.status_code == 200, acc.text
+        projects = await joiner.get("/api/v1/projects")
+        ids = [p["id"] for p in projects.json()["items"]]
+        assert pid in ids

@@ -45,18 +45,28 @@ class ProjectsRepository {
     await _api.dio.post('/api/v1/invites/$id/decline');
   }
 
-  Future<void> inviteMember({
+  Future<Map<String, dynamic>> inviteMember({
     required String projectId,
-    required String email,
+    String? email,
     String? note,
   }) async {
-    await _api.dio.post(
+    final res = await _api.dio.post<Map<String, dynamic>>(
       '/api/v1/projects/$projectId/invites',
       data: {
-        'email': email.trim(),
+        if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
         if (note != null && note.isNotEmpty) 'note': note,
       },
     );
+    return res.data ?? {};
+  }
+
+  Future<String?> createOrGetInviteLink(String projectId) async {
+    final res = await inviteMember(projectId: projectId);
+    final invite = res['invite'];
+    if (invite is Map<String, dynamic>) {
+      return invite['token'] as String?;
+    }
+    return null;
   }
 
   Future<List<UserProfile>> searchUsers({String? q, String? excludeProjectId}) async {

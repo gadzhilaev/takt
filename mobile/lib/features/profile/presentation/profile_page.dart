@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/config.dart';
 import '../../../core/push/fcm_bootstrap.dart';
 import '../../../core/takt_links.dart';
 import '../../../core/theme.dart';
@@ -505,13 +506,42 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _inviteDialog(BuildContext context) async {
     final email = TextEditingController();
-    final ok = await showTaktSheet(
+    final choice = await showModalBottomSheet<String>(
       context: context,
-      title: 'Приглашение',
-      confirmLabel: 'Отправить',
-      body: TaktTextField(controller: email, label: 'Email', keyboardType: TextInputType.emailAddress),
+      useRootNavigator: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Приглашение', style: Theme.of(ctx).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                TaktTextField(
+                  controller: email,
+                  label: 'Email сотрудника',
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, 'email'),
+                  child: const Text('Пригласить по email'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, 'link'),
+                  child: const Text('Скопировать ссылку'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
-    if (ok != true || !context.mounted) return;
+    if (choice == null || !context.mounted) return;
     final projectsRepo = context.read<ProjectsRepository>();
     final api = context.read<ApiClient>();
     final currentId = context.read<BoardCubit>().state.project?.id;
@@ -523,14 +553,47 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
       final projectId = currentId ?? projects.first.id;
-      await projectsRepo.inviteMember(projectId: projectId, email: email.text);
+      if (choice == 'link') {
+        final token = await projectsRepo.createOrGetInviteLink(projectId);
+        if (!mounted) return;
+        if (token == null || token.isEmpty) {
+          setState(() => _message = 'Не удалось создать ссылку');
+          return;
+        }
+        final url = _inviteWebUrl(token);
+        await Clipboard.setData(ClipboardData(text: url));
+        if (!mounted) return;
+        setState(() => _message = 'Ссылка скопирована');
+        return;
+      }
+      final trimmed = email.text.trim();
+      if (trimmed.isEmpty) {
+        setState(() => _message = 'Укажите email');
+        return;
+      }
+      final res = await projectsRepo.inviteMember(projectId: projectId, email: trimmed);
       if (!mounted) return;
-      setState(() => _message = 'Приглашение отправлено');
+      final invite = res['invite'];
+      final token = invite is Map<String, dynamic> ? invite['token'] as String? : null;
+      if (token != null && token.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: _inviteWebUrl(token)));
+        if (!mounted) return;
+        setState(() => _message = 'Приглашение создано, ссылка скопирована');
+      } else {
+        setState(() => _message = 'Приглашение отправлено');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _message = api.messageFromError(e));
     }
   }
+}
+
+String _inviteWebUrl(String token) {
+  final api = AppConfig.apiBase;
+  // https://taktapp.ru/api/v1 → https://taktapp.ru
+  final origin = api.replaceFirst(RegExp(r'/api(?:/v1)?/?$'), '');
+  return '$origin/invite/$token';
 }
 
 class _ThemeChip extends StatelessWidget {
