@@ -135,3 +135,18 @@ async def test_projects_metadata_only(admin_client: AsyncClient):
     for item in r.json()["items"]:
         assert item.get("content_access") == "metadata_only"
         assert "tasks" not in item
+
+
+@pytest.mark.asyncio
+async def test_project_detail_members(admin_client: AsyncClient):
+    created = await admin_client.post("/api/v1/projects", json={"name": "Admin members view"})
+    assert created.status_code in (200, 201), created.text
+    pid = created.json()["project"]["id"]
+    detail = await admin_client.get(f"/api/v1/platform/projects/{pid}")
+    assert detail.status_code == 200, detail.text
+    body = detail.json()
+    assert body["name"] == "Admin members view"
+    assert body["content_access"] == "metadata_only"
+    assert isinstance(body["members"], list)
+    assert len(body["members"]) >= 1
+    assert "email" in body["members"][0]

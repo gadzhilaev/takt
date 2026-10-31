@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type MethodFlags = {
@@ -12,6 +13,9 @@ type MethodFlags = {
   yandex: boolean;
   email_password: boolean;
 };
+
+type Privacy = { url: string; text: string };
+type Support = { email: string; url: string; telegram: string };
 
 type SettingsResponse = {
   stored: Record<string, unknown>;
@@ -29,7 +33,8 @@ type SettingsResponse = {
     notes?: string[];
   };
   oauth_login_methods?: MethodFlags;
-  billing_placeholder?: { note?: string };
+  privacy_policy?: Privacy;
+  support?: Support;
 };
 
 const LABELS: { key: keyof MethodFlags; title: string; hint: string }[] = [
@@ -46,6 +51,9 @@ const DEFAULT_FLAGS: MethodFlags = {
   email_password: true,
 };
 
+const EMPTY_PRIVACY: Privacy = { url: "", text: "" };
+const EMPTY_SUPPORT: Support = { email: "", url: "", telegram: "" };
+
 export default function AdminSettingsPage() {
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
@@ -53,15 +61,19 @@ export default function AdminSettingsPage() {
     queryFn: () => api<SettingsResponse>("/api/v1/platform/settings"),
   });
   const [flags, setFlags] = useState<MethodFlags>(DEFAULT_FLAGS);
+  const [privacy, setPrivacy] = useState<Privacy>(EMPTY_PRIVACY);
+  const [support, setSupport] = useState<Support>(EMPTY_SUPPORT);
   const [savedMsg, setSavedMsg] = useState("");
 
   useEffect(() => {
     if (data?.oauth_login_methods) setFlags({ ...DEFAULT_FLAGS, ...data.oauth_login_methods });
-  }, [data?.oauth_login_methods]);
+    if (data?.privacy_policy) setPrivacy({ ...EMPTY_PRIVACY, ...data.privacy_policy });
+    if (data?.support) setSupport({ ...EMPTY_SUPPORT, ...data.support });
+  }, [data]);
 
-  const save = useMutation({
-    mutationFn: (value: MethodFlags) =>
-      api("/api/v1/platform/settings/oauth_login_methods", { method: "PUT", json: { value } }),
+  const saveKey = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: Record<string, unknown> }) =>
+      api(`/api/v1/platform/settings/${key}`, { method: "PUT", json: { value } }),
     onSuccess: async () => {
       setSavedMsg("Сохранено");
       await qc.invalidateQueries({ queryKey: ["platform-settings"] });
@@ -75,25 +87,25 @@ export default function AdminSettingsPage() {
   if (error) return <p className="text-sm text-[var(--danger)]">{(error as Error).message}</p>;
 
   const providers = data?.oauth_providers?.providers ?? {};
-  const dirty =
+  const oauthDirty =
     JSON.stringify(flags) !==
     JSON.stringify({ ...DEFAULT_FLAGS, ...(data?.oauth_login_methods ?? {}) });
+  const privacyDirty =
+    JSON.stringify(privacy) !==
+    JSON.stringify({ ...EMPTY_PRIVACY, ...(data?.privacy_policy ?? {}) });
+  const supportDirty =
+    JSON.stringify(support) !== JSON.stringify({ ...EMPTY_SUPPORT, ...(data?.support ?? {}) });
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Настройки платформы</h1>
-        <p className="mt-1 text-[13px] text-muted">
-          Управление способами входа для всех пользователей. Credentials в `.env` не удаляются.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight">Настройки</h1>
+        <p className="mt-1 text-[13px] text-muted">Входы, поддержка и политика конфиденциальности.</p>
       </div>
 
       <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
         <h2 className="text-[14px] font-semibold">Способы входа</h2>
-        <p className="mt-1 text-[13px] text-muted">
-          Выключение скрывает кнопку на сайте и в мобильном приложении.
-        </p>
-        <ul className="mt-4 space-y-2">
+        <ul className="mt-3 space-y-2">
           {LABELS.map(({ key, title, hint }) => {
             const meta = key === "email_password" ? null : providers[key];
             const live = key === "email_password" ? flags.email_password : Boolean(meta?.enabled);
@@ -111,13 +123,13 @@ export default function AdminSettingsPage() {
                         live ? "bg-[#e8f3ec] text-[#2f6b4f]" : "bg-[#f1f3f5] text-[#5a6573]"
                       )}
                     >
-                      {live ? "Сейчас доступен" : "Сейчас скрыт"}
+                      {live ? "Доступен" : "Скрыт"}
                     </span>
                   </div>
                   <p className="mt-0.5 text-[12px] text-muted">
                     {hint}
-                    {meta?.configured === false ? " · credentials не заданы" : ""}
-                    {meta?.policy_blocked ? " · блокировка политикой РФ" : ""}
+                    {meta?.configured === false ? " · нет credentials" : ""}
+                    {meta?.policy_blocked ? " · политика РФ" : ""}
                   </p>
                 </div>
                 <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-[13px]">
@@ -134,31 +146,98 @@ export default function AdminSettingsPage() {
           })}
         </ul>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button type="button" disabled={save.isPending || !dirty} onClick={() => save.mutate(flags)}>
-            {save.isPending ? "Сохраняем…" : "Сохранить"}
+          <Button
+            type="button"
+            disabled={saveKey.isPending || !oauthDirty}
+            onClick={() => saveKey.mutate({ key: "oauth_login_methods", value: flags })}
+          >
+            Сохранить входы
           </Button>
-          {savedMsg ? <span className="text-[13px] text-muted">{savedMsg}</span> : null}
-          {dirty && !savedMsg ? (
-            <span className="text-[13px] text-muted">Есть несохранённые изменения</span>
-          ) : null}
-          {save.isError ? (
-            <span className="text-[13px] text-[var(--danger)]">{(save.error as Error).message}</span>
-          ) : null}
         </div>
-        {data?.oauth_providers?.notes?.length ? (
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-[12px] text-muted">
-            {data.oauth_providers.notes.map((n) => (
-              <li key={n}>{n}</li>
-            ))}
-          </ul>
-        ) : null}
       </section>
 
       <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
-        <h2 className="text-[14px] font-semibold">Тарифы</h2>
-        <p className="mt-2 text-[13px] text-muted">
-          {data?.billing_placeholder?.note ?? "Биллинг пока не подключён — заглушка без выдуманных цен."}
+        <h2 className="text-[14px] font-semibold">Поддержка</h2>
+        <p className="mt-1 text-[12px] text-muted">Куда писать пользователям по вопросам сервиса.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-[13px]">
+            <span className="text-muted">Email</span>
+            <Input
+              className="mt-1"
+              type="email"
+              value={support.email}
+              onChange={(e) => setSupport((p) => ({ ...p, email: e.target.value }))}
+              placeholder="support@taktapp.ru"
+            />
+          </label>
+          <label className="block text-[13px]">
+            <span className="text-muted">Telegram</span>
+            <Input
+              className="mt-1"
+              value={support.telegram}
+              onChange={(e) => setSupport((p) => ({ ...p, telegram: e.target.value }))}
+              placeholder="@takt_support"
+            />
+          </label>
+          <label className="block text-[13px] sm:col-span-2">
+            <span className="text-muted">Ссылка на справку / чат</span>
+            <Input
+              className="mt-1"
+              value={support.url}
+              onChange={(e) => setSupport((p) => ({ ...p, url: e.target.value }))}
+              placeholder="https://…"
+            />
+          </label>
+        </div>
+        <div className="mt-4">
+          <Button
+            type="button"
+            disabled={saveKey.isPending || !supportDirty}
+            onClick={() => saveKey.mutate({ key: "support", value: support })}
+          >
+            Сохранить поддержку
+          </Button>
+        </div>
+      </section>
+
+      <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
+        <h2 className="text-[14px] font-semibold">Политика конфиденциальности</h2>
+        <p className="mt-1 text-[12px] text-muted">
+          URL публичной страницы и/или текст для ссылки в приложении и на сайте.
         </p>
+        <label className="mt-3 block text-[13px]">
+          <span className="text-muted">Ссылка</span>
+          <Input
+            className="mt-1"
+            value={privacy.url}
+            onChange={(e) => setPrivacy((p) => ({ ...p, url: e.target.value }))}
+            placeholder="https://taktapp.ru/privacy"
+          />
+        </label>
+        <label className="mt-3 block text-[13px]">
+          <span className="text-muted">Текст (опционально)</span>
+          <textarea
+            className="mt-1 min-h-[120px] w-full rounded-[var(--radius)] border border-[var(--border)] bg-white px-3 py-2 text-[13px] outline-none focus:border-[var(--accent)]"
+            value={privacy.text}
+            onChange={(e) => setPrivacy((p) => ({ ...p, text: e.target.value }))}
+            placeholder="Краткий текст или примечание для команды"
+          />
+        </label>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            disabled={saveKey.isPending || !privacyDirty}
+            onClick={() => saveKey.mutate({ key: "privacy_policy", value: privacy })}
+          >
+            Сохранить политику
+          </Button>
+          {savedMsg ? <span className="text-[13px] text-muted">{savedMsg}</span> : null}
+          {saveKey.isError ? (
+            <span className="text-[13px] text-[var(--danger)]">
+              {(saveKey.error as Error).message}
+            </span>
+          ) : null}
+        </div>
       </section>
     </div>
   );

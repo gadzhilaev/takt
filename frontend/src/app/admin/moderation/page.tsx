@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -46,6 +46,7 @@ export default function AdminModerationPage() {
       if (status) sp.set("status", status);
       return api<{ items: Report[] }>(`/api/v1/platform/moderation/reports?${sp}`);
     },
+    placeholderData: keepPreviousData,
   });
 
   const decide = useMutation({

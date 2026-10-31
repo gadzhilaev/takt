@@ -16,8 +16,6 @@ const NAV = [
   { href: "/admin/projects", label: "Проекты" },
   { href: "/admin/moderation", label: "Модерация" },
   { href: "/admin/system", label: "Система" },
-  { href: "/admin/analytics", label: "Аналитика" },
-  { href: "/admin/security", label: "Безопасность" },
   { href: "/admin/settings", label: "Настройки" },
 ];
 

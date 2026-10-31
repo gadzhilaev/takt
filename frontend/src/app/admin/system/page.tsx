@@ -12,7 +12,6 @@ type Health = {
   web_push?: { configured?: boolean };
   fcm?: { enabled?: boolean; credentials_configured?: boolean };
   oauth?: Record<string, { enabled?: boolean; configured?: boolean }>;
-  background_jobs?: { available?: boolean; note?: string };
 };
 
 function StatusPill({ ok, label }: { ok: boolean; label: string }) {
@@ -79,9 +78,7 @@ export default function AdminSystemPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Система</h1>
-          <p className="mt-1 text-[13px] text-muted">
-            Состояние API, почты, пушей и OAuth. Секреты сюда не попадают.
-          </p>
+          <p className="mt-1 text-[13px] text-muted">API, почта, пуши и OAuth.</p>
         </div>
         <div className="flex items-center gap-2">
           {dataUpdatedAt ? (
@@ -96,7 +93,7 @@ export default function AdminSystemPage() {
             disabled={isFetching}
             onClick={() => refetch()}
           >
-            Проверить снова
+            Проверить
           </Button>
         </div>
       </div>
@@ -109,47 +106,30 @@ export default function AdminSystemPage() {
             : "border-[#f0d6d6] bg-[#fdf6f6] text-[var(--danger)]"
         )}
       >
-        {coreOk
-          ? "Ядро в порядке: API и база данных отвечают."
-          : "Проблема с ядром: проверьте API или PostgreSQL."}
+        {coreOk ? "API и база в порядке." : "Проблема с API или базой."}
       </div>
 
       <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white px-4">
         <ul>
-          <Row
-            title="Сервер API"
-            hint="Backend отвечает на запросы"
-            ok={data.backend === "ok"}
-          />
-          <Row
-            title="База данных"
-            hint="PostgreSQL доступна"
-            ok={data.database === "ok"}
-          />
+          <Row title="Сервер API" hint="Backend отвечает" ok={data.backend === "ok"} />
+          <Row title="База данных" hint="PostgreSQL" ok={data.database === "ok"} />
           <Row
             title="Почта (SMTP)"
-            hint="Коды регистрации, сброс пароля, приглашения"
+            hint="Коды, сброс пароля, приглашения"
             ok={Boolean(data.email?.configured)}
             detail={data.email?.from ? `Отправитель: ${data.email.from}` : null}
           />
+          <Row title="Web Push" hint="Уведомления в браузере" ok={Boolean(data.web_push?.configured)} />
           <Row
-            title="Web Push"
-            hint="Уведомления в браузере"
-            ok={Boolean(data.web_push?.configured)}
-          />
-          <Row
-            title="Push в приложении (FCM)"
-            hint="Уведомления на телефоне через Firebase"
+            title="Push (FCM)"
+            hint="Уведомления в приложении"
             ok={Boolean(data.fcm?.enabled && data.fcm?.credentials_configured)}
           />
         </ul>
       </section>
 
       <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
-        <h2 className="text-[14px] font-semibold">Вход через соцсети</h2>
-        <p className="mt-1 text-[12px] text-muted">
-          «Включён» = credentials есть и метод не выключен в настройках платформы.
-        </p>
+        <h2 className="text-[14px] font-semibold">OAuth</h2>
         <ul className="mt-2">
           {oauthEntries.map(([key, v]) => {
             const ready = Boolean(v.enabled && v.configured);
@@ -167,17 +147,6 @@ export default function AdminSystemPage() {
             );
           })}
         </ul>
-      </section>
-
-      <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
-        <h2 className="text-[14px] font-semibold">Фоновые задачи</h2>
-        <p className="mt-2 text-[13px] text-muted">
-          {data.background_jobs?.note ??
-            "Отдельной очереди ошибок пока нет — показатель не придумываем."}
-        </p>
-        <p className="mt-2">
-          <StatusPill ok={false} label="Очередь не подключена" />
-        </p>
       </section>
     </div>
   );

@@ -655,6 +655,55 @@ async def list_projects(
     }
 
 
+async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
+    project = await db.get(Project, project_id)
+    if not project:
+        raise PlatformError("not_found", "Проект не найден", 404)
+    member_count = await db.scalar(
+        select(func.count()).select_from(ProjectMember).where(ProjectMember.project_id == project.id)
+    ) or 0
+    task_count = await db.scalar(
+        select(func.count())
+        .select_from(Task)
+        .where(Task.project_id == project.id, Task.deleted_at.is_(None))
+    ) or 0
+    restriction = await db.scalar(
+        select(ProjectRestriction).where(
+            ProjectRestriction.project_id == project.id, ProjectRestriction.active.is_(True)
+        )
+    )
+    rows = (
+        await db.execute(
+            select(ProjectMember, User)
+            .join(User, User.id == ProjectMember.user_id)
+            .where(ProjectMember.project_id == project.id)
+            .order_by(ProjectMember.created_at.asc())
+        )
+    ).all()
+    return {
+        "id": str(project.id),
+        "name": project.name,
+        "is_demo": project.is_demo,
+        "is_archived": project.is_archived,
+        "created_at": project.created_at.isoformat() if project.created_at else None,
+        "member_count": member_count,
+        "task_count": task_count,
+        "restricted": bool(restriction),
+        "restriction_reason": restriction.reason if restriction else None,
+        "members": [
+            {
+                "user_id": str(u.id),
+                "name": u.name,
+                "email": u.email,
+                "role": m.role.value,
+                "joined_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m, u in rows
+        ],
+        "content_access": "metadata_only",
+    }
+
+
 async def restrict_project(db: AsyncSession, admin: User, project_id: uuid.UUID, reason: str) -> dict:
     project = await db.get(Project, project_id)
     if not project:

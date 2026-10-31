@@ -205,6 +205,18 @@ async def projects(
     )
 
 
+@router.get("/projects/{project_id}")
+async def project_card(
+    project_id: uuid.UUID,
+    admin: Annotated[User, Depends(require_platform_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        return await pas.project_detail(db, project_id)
+    except pas.PlatformError as e:
+        raise _err(e)
+
+
 class RestrictBody(BaseModel):
     reason: str = Field(min_length=3, max_length=2000)
 
@@ -355,10 +367,10 @@ async def get_settings_api(
             "yandex": True,
             "email_password": True,
         },
-        "billing_placeholder": {
-            "enabled": False,
-            "note": "Тарифы не подключены; ключ reserved для будущей конфигурации.",
-        },
+        "privacy_policy": stored.get("privacy_policy")
+        or {"url": "", "text": ""},
+        "support": stored.get("support")
+        or {"email": "", "url": "", "telegram": ""},
     }
 
 
@@ -388,6 +400,22 @@ async def put_setting(
                 detail={"error": {"code": "bad_value", "message": "Нужен хотя бы один флаг способа входа"}},
             )
         value = cleaned
+    elif key == "privacy_policy":
+        value = {
+            "url": str(value.get("url") or "")[:2000],
+            "text": str(value.get("text") or "")[:20000],
+        }
+    elif key == "support":
+        value = {
+            "email": str(value.get("email") or "")[:320],
+            "url": str(value.get("url") or "")[:2000],
+            "telegram": str(value.get("telegram") or "")[:200],
+        }
+    elif key not in ("oauth_login_methods", "privacy_policy", "support"):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "bad_key", "message": "Неизвестный ключ настройки"}},
+        )
     result = await pas.put_setting(db, admin, key[:100], value)
     await db.commit()
     return result
