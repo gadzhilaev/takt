@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.task import Task
 from app.models.team import TaskStatus
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.services.bootstrap import DEFAULT_STATUSES
 
 DEFAULT_STATUS_TEMPLATE = [
@@ -30,7 +30,10 @@ async def get_project(db: AsyncSession, project_id: uuid.UUID) -> Project | None
 async def list_projects_for_user(
     db: AsyncSession, user: User, *, include_archived: bool = False
 ) -> list[Project]:
-    """Membership-based list. Demo projects are never auto-visible to system admins."""
+    """Только проекты, где пользователь — участник (в т.ч. для legacy UserRole.admin).
+
+    Обзор всех проектов платформы — через `/api/v1/platform/projects`, не workspace.
+    """
     membership = (
         select(Project)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
@@ -40,27 +43,7 @@ async def list_projects_for_user(
     )
     if not include_archived:
         membership = membership.where(Project.is_archived.is_(False))
-
-    if user.role != UserRole.admin:
-        return list((await db.execute(membership)).scalars().unique().all())
-
-    # System admin: all non-demo projects + demo projects where they are a member.
-    admin_q = (
-        select(Project)
-        .outerjoin(
-            ProjectMember,
-            (ProjectMember.project_id == Project.id) & (ProjectMember.user_id == user.id),
-        )
-        .where(
-            (Project.is_demo.is_(False))
-            | (ProjectMember.user_id == user.id)
-        )
-        .options(selectinload(Project.members))
-        .order_by(Project.is_default.desc(), Project.name.asc())
-    )
-    if not include_archived:
-        admin_q = admin_q.where(Project.is_archived.is_(False))
-    return list((await db.execute(admin_q)).scalars().unique().all())
+    return list((await db.execute(membership)).scalars().unique().all())
 
 
 async def user_project_role(
@@ -69,9 +52,6 @@ async def user_project_role(
     project = await db.get(Project, project_id)
     if project is None:
         return None
-    # Demo projects require explicit membership even for system admins.
-    if user.role == UserRole.admin and not project.is_demo:
-        return ProjectMemberRole.admin
     row = await db.scalar(
         select(ProjectMember.role).where(
             ProjectMember.project_id == project_id,

@@ -5,24 +5,38 @@ from tests.conftest import register_verified
 
 
 @pytest.mark.asyncio
-async def test_demo_projects_hidden_from_admin_without_membership(client: AsyncClient):
+async def test_workspace_lists_only_membership_projects(client: AsyncClient):
     await client.post(
         "/api/v1/auth/login",
         json={"email": "admin@test.com", "password": "Admin123!Test"},
     )
-    # Create a regular project as admin
+    # Create a regular project as admin (membership via create)
     proj = await client.post(
         "/api/v1/projects",
         json={"name": "Work Board", "description": None, "color": "#315F72"},
     )
     assert proj.status_code == 200
+    work_id = proj.json()["project"]["id"]
 
-    # Register demo-like user and create [E2E] project (auto is_demo)
+    # Ordinary user creates own non-demo project — admin must not see it in workspace.
     await client.post("/api/v1/auth/logout")
     reg = await register_verified(
-        client, name="Демо пользователь", email="demo-iso@example.com"
+        client, name="Участник", email="member-iso@example.com"
     )
-    assert reg["user"]["email"] == "demo-iso@example.com"
+    assert reg["user"]["email"] == "member-iso@example.com"
+    foreign = await client.post(
+        "/api/v1/projects",
+        json={
+            "name": "Чужой проект",
+            "description": None,
+            "color": "#315F72",
+        },
+    )
+    assert foreign.status_code == 200, foreign.text
+    foreign_id = foreign.json()["project"]["id"]
+    assert foreign.json()["project"]["is_demo"] is False
+
+    # Same user creates demo/[E2E] project
     e2e = await client.post(
         "/api/v1/projects",
         json={
@@ -35,8 +49,9 @@ async def test_demo_projects_hidden_from_admin_without_membership(client: AsyncC
     e2e_id = e2e.json()["project"]["id"]
     assert e2e.json()["project"]["is_demo"] is True
 
-    demo_list = (await client.get("/api/v1/projects")).json()["items"]
-    assert any(p["id"] == e2e_id for p in demo_list)
+    member_list = (await client.get("/api/v1/projects")).json()["items"]
+    assert any(p["id"] == foreign_id for p in member_list)
+    assert any(p["id"] == e2e_id for p in member_list)
 
     await client.post("/api/v1/auth/logout")
     await client.post(
@@ -44,9 +59,10 @@ async def test_demo_projects_hidden_from_admin_without_membership(client: AsyncC
         json={"email": "admin@test.com", "password": "Admin123!Test"},
     )
     admin_list = (await client.get("/api/v1/projects")).json()["items"]
+    assert any(p["id"] == work_id for p in admin_list)
+    assert all(p["id"] != foreign_id for p in admin_list)
     assert all(p["id"] != e2e_id for p in admin_list)
-    assert any(p["name"] == "Work Board" for p in admin_list)
 
-    # Direct access without membership must fail for demo project
-    denied = await client.get(f"/api/v1/projects/{e2e_id}")
-    assert denied.status_code == 403
+    # Direct access without membership must fail for both
+    assert (await client.get(f"/api/v1/projects/{e2e_id}")).status_code == 403
+    assert (await client.get(f"/api/v1/projects/{foreign_id}")).status_code == 403

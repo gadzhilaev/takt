@@ -14,8 +14,8 @@ Middleware Next.js проверяет наличие JWT и `exp` без кри�
 | Ось | Где | Назначение |
 |-----|-----|------------|
 | `ProjectMemberRole` | `project_members.role` | viewer / member / admin в проекте |
-| `UserRole.admin` | `users.role` | legacy системный admin: non-demo проекты как project admin |
-| `platform_role` | `users.platform_role` | `/admin` UI и `/api/v1/platform` |
+| `UserRole.admin` | `users.role` | legacy bootstrap-admin (bootstrap / часть admin API); **не** даёт доступ ко всем проектам в workspace |
+| `platform_role` | `users.platform_role` | `/admin` UI и `/api/v1/platform` (все проекты платформы) |
 
 Фронтенд не граница RBAC. ACL задач — `ensure_project_access` через project_id задачи.
 
