@@ -12,14 +12,39 @@ class AuthRepository {
 
   Future<UserProfile?> restoreSession() async {
     final access = await tokens.readAccess();
-    if (access == null || access.isEmpty) return null;
-    try {
-      final res = await api.dio.get<Map<String, dynamic>>('/api/v1/auth/me');
-      return UserProfile.fromJson(res.data!['user'] as Map<String, dynamic>);
-    } catch (_) {
-      await tokens.clear();
+    final refresh = await tokens.readRefresh();
+    // Keep session if either token exists; interceptor renews via refresh on 401.
+    if ((access == null || access.isEmpty) && (refresh == null || refresh.isEmpty)) {
       return null;
     }
+    // Retry through deploy / network blips so a short outage doesn't force re-login.
+    Object? lastError;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        final res = await api.dio.get<Map<String, dynamic>>('/api/v1/auth/me');
+        return UserProfile.fromJson(res.data!['user'] as Map<String, dynamic>);
+      } on DioException catch (e) {
+        lastError = e;
+        final code = e.response?.statusCode;
+        if (code == 401 || code == 403) {
+          await tokens.clear();
+          return null;
+        }
+        if (attempt < 3) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          continue;
+        }
+      } catch (e) {
+        lastError = e;
+        if (attempt < 3) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          continue;
+        }
+      }
+    }
+    // Tokens still present — surface as error so cubit can retry, not as guest.
+    if (lastError != null) throw lastError;
+    return null;
   }
 
   Future<UserProfile> login({required String email, required String password}) async {

@@ -54,28 +54,16 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
   if (me.data) allowedMe.current = me.data;
   const user = me.data ?? allowedMe.current;
 
+  useEffect(() => {
+    if (me.isError && !allowedMe.current) {
+      router.replace("/login?next=/admin");
+    }
+  }, [me.isError, router]);
+
   if (me.isError && !user) {
     return (
-      <div className="platform-admin flex min-h-screen flex-col items-center justify-center gap-3 px-4 text-center">
-        <p className="text-sm text-[#5a6573]">Нет доступа к панели платформы Takt.</p>
-        <p className="max-w-sm text-[13px] text-[#5a6573]">
-          Войдите обычным аккаунтом на /login. Ссылка на админку появится в профиле, если у вас есть
-          роль платформы.
-        </p>
-        <button
-          type="button"
-          className="text-sm font-semibold text-[#315f72]"
-          onClick={() => router.push("/app/projects")}
-        >
-          В рабочее пространство
-        </button>
-        <button
-          type="button"
-          className="text-sm text-[#5a6573] underline-offset-2 hover:underline"
-          onClick={() => router.push("/login?next=/admin")}
-        >
-          Войти
-        </button>
+      <div className="platform-admin flex min-h-screen items-center justify-center text-sm text-[#5a6573]">
+        Переход ко входу…
       </div>
     );
   }

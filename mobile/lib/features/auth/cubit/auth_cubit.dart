@@ -64,8 +64,20 @@ class AuthCubit extends Cubit<AuthState> {
         await fcm?.registerForUser();
       }
     } catch (e) {
-      emit(AuthFailure(api.messageFromError(e)));
-      emit(const AuthGuest());
+      // Network/deploy blip with tokens still stored — stay on splash briefly, retry once.
+      try {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        final user = await auth.restoreSession();
+        if (user == null) {
+          emit(const AuthGuest());
+        } else {
+          emit(AuthAuthenticated(user));
+          await fcm?.registerForUser();
+        }
+      } catch (_) {
+        emit(AuthFailure(api.messageFromError(e)));
+        emit(const AuthGuest());
+      }
     }
   }
 

@@ -47,6 +47,30 @@ function LoginForm() {
   const { data: oauthMeta } = useOAuthProviders();
   const emailPassword = oauthMeta?.email_password !== false;
 
+  // Refresh-only cookie: silently renew and enter the app (middleware no longer bounces on refresh alone).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        if (!cancelled && res.ok) {
+          router.replace(safeNext(searchParams.get("next")));
+        }
+      } catch {
+        /* stay on login */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on mount
+  }, []);
+
   // Показать сообщение один раз, затем убрать его из URL — иначе refresh снова поднимает алерт.
   useEffect(() => {
     if (!searchParams.get("message") && !searchParams.get("oauth_error")) return;

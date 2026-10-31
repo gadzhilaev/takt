@@ -6,7 +6,7 @@ function csrfToken(): string | undefined {
   return match ? decodeURIComponent(match[1]) : undefined;
 }
 
-type ApiOptions = RequestInit & { json?: unknown };
+type ApiOptions = RequestInit & { json?: unknown; _retried?: boolean };
 
 /** FastAPI `{detail:{error:{message}}}`, SlowAPI `{error:"…"}`, validation `detail:[]`. */
 export function messageFromApiError(err: unknown): string | undefined {
@@ -40,6 +40,60 @@ export function messageFromApiError(err: unknown): string | undefined {
   return undefined;
 }
 
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshSession(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const headers = new Headers({ "Content-Type": "application/json" });
+      const csrf = csrfToken();
+      if (csrf) headers.set("X-CSRF-Token", csrf);
+      const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+        headers,
+        body: "{}",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+async function clearAuthCookiesBestEffort() {
+  try {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const csrf = csrfToken();
+    if (csrf) headers.set("X-CSRF-Token", csrf);
+    await fetch(`${API_BASE}/api/v1/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: "{}",
+    });
+  } catch {
+    /* ignore — navigation still proceeds */
+  }
+}
+
+function redirectToLogin() {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname + window.location.search;
+  if (path.startsWith("/login") || path.startsWith("/register") || path.startsWith("/forgot-password")) {
+    return;
+  }
+  const next = encodeURIComponent(path || "/app/projects");
+  void clearAuthCookiesBestEffort().finally(() => {
+    window.location.assign(`/login?next=${next}`);
+  });
+}
+
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (options.json !== undefined) {
@@ -55,6 +109,25 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     headers,
     body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
   });
+
+  if (res.status === 401) {
+    const isAuthPath =
+      path.includes("/auth/login") ||
+      path.includes("/auth/refresh") ||
+      path.includes("/auth/register") ||
+      path.includes("/auth/forgot-password") ||
+      path.includes("/auth/oauth");
+    if (!isAuthPath && !options._retried) {
+      const renewed = await tryRefreshSession();
+      if (renewed) {
+        return api<T>(path, { ...options, _retried: true });
+      }
+      redirectToLogin();
+    } else if (!isAuthPath) {
+      redirectToLogin();
+    }
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const fromServer = messageFromApiError(err);

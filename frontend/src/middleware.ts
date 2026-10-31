@@ -3,8 +3,8 @@ import type { NextRequest } from "next/server";
 
 const AUTH_COOKIES = ["access_token", "refresh_token"] as const;
 
-/** Cookie present AND JWT payload not expired (edge-safe, no crypto verify). */
-function hasUsableSession(request: NextRequest): boolean {
+/** Access JWT still valid (edge-safe, no crypto verify). */
+function accessTokenAlive(request: NextRequest): boolean {
   const raw = request.cookies.get("access_token")?.value;
   if (!raw) return false;
   const parts = raw.split(".");
@@ -14,25 +14,36 @@ function hasUsableSession(request: NextRequest): boolean {
     const payload = JSON.parse(json) as { exp?: number; type?: string };
     if (payload.type && payload.type !== "access") return false;
     if (typeof payload.exp !== "number") return false;
-    // 30s skew
     return payload.exp * 1000 > Date.now() - 30_000;
   } catch {
     return false;
   }
 }
 
+function hasRefreshCookie(request: NextRequest): boolean {
+  const raw = request.cookies.get("refresh_token")?.value;
+  return Boolean(raw && raw.length > 20);
+}
+
+/**
+ * Session can continue if access is valid OR refresh cookie exists.
+ * Never clear refresh just because access expired — client/API will renew.
+ */
+function hasSession(request: NextRequest): boolean {
+  return accessTokenAlive(request) || hasRefreshCookie(request);
+}
+
 function clearAuthCookies(res: NextResponse) {
   for (const name of AUTH_COOKIES) {
     res.cookies.set(name, "", { path: "/", maxAge: 0 });
   }
+  res.cookies.set("csrf_token", "", { path: "/", maxAge: 0 });
 }
 
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const authed = hasUsableSession(request);
-  const hadCookie = Boolean(request.cookies.get("access_token")?.value);
+  const authed = hasSession(request);
 
-  // Public landing: always available without a valid session.
   if (pathname === "/") {
     if (authed) {
       const url = request.nextUrl.clone();
@@ -40,20 +51,24 @@ export function middleware(request: NextRequest) {
       url.search = "";
       return NextResponse.redirect(url);
     }
-    // Stale/invalid cookie must NOT bounce guests through /app → /login.
-    if (hadCookie) {
-      const res = NextResponse.next();
-      clearAuthCookies(res);
-      return res;
-    }
     return NextResponse.next();
   }
 
-  // Already signed in — skip auth forms (respect ?next= for invite links).
-  if ((pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") && authed) {
+  // Only bounce away from login when access is still valid.
+  // Refresh-only (or stale refresh) must not trap users in /app ↔ /login loops.
+  if (
+    (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") &&
+    accessTokenAlive(request)
+  ) {
     const next = request.nextUrl.searchParams.get("next");
     const url = request.nextUrl.clone();
-    if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") && !next.startsWith("/register")) {
+    if (
+      next &&
+      next.startsWith("/") &&
+      !next.startsWith("//") &&
+      !next.startsWith("/login") &&
+      !next.startsWith("/register")
+    ) {
       try {
         const dest = new URL(next, request.nextUrl.origin);
         url.pathname = dest.pathname;
@@ -69,26 +84,24 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Protect workspace shell.
   if (pathname === "/app" || pathname.startsWith("/app/")) {
     if (!authed) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.search = `?next=${encodeURIComponent(pathname + search)}`;
       const res = NextResponse.redirect(url);
-      if (hadCookie) clearAuthCookies(res);
+      clearAuthCookies(res);
       return res;
     }
   }
 
-  // Global platform admin console (role checked on API + client layout).
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (!authed) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.search = `?next=${encodeURIComponent(pathname + search)}`;
       const res = NextResponse.redirect(url);
-      if (hadCookie) clearAuthCookies(res);
+      clearAuthCookies(res);
       return res;
     }
   }

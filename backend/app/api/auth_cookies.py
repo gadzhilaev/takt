@@ -34,7 +34,8 @@ def set_auth_cookies(response: Response, access: str, refresh: str) -> None:
     )
     csrf = generate_csrf_token()
     csrf_opts: dict = {
-        "max_age": 86400 * 7,
+        # Align with refresh so long-lived sessions keep mutating requests working.
+        "max_age": settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
         "httponly": False,
         "secure": settings.COOKIE_SECURE,
         "samesite": "lax",

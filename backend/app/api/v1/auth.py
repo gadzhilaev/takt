@@ -206,20 +206,28 @@ async def login(
     }
 
 
-@router.post("/logout", dependencies=[Depends(verify_csrf)])
+@router.post("/logout")
 async def logout(
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     refresh_token: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ):
+    # No CSRF: clearing cookies must work when session/CSRF is already dead
+    # (client redirect-to-login after failed refresh).
     if refresh_token:
         payload = decode_token(refresh_token)
         if payload and payload.get("jti"):
             await auth_service.revoke_refresh_token(db, payload["jti"])
             await db.commit()
-    response.delete_cookie(ACCESS_COOKIE, path="/")
-    response.delete_cookie(REFRESH_COOKIE, path="/")
-    response.delete_cookie(CSRF_COOKIE, path="/")
+    from app.core.config import get_settings
+
+    cookie_opts: dict = {"path": "/"}
+    domain = get_settings().COOKIE_DOMAIN
+    if domain:
+        cookie_opts["domain"] = domain
+    response.delete_cookie(ACCESS_COOKIE, **cookie_opts)
+    response.delete_cookie(REFRESH_COOKIE, **cookie_opts)
+    response.delete_cookie(CSRF_COOKIE, **cookie_opts)
     return {"ok": True}
 
 

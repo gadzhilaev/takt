@@ -95,16 +95,30 @@ class ApiClient {
 
   final TokenStorage tokens;
   final Dio dio;
-  bool _refreshing = false;
+  Future<bool>? _refreshInFlight;
 
-  Future<bool> _tryRefresh() async {
-    if (_refreshing) return false;
-    _refreshing = true;
+  Future<bool> _tryRefresh() {
+    final existing = _refreshInFlight;
+    if (existing != null) return existing;
+    final future = _doRefresh();
+    _refreshInFlight = future;
+    return future.whenComplete(() {
+      if (identical(_refreshInFlight, future)) {
+        _refreshInFlight = null;
+      }
+    });
+  }
+
+  Future<bool> _doRefresh() async {
     try {
       final refresh = await tokens.readRefresh();
       if (refresh == null || refresh.isEmpty) return false;
       final res = await Dio(
-        BaseOptions(baseUrl: dio.options.baseUrl),
+        BaseOptions(
+          baseUrl: dio.options.baseUrl,
+          connectTimeout: const Duration(seconds: 25),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
       ).post<Map<String, dynamic>>(
         '/api/v1/auth/refresh',
         data: {'refresh_token': refresh},
@@ -116,11 +130,16 @@ class ApiClient {
       if (access == null || nextRefresh == null) return false;
       await tokens.saveTokens(access: access, refresh: nextRefresh);
       return true;
-    } catch (_) {
-      await tokens.clear();
+    } on DioException catch (e) {
+      // Only drop the session when the server rejects the refresh token.
+      // Network blips during deploy must not wipe a valid login.
+      final code = e.response?.statusCode;
+      if (code == 401 || code == 403) {
+        await tokens.clear();
+      }
       return false;
-    } finally {
-      _refreshing = false;
+    } catch (_) {
+      return false;
     }
   }
 
