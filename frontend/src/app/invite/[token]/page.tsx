@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { loginWithNext, paths } from "@/lib/paths";
@@ -23,6 +24,7 @@ export default function InviteAcceptPage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
   const invitePath = paths.invite(token);
+  const autoTried = useRef(false);
 
   const me = useQuery({
     queryKey: ["me"],
@@ -55,6 +57,18 @@ export default function InviteAcceptPage() {
     invite.data.email &&
     me.data!.user.email.toLowerCase() !== invite.data.email.toLowerCase();
 
+  // После входа / регистрации сразу вступаем, без второго клика.
+  useEffect(() => {
+    if (autoTried.current) return;
+    if (!loggedIn || !invite.isSuccess || !invite.data || emailMismatch) return;
+    autoTried.current = true;
+    accept.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- однократный auto-accept
+  }, [loggedIn, invite.isSuccess, invite.data, emailMismatch]);
+
+  const joining =
+    loggedIn && !emailMismatch && !accept.isError && (accept.isPending || accept.isIdle);
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
       <div className="w-full max-w-md space-y-5 rounded-[var(--radius-lg)] border border-hairline bg-[var(--surface)] p-6 shadow-sm">
@@ -64,8 +78,11 @@ export default function InviteAcceptPage() {
           <p className="mt-1 text-sm text-muted">Откройте ссылку и вступите в команду.</p>
         </div>
 
-        {invite.isLoading || me.isLoading ? (
-          <Skeleton className="h-24 w-full" />
+        {invite.isLoading || me.isLoading || joining ? (
+          <div className="space-y-2">
+            <Skeleton className="h-24 w-full" />
+            {joining && <p className="text-center text-sm text-muted">Вступаем в проект…</p>}
+          </div>
         ) : invite.isError ? (
           <p className="text-sm text-[var(--danger)]">
             {(invite.error as Error).message || "Приглашение не найдено или уже недействительно"}

@@ -84,6 +84,7 @@ async def register_verified(
     name: str,
     email: str,
     password: str = "SecurePass123!",
+    invite_token: str | None = None,
 ) -> dict:
     """Registration via email OTP (dev_code available when ENV=test)."""
     send = await client.post(
@@ -98,9 +99,12 @@ async def register_verified(
     assert send.status_code == 200, send.text
     code = send.json().get("dev_code")
     assert code, "expected dev_code in test env"
+    payload: dict = {"email": email, "code": code}
+    if invite_token:
+        payload["invite_token"] = invite_token
     confirm = await client.post(
         "/api/v1/auth/register/confirm",
-        json={"email": email, "code": code},
+        json=payload,
     )
     assert confirm.status_code == 200, confirm.text
     return confirm.json()

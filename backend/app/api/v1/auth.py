@@ -122,6 +122,25 @@ async def register_confirm(
     db.add(user)
     await db.flush()
     await invite_service.link_pending_invites_to_user(db, user)
+
+    joined_project_id: str | None = None
+    token = (body.invite_token or "").strip()
+    if token:
+        invite = await invite_service.get_invite_by_token(db, token)
+        if invite:
+            try:
+                await invite_service.accept_invite(db, invite, user)
+                joined_project_id = str(invite.project_id)
+            except invite_service.InviteError:
+                pass
+    if joined_project_id is None:
+        for inv in await invite_service.list_pending_for_user(db, user):
+            try:
+                await invite_service.accept_invite(db, inv, user)
+                joined_project_id = str(inv.project_id)
+            except invite_service.InviteError:
+                continue
+
     access, refresh, _ = await auth_service.create_token_pair(db, user)
     await db.commit()
     set_auth_cookies(response, access, refresh)
@@ -130,6 +149,7 @@ async def register_confirm(
         "access_token": access,
         "refresh_token": refresh,
         "token_type": "bearer",
+        "joined_project_id": joined_project_id,
     }
 
 

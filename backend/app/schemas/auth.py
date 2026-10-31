@@ -22,6 +22,8 @@ class RegisterRequest(BaseModel):
 class RegisterConfirmRequest(BaseModel):
     email: EmailStr
     code: str = Field(min_length=4, max_length=12)
+    # Токен из /invite/{token} — сразу вступить в проект после регистрации.
+    invite_token: str | None = Field(default=None, max_length=128)
 
 
 class ChangePasswordRequest(BaseModel):

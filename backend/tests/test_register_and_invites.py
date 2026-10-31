@@ -91,16 +91,14 @@ async def test_invite_accept_flow(admin_client: AsyncClient):
     async with AsyncClient(transport=transport, base_url="http://test") as invitee:
         reg = await register_verified(invitee, name="Invitee", email="invitee@example.com")
         assert reg["user"]["email"] == "invitee@example.com"
-        mine = await invitee.get("/api/v1/invites/mine")
-        assert mine.status_code == 200
-        items = mine.json()["items"]
-        assert len(items) >= 1
-        invite_id = items[0]["id"]
-        acc = await invitee.post(f"/api/v1/invites/{invite_id}/accept")
-        assert acc.status_code == 200, acc.text
+        # Персональное приглашение принимается при регистрации.
+        assert reg.get("joined_project_id") == pid
         projects = await invitee.get("/api/v1/projects")
         ids = [p["id"] for p in projects.json()["items"]]
         assert pid in ids
+        mine = await invitee.get("/api/v1/invites/mine")
+        assert mine.status_code == 200
+        assert mine.json()["items"] == []
 
 
 @pytest.mark.asyncio
@@ -145,9 +143,13 @@ async def test_open_invite_link_flow(admin_client: AsyncClient):
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as joiner:
-        await register_verified(joiner, name="Joiner", email="joiner@example.com")
-        acc = await joiner.post(f"/api/v1/invites/token/{token}/accept")
-        assert acc.status_code == 200, acc.text
+        reg = await register_verified(
+            joiner,
+            name="Joiner",
+            email="joiner@example.com",
+            invite_token=token,
+        )
+        assert reg.get("joined_project_id") == pid
         projects = await joiner.get("/api/v1/projects")
         ids = [p["id"] for p in projects.json()["items"]]
         assert pid in ids
