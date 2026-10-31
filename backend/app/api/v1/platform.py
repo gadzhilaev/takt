@@ -123,6 +123,56 @@ class RoleBody(BaseModel):
     platform_role: PlatformRole
 
 
+class UserUpdateBody(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    email: str | None = Field(default=None, min_length=3, max_length=320)
+    is_active: bool | None = None
+    must_change_password: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    platform_role: PlatformRole | None = None
+
+
+@router.patch("/users/{user_id}")
+async def update_user(
+    user_id: uuid.UUID,
+    body: UserUpdateBody,
+    admin: Annotated[User, Depends(require_platform_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        user = await pas.update_user(
+            db,
+            admin,
+            user_id,
+            name=body.name,
+            email=body.email,
+            is_active=body.is_active,
+            must_change_password=body.must_change_password,
+            password=body.password,
+            platform_role=body.platform_role,
+        )
+    except pas.PlatformError as e:
+        raise _err(e)
+    await db.commit()
+    # Reload identities for login_methods in response
+    detail = await pas.user_detail(db, user.id)
+    return {"user": detail["user"]}
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: uuid.UUID,
+    admin: Annotated[User, Depends(require_platform_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        await pas.delete_user(db, admin, user_id)
+    except pas.PlatformError as e:
+        raise _err(e)
+    await db.commit()
+    return {"ok": True}
+
+
 @router.post("/users/{user_id}/platform-role")
 async def set_role(
     user_id: uuid.UUID,

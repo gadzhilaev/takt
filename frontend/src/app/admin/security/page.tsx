@@ -16,6 +16,8 @@ type AuditItem = {
 const ACTION_LABELS: Record<string, string> = {
   user_blocked: "Пользователь заблокирован",
   user_unblocked: "Пользователь разблокирован",
+  user_updated: "Профиль пользователя изменён",
+  user_deleted: "Пользователь удалён",
   platform_role_set: "Изменена роль платформы",
   project_restricted: "Проект ограничен",
   project_unrestricted: "Ограничение проекта снято",

@@ -74,6 +74,43 @@ async def test_block_unblock_and_audit(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_platform_user_update_and_delete(client: AsyncClient):
+    await register_verified(client, name="EditMe", email="edit-me@example.com")
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@test.com", "password": "Admin123!Test"},
+    )
+    assert login.status_code == 200
+    users = await client.get("/api/v1/platform/users?q=edit-me@example.com")
+    uid = users.json()["items"][0]["id"]
+
+    patched = await client.patch(
+        f"/api/v1/platform/users/{uid}",
+        json={
+            "name": "Отредактирован",
+            "email": "edited-me@example.com",
+            "password": "NewPass123!",
+            "must_change_password": True,
+        },
+    )
+    assert patched.status_code == 200, patched.text
+    body = patched.json()["user"]
+    assert body["name"] == "Отредактирован"
+    assert body["email"] == "edited-me@example.com"
+    assert body["must_change_password"] is True
+    assert body["has_password"] is True
+
+    deleted = await client.delete(f"/api/v1/platform/users/{uid}")
+    assert deleted.status_code == 200, deleted.text
+    gone = await client.get(f"/api/v1/platform/users/{uid}")
+    assert gone.status_code == 404
+    audit = await client.get("/api/v1/platform/security/audit")
+    actions = [a["action"] for a in audit.json()["items"]]
+    assert "user_updated" in actions
+    assert "user_deleted" in actions
+
+
+@pytest.mark.asyncio
 async def test_oauth_providers_public_and_disabled_by_default(client: AsyncClient):
     r = await client.get("/api/v1/auth/oauth/providers")
     assert r.status_code == 200

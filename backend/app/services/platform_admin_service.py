@@ -5,9 +5,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_password
 from app.models.platform import (
     ModerationAction,
     ModerationReport,
@@ -18,8 +19,16 @@ from app.models.platform import (
     UserBlock,
     UserIdentity,
 )
+from app.models.auth import RefreshToken
 from app.models.project import Project, ProjectMember
-from app.models.task import AdminAuditLog, Task
+from app.models.task import (
+    ActivityLog,
+    AdminAuditLog,
+    Attachment,
+    Comment,
+    Task,
+    TaskAssignee,
+)
 from app.models.user import PLATFORM_ROLE_RANK, PlatformRole, User, UserRole
 from app.services import admin_service
 from app.services.auth_service import revoke_all_user_tokens
@@ -213,6 +222,7 @@ def _user_row(u: User, *, oauth_providers: list[str] | None = None) -> dict:
         "blocked_until": u.blocked_until.isoformat() if u.blocked_until else None,
         "block_reason": u.block_reason,
         "has_password": bool(u.password_hash),
+        "must_change_password": bool(u.must_change_password),
         "login_methods": methods,
     }
 
@@ -346,6 +356,190 @@ async def set_platform_role(db: AsyncSession, admin: User, target_id: uuid.UUID,
     await admin_service.audit(db, admin.id, "platform_role_set", target.id, f"role={role.value}")
     await db.flush()
     return target
+
+
+def _assert_can_manage(admin: User, target: User, *, action: str) -> None:
+    if target.id == admin.id and action == "delete":
+        raise PlatformError("self", "Нельзя удалить свой аккаунт")
+    admin_rank = PLATFORM_ROLE_RANK[admin.platform_role or PlatformRole.none]
+    target_rank = PLATFORM_ROLE_RANK[target.platform_role or PlatformRole.none]
+    if target_rank >= PLATFORM_ROLE_RANK[PlatformRole.admin] and admin_rank < PLATFORM_ROLE_RANK[
+        PlatformRole.super_admin
+    ]:
+        raise PlatformError(
+            "forbidden",
+            "Только super_admin может изменять или удалять администраторов",
+            403,
+        )
+    if target_rank > admin_rank:
+        raise PlatformError("forbidden", "Нельзя управлять пользователем с более высокой ролью", 403)
+
+
+async def update_user(
+    db: AsyncSession,
+    admin: User,
+    target_id: uuid.UUID,
+    *,
+    name: str | None = None,
+    email: str | None = None,
+    is_active: bool | None = None,
+    must_change_password: bool | None = None,
+    password: str | None = None,
+    platform_role: PlatformRole | None = None,
+) -> User:
+    target = await db.get(User, target_id)
+    if not target:
+        raise PlatformError("not_found", "Пользователь не найден", 404)
+    _assert_can_manage(admin, target, action="update")
+
+    changes: list[str] = []
+    if name is not None:
+        clean = name.strip()
+        if len(clean) < 1 or len(clean) > 200:
+            raise PlatformError("bad_name", "Имя должно быть от 1 до 200 символов")
+        if clean != target.name:
+            target.name = clean
+            changes.append("name")
+    if email is not None:
+        clean_email = email.strip().lower()
+        if "@" not in clean_email or len(clean_email) > 320:
+            raise PlatformError("bad_email", "Некорректный email")
+        if clean_email != target.email:
+            taken = await db.scalar(
+                select(User.id).where(User.email == clean_email, User.id != target.id)
+            )
+            if taken:
+                raise PlatformError("email_taken", "Email уже занят", 409)
+            target.email = clean_email
+            changes.append("email")
+    if is_active is not None and is_active != target.is_active:
+        if target.id == admin.id and not is_active:
+            raise PlatformError("self", "Нельзя деактивировать себя")
+        target.is_active = is_active
+        if is_active:
+            target.blocked_until = None
+            target.block_reason = None
+        changes.append("is_active")
+    if must_change_password is not None and must_change_password != target.must_change_password:
+        target.must_change_password = must_change_password
+        changes.append("must_change_password")
+    if password is not None:
+        if len(password) < 8 or len(password) > 128:
+            raise PlatformError("bad_password", "Пароль должен быть от 8 до 128 символов")
+        target.password_hash = hash_password(password)
+        changes.append("password")
+        await revoke_all_user_tokens(db, target.id)
+    if platform_role is not None and platform_role != target.platform_role:
+        if PLATFORM_ROLE_RANK[admin.platform_role or PlatformRole.none] < PLATFORM_ROLE_RANK[
+            PlatformRole.super_admin
+        ]:
+            raise PlatformError("forbidden", "Только super_admin назначает роли", 403)
+        if target.id == admin.id and platform_role != PlatformRole.super_admin:
+            raise PlatformError("self", "Нельзя снять с себя super_admin")
+        target.platform_role = platform_role
+        if PLATFORM_ROLE_RANK[platform_role] >= PLATFORM_ROLE_RANK[PlatformRole.admin]:
+            target.role = UserRole.admin
+        elif target.role == UserRole.admin and platform_role == PlatformRole.none:
+            target.role = UserRole.member
+        changes.append(f"platform_role={platform_role.value}")
+
+    if not changes:
+        return target
+    await admin_service.audit(
+        db, admin.id, "user_updated", target.id, ", ".join(changes)[:500]
+    )
+    await db.flush()
+    return target
+
+
+async def delete_user(db: AsyncSession, admin: User, target_id: uuid.UUID) -> None:
+    target = await db.get(User, target_id)
+    if not target:
+        raise PlatformError("not_found", "Пользователь не найден", 404)
+    _assert_can_manage(admin, target, action="delete")
+    if target.platform_role == PlatformRole.super_admin:
+        others = await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.platform_role == PlatformRole.super_admin, User.id != target.id)
+        )
+        if not others:
+            raise PlatformError("last_super_admin", "Нельзя удалить последнего суперадмина")
+
+    await revoke_all_user_tokens(db, target.id)
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == target.id))
+
+    # Reassign non-cascading FK references to the acting admin, then delete.
+    await db.execute(
+        update(Task).where(Task.author_id == target.id).values(author_id=admin.id)
+    )
+    await db.execute(delete(TaskAssignee).where(TaskAssignee.user_id == target.id))
+    await db.execute(
+        update(Comment).where(Comment.author_id == target.id).values(author_id=admin.id)
+    )
+    await db.execute(
+        update(Attachment)
+        .where(Attachment.uploaded_by_id == target.id)
+        .values(uploaded_by_id=admin.id)
+    )
+    await db.execute(
+        update(ActivityLog).where(ActivityLog.user_id == target.id).values(user_id=admin.id)
+    )
+    await db.execute(
+        update(AdminAuditLog)
+        .where(AdminAuditLog.target_user_id == target.id)
+        .values(target_user_id=None)
+    )
+    await db.execute(
+        update(AdminAuditLog)
+        .where(AdminAuditLog.admin_id == target.id)
+        .values(admin_id=admin.id)
+    )
+    await db.execute(
+        update(UserBlock)
+        .where(UserBlock.created_by_id == target.id)
+        .values(created_by_id=admin.id)
+    )
+    await db.execute(
+        update(UserBlock)
+        .where(UserBlock.lifted_by_id == target.id)
+        .values(lifted_by_id=None)
+    )
+    await db.execute(delete(UserBlock).where(UserBlock.user_id == target.id))
+    await db.execute(
+        update(ProjectRestriction)
+        .where(ProjectRestriction.created_by_id == target.id)
+        .values(created_by_id=admin.id)
+    )
+    await db.execute(
+        update(ModerationReport)
+        .where(ModerationReport.assignee_id == target.id)
+        .values(assignee_id=None)
+    )
+    await db.execute(
+        update(ModerationReport)
+        .where(ModerationReport.decided_by_id == target.id)
+        .values(decided_by_id=None)
+    )
+    await db.execute(
+        update(ModerationAction)
+        .where(ModerationAction.actor_id == target.id)
+        .values(actor_id=admin.id)
+    )
+    await db.execute(
+        update(PlatformSetting)
+        .where(PlatformSetting.updated_by_id == target.id)
+        .values(updated_by_id=None)
+    )
+
+    email_snapshot = target.email
+    tid = target.id
+    await admin_service.audit(
+        db, admin.id, "user_deleted", None, f"email={email_snapshot}; id={tid}"
+    )
+    # Core DELETE avoids ORM nullifying non-nullable FKs via relationships.
+    await db.execute(delete(User).where(User.id == tid))
+    await db.flush()
 
 
 _PROJECT_SORT = {
