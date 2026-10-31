@@ -44,6 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const qc = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -92,6 +93,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (currentProjectId) setLastProjectId(currentProjectId);
   }, [currentProjectId]);
+
+  useEffect(() => {
+    try {
+      setSidebarHidden(localStorage.getItem("takt:sidebarHidden") === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function toggleSidebarHidden() {
+    setSidebarHidden((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("takt:sidebarHidden", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   // Старый id в URL после wipe / потери доступа — на главный экран проектов.
   useEffect(() => {
@@ -234,14 +255,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const Sidebar = (
-    <aside className="flex h-full w-[15.5rem] shrink-0 flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-3.5 py-4">
+    <aside className="flex h-full w-[19.5rem] shrink-0 flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
+      <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-4">
         <Link href="/app/projects" className="inline-flex min-w-0" aria-label="Takt">
-          <BrandLogo className="h-6" />
+          <BrandLogo className="h-7" />
         </Link>
         <div className="flex items-center gap-0.5">
           <NotificationsMenu onOpen={() => setNotificationsOpen(true)} />
           <ThemeMenu />
+          <button
+            type="button"
+            className="hidden h-8 w-8 items-center justify-center rounded-[var(--radius)] text-muted hover:bg-[var(--surface-2)] hover:text-foreground lg:inline-flex"
+            aria-label="Скрыть боковую панель"
+            title="Скрыть боковую панель"
+            onClick={toggleSidebarHidden}
+          >
+            <AppIcon name="chevron-left" size={16} />
+          </button>
         </div>
       </div>
 
@@ -404,7 +434,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <div className="sticky top-0 hidden h-dvh shrink-0 self-start lg:block">{Sidebar}</div>
+      {!sidebarHidden && (
+        <div className="sticky top-0 hidden h-dvh shrink-0 self-start lg:block">{Sidebar}</div>
+      )}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} aria-hidden />
@@ -424,6 +456,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <NotificationsMenu onOpen={() => setNotificationsOpen(true)} />
           <ThemeMenu />
         </header>
+        {sidebarHidden && (
+          <div className="z-20 hidden shrink-0 items-center gap-2 border-b border-hairline bg-[var(--surface)] px-3 py-1.5 lg:flex">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Показать боковую панель"
+              title="Показать боковую панель"
+              onClick={toggleSidebarHidden}
+            >
+              <AppIcon name="menu" size={16} />
+            </Button>
+            <BrandMark className="h-6" />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {projects.find((p) => p.id === currentProjectId)?.name || "Takt"}
+            </span>
+            <NotificationsMenu onOpen={() => setNotificationsOpen(true)} />
+            <ThemeMenu />
+          </div>
+        )}
         <main className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden bg-[var(--kanban-board-bg)] p-3 md:p-4">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">{children}</div>
         </main>

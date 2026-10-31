@@ -692,7 +692,7 @@ export function KanbanBoard({
   function renderColumnShell(status: Status, body: ReactNode) {
     return (
       <div
-        className="kanban-column-shell flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+        className="kanban-column-shell flex w-full max-h-[min(36rem,calc(100dvh-13rem))] flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
         style={columnShellStyle(status.color || "#607FA4")}
       >
         <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
@@ -793,13 +793,20 @@ export function KanbanBoard({
     </Dialog>
   );
 
-  const boardFrame = "flex min-h-0 flex-1 flex-col gap-3";
+  const boardFrame = "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain";
 
   /* Mobile: one column */
   if (!isDesktop) {
     return (
       <div className={boardFrame}>
-        <div className="flex min-h-0 flex-1 flex-col space-y-3 overflow-hidden">
+        <MemberTasksSection
+          projectId={projectId}
+          members={members}
+          statuses={statuses}
+          tasks={tasks}
+          onOpenTask={openTask}
+        />
+        <div className="flex flex-col space-y-3">
           <div className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Столбцы">
             {statuses.map((status) => {
               const active = status.id === mobileStatus.id;
@@ -823,27 +830,25 @@ export function KanbanBoard({
             })}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {renderColumnShell(
-              mobileStatus,
-              <div className="flex flex-col gap-2">
-                {mobileTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    draggable={false}
-                    isDone={!!statusById[task.status_id]?.is_done}
-                    statuses={statuses}
-                    onChangeStatus={(statusId) => moveToStatus(task, statusId)}
-                    onOpen={() => openTask(task.id)}
-                  />
-                ))}
-                {!mobileTasks.length && (
-                  <p className="py-8 text-center text-sm text-muted">Пока пусто</p>
-                )}
-              </div>
-            )}
-          </div>
+          {renderColumnShell(
+            mobileStatus,
+            <div className={cn("flex flex-col gap-2", !mobileTasks.length && "min-h-[2.5rem]")}>
+              {mobileTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  draggable={false}
+                  isDone={!!statusById[task.status_id]?.is_done}
+                  statuses={statuses}
+                  onChangeStatus={(statusId) => moveToStatus(task, statusId)}
+                  onOpen={() => openTask(task.id)}
+                />
+              ))}
+              {!mobileTasks.length && (
+                <p className="py-3 text-center text-sm text-muted">Пока пусто</p>
+              )}
+            </div>
+          )}
 
           {addingColumn ? (
             <form
@@ -878,13 +883,6 @@ export function KanbanBoard({
             </button>
           )}
         </div>
-        <MemberTasksSection
-          projectId={projectId}
-          members={members}
-          statuses={statuses}
-          tasks={tasks}
-          onOpenTask={openTask}
-        />
         {drawer}
         {deleteColumnDialog}
       </div>
@@ -894,6 +892,13 @@ export function KanbanBoard({
   /* Desktop */
   return (
     <div className={boardFrame}>
+      <MemberTasksSection
+        projectId={projectId}
+        members={members}
+        statuses={statuses}
+        tasks={tasks}
+        onOpenTask={openTask}
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -905,7 +910,7 @@ export function KanbanBoard({
           setDropIndicator(null);
         }}
       >
-        <div className="flex min-h-0 flex-1 items-stretch gap-3 overflow-x-auto">
+        <div className="flex items-start gap-3 overflow-x-auto pb-1">
           {statuses.map((status) => {
             const colTasks = byStatus[status.id] ?? [];
             const emptyDrop =
@@ -916,7 +921,12 @@ export function KanbanBoard({
               <KanbanColumn key={status.id} id={status.id} showEmptyIndicator={emptyDrop}>
                 {renderColumnShell(
                   status,
-                  <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+                  <div
+                    className={cn(
+                      "flex flex-col gap-2 overflow-y-auto",
+                      colTasks.length === 0 ? "min-h-[2.5rem]" : "min-h-0"
+                    )}
+                  >
                     <ColumnStartDroppable
                       statusId={status.id}
                       active={dropIndicator?.kind === "start" && dropIndicator.statusId === status.id}
@@ -986,13 +996,6 @@ export function KanbanBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
-      <MemberTasksSection
-        projectId={projectId}
-        members={members}
-        statuses={statuses}
-        tasks={tasks}
-        onOpenTask={openTask}
-      />
       {drawer}
       {deleteColumnDialog}
     </div>

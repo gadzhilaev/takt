@@ -149,7 +149,7 @@ export function MemberTasksSection({
 
   return (
     <section
-      className="max-h-[55%] min-h-[18rem] shrink-0 overflow-y-auto border-t border-hairline pt-3"
+      className="shrink-0 overflow-y-auto border-b border-hairline pb-3"
       aria-label={title}
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -163,17 +163,17 @@ export function MemberTasksSection({
       </div>
 
       {empty ? (
-        <p className="rounded-[var(--radius-lg)] border border-dashed border-hairline bg-[var(--surface)] px-4 py-6 text-center text-sm text-muted">
+        <p className="rounded-[var(--radius-lg)] border border-dashed border-hairline bg-[var(--surface)] px-4 py-4 text-center text-sm text-muted">
           У сотрудника пока нет задач
         </p>
       ) : isDesktop ? (
-        <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
+        <div className="flex items-start gap-3 overflow-x-auto pb-1">
           {statuses.map((status) => {
             const colTasks = byStatus[status.id] ?? [];
             return (
-              <div key={status.id} className="flex w-[17.5rem] shrink-0 flex-col">
+              <div key={status.id} className="flex w-[17.5rem] shrink-0 flex-col self-start">
                 <div
-                  className="kanban-column-shell flex min-h-[16rem] w-full flex-1 flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+                  className="kanban-column-shell flex w-full max-h-[min(20rem,40vh)] flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
                   style={columnShellStyle(status.color || "#607FA4")}
                 >
                   <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
@@ -181,7 +181,12 @@ export function MemberTasksSection({
                     <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold">{status.name}</h3>
                     <span className="text-[11px] tabular-nums text-muted">{colTasks.length}</span>
                   </div>
-                  <div className="flex max-h-72 min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+                  <div
+                    className={cn(
+                      "flex flex-col gap-2 overflow-y-auto",
+                      colTasks.length === 0 ? "min-h-[2rem]" : "min-h-0"
+                    )}
+                  >
                     {colTasks.map((task) => (
                       <TaskCard
                         key={task.id}
@@ -192,7 +197,7 @@ export function MemberTasksSection({
                       />
                     ))}
                     {!colTasks.length && (
-                      <p className="py-6 text-center text-[12px] text-muted">Пусто</p>
+                      <p className="py-2 text-center text-[12px] text-muted">Пусто</p>
                     )}
                   </div>
                 </div>
