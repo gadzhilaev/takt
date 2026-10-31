@@ -79,6 +79,8 @@ class OAuthLoginState(Base):
     nonce: Mapped[str | None] = mapped_column(String(128), nullable=True)
     redirect_uri: Mapped[str] = mapped_column(String(500), nullable=False)
     client_kind: Mapped[str] = mapped_column(String(32), default="web", nullable=False)  # web | mobile
+    # Relative post-login path, e.g. /invite/{token} or /app/projects/{id}.
+    return_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     link_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True
     )

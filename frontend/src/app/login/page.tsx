@@ -174,10 +174,17 @@ function LoginForm() {
               {error}
             </p>
           ) : null}
-          <OAuthButtons mode="login" />
+          <OAuthButtons mode="login" next={searchParams.get("next")} />
           <p className="mt-5 text-center text-sm text-muted">
             Нет аккаунта?{" "}
-            <Link href={paths.register} className="font-medium text-[var(--accent)]">
+            <Link
+              href={
+                searchParams.get("next")
+                  ? `${paths.register}?next=${encodeURIComponent(searchParams.get("next")!)}`
+                  : paths.register
+              }
+              className="font-medium text-[var(--accent)]"
+            >
               Регистрация
             </Link>
           </p>

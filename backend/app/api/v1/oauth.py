@@ -45,6 +45,7 @@ async def oauth_start(
     redirect_uri: str | None = None,
     client: Literal["web", "mobile"] = "web",
     link: bool = False,
+    next: str | None = Query(default=None, alias="next"),
     user: Annotated[User | None, Depends(get_current_user_optional)] = None,
 ):
     settings = get_settings()
@@ -64,6 +65,7 @@ async def oauth_start(
             redirect_uri=uri,
             client_kind=client,
             link_user_id=link_user_id,
+            return_path=next,
         )
         await db.commit()
     except oauth_service.OAuthError as e:
@@ -101,7 +103,7 @@ async def _finish_web(
 ) -> RedirectResponse:
     settings = get_settings()
     try:
-        user, created = await oauth_service.exchange_code(
+        user, created, return_path = await oauth_service.exchange_code(
             db, provider, code=code, state=state, device_id=device_id
         )
         access, refresh = await oauth_service.issue_session(db, user)
@@ -111,8 +113,9 @@ async def _finish_web(
         await db.rollback()
         return _login_error_redirect(settings, code=e.code, message=e.message)
 
-    # New OAuth users land in workspace the same as email registration.
-    redirect = RedirectResponse(f"{settings.APP_PUBLIC_URL}/app/projects", status_code=302)
+    # Keep invite/next path; membership only after explicit «Принять приглашение».
+    dest = return_path or "/app/projects"
+    redirect = RedirectResponse(f"{settings.APP_PUBLIC_URL}{dest}", status_code=302)
     set_auth_cookies(redirect, access, refresh)
     return redirect
 
@@ -196,7 +199,7 @@ async def oauth_mobile(
     user: Annotated[User | None, Depends(get_current_user_optional)] = None,
 ):
     try:
-        u, created = await oauth_service.mobile_complete(
+        u, created, _return_path = await oauth_service.mobile_complete(
             db,
             OAuthProvider(body.provider),
             code=body.code,

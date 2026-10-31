@@ -12,18 +12,11 @@ import { Input } from "@/components/ui/input";
 import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
 import { paths } from "@/lib/paths";
-import { setLastProjectId } from "@/lib/last-project";
 
 function safeNext(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return paths.projects;
   if (raw.startsWith("/login") || raw.startsWith("/register")) return paths.projects;
   return raw;
-}
-
-function inviteTokenFromNext(raw: string | null): string | undefined {
-  if (!raw) return undefined;
-  const m = raw.match(/^\/invite\/([^/?#]+)/);
-  return m?.[1];
 }
 
 // Без клиентских текстов ошибок — тексты приходят с API (validation + auth).
@@ -77,20 +70,14 @@ function RegisterForm() {
     setSending(true);
     try {
       const next = searchParams.get("next");
-      const inviteToken = inviteTokenFromNext(next);
-      const res = await api<{ joined_project_id?: string | null }>("/api/v1/auth/register/confirm", {
+      await api("/api/v1/auth/register/confirm", {
         method: "POST",
         json: {
           email: pending.email,
           code: code.trim(),
-          ...(inviteToken ? { invite_token: inviteToken } : {}),
         },
       });
-      if (res.joined_project_id) {
-        setLastProjectId(res.joined_project_id);
-        router.push(paths.project(res.joined_project_id));
-        return;
-      }
+      // Invite membership only after explicit accept on /invite/{token}.
       router.push(safeNext(next));
     } catch (err) {
       setError(err instanceof Error ? err.message : "");
@@ -197,7 +184,7 @@ function RegisterForm() {
                   {error}
                 </p>
               ) : null}
-              <OAuthButtons mode="register" />
+              <OAuthButtons mode="register" next={searchParams.get("next")} />
             </>
           ) : (
             <form className="space-y-3" onSubmit={onConfirm}>

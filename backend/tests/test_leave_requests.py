@@ -41,7 +41,10 @@ async def test_leave_request_and_owner_remove(admin_client: AsyncClient):
     async with AsyncClient(transport=transport, base_url="http://test") as member:
         reg = await register_verified(member, name="Участник", email="leaver@example.com")
         member_id = reg["user"]["id"]
-        assert reg.get("joined_project_id") == pid
+        mine = await member.get("/api/v1/invites/mine")
+        assert len(mine.json()["items"]) == 1
+        invite_id = mine.json()["items"][0]["id"]
+        assert (await member.post(f"/api/v1/invites/{invite_id}/accept")).status_code == 200
 
         leave = await member.post(f"/api/v1/projects/{pid}/leave-requests")
         assert leave.status_code == 200, leave.text

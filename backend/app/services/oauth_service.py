@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import secrets
 import time
 import uuid
@@ -185,6 +186,30 @@ async def _provider_enabled(
     return bool(avail["providers"][provider.value]["enabled"])
 
 
+def sanitize_return_path(raw: str | None) -> str | None:
+    """Allow only same-origin relative paths (invite, app routes)."""
+    if not raw:
+        return None
+    path = raw.strip()
+    if not path.startswith("/") or path.startswith("//"):
+        return None
+    if "://" in path or "\\" in path:
+        return None
+    if len(path) > 500:
+        return None
+    for prefix in ("/login", "/register", "/forgot-password", "/auth", "/api"):
+        if path == prefix or path.startswith(f"{prefix}/") or path.startswith(f"{prefix}?"):
+            return None
+    return path
+
+
+def invite_token_from_path(path: str | None) -> str | None:
+    if not path:
+        return None
+    m = re.match(r"^/invite/([^/?#]+)", path)
+    return m.group(1) if m else None
+
+
 async def start_oauth(
     db: AsyncSession,
     provider: OAuthProvider,
@@ -192,6 +217,7 @@ async def start_oauth(
     redirect_uri: str,
     client_kind: str = "web",
     link_user_id: uuid.UUID | None = None,
+    return_path: str | None = None,
 ) -> dict[str, str]:
     settings = get_settings()
     if not await _provider_enabled(db, provider, settings):
@@ -216,6 +242,7 @@ async def start_oauth(
             nonce=nonce,
             redirect_uri=redirect_uri,
             client_kind=client_kind,
+            return_path=sanitize_return_path(return_path),
             link_user_id=link_user_id,
             created_at=now,
             expires_at=now + timedelta(minutes=10),
@@ -465,14 +492,16 @@ async def exchange_code(
     code: str,
     state: str,
     device_id: str | None = None,
-) -> tuple[User, bool]:
-    """Complete web OAuth. Returns (user, created)."""
+) -> tuple[User, bool, str | None]:
+    """Complete web OAuth. Returns (user, created, return_path)."""
     row = await _consume_state(db, state, provider)
+    return_path = sanitize_return_path(row.return_path)
     profile = await _fetch_profile(provider, code, row.redirect_uri, row.code_verifier, device_id)
     if row.link_user_id:
         user = await link_identity(db, row.link_user_id, profile)
-        return user, False
-    return await login_or_register(db, profile)
+        return user, False, return_path
+    user, created = await login_or_register(db, profile)
+    return user, created, return_path
 
 
 async def mobile_complete(
@@ -487,16 +516,18 @@ async def mobile_complete(
     state: str | None = None,
     display_name: str | None = None,
     link_user_id: uuid.UUID | None = None,
-) -> tuple[User, bool]:
+) -> tuple[User, bool, str | None]:
     settings = get_settings()
     if not await _provider_enabled(db, provider, settings):
         raise OAuthError("provider_disabled", f"Провайдер {provider.value} недоступен")
 
-    # PKCE state с сервера: verifier / redirect / device_id (VK nonce) / link.
+    return_path: str | None = None
+    # PKCE state с сервера: verifier / redirect / device_id (VK nonce) / link / return_path.
     if state:
         row = await _consume_state(db, state, provider)
         redirect_uri = row.redirect_uri
         code_verifier = row.code_verifier
+        return_path = sanitize_return_path(row.return_path)
         if not device_id and provider == OAuthProvider.vk:
             device_id = row.nonce
         if not link_user_id and row.link_user_id:
@@ -523,8 +554,9 @@ async def mobile_complete(
     else:
         raise OAuthError("missing_code", "Нужен code или id_token")
     if link_user_id:
-        return await link_identity(db, link_user_id, profile), False
-    return await login_or_register(db, profile)
+        return await link_identity(db, link_user_id, profile), False, return_path
+    user, created = await login_or_register(db, profile)
+    return user, created, return_path
 
 
 async def _fetch_profile(
@@ -639,6 +671,10 @@ async def login_or_register(db: AsyncSession, profile: ProviderProfile) -> tuple
     created = True
     await _attach_identity(db, user.id, profile)
     await _maybe_set_avatar_from_url(user, profile.avatar_url, force=True)
+    # Match email invites the same way as email registration.
+    from app.services import invite_service
+
+    await invite_service.link_pending_invites_to_user(db, user)
     await record_activity(
         db,
         user.id,

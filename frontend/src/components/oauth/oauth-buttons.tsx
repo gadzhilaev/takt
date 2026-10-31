@@ -30,7 +30,14 @@ const PROVIDER_ICONS: Record<string, { src: string; alt: string }> = {
 /** Web: только VK / Яндекс. Apple — только в мобильном приложении. */
 const WEB_PROVIDERS = new Set(["vk", "yandex"]);
 
-export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" | "link" }) {
+export function OAuthButtons({
+  mode = "login",
+  next,
+}: {
+  mode?: "login" | "register" | "link";
+  /** Preserve invite / deep link through OAuth redirect (e.g. /invite/{token}). */
+  next?: string | null;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const { data } = useOAuthProviders();
@@ -43,8 +50,13 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" |
     setErr("");
     setBusy(provider);
     try {
+      const qs = new URLSearchParams({ client: "web" });
+      if (mode === "link") qs.set("link", "true");
+      if (next && next.startsWith("/") && !next.startsWith("//")) {
+        qs.set("next", next);
+      }
       const res = await api<{ authorize_url: string }>(
-        `/api/v1/auth/oauth/${provider}/start?client=web${mode === "link" ? "&link=true" : ""}`
+        `/api/v1/auth/oauth/${provider}/start?${qs.toString()}`
       );
       window.location.href = res.authorize_url;
     } catch (e) {
