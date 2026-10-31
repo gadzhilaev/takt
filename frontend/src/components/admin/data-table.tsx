@@ -36,14 +36,15 @@ type Props<T> = {
   onRowClick?: (row: T) => void;
 };
 
-type Persist = { order: string[]; widths: Record<string, number> };
+type Persist = { widths: Record<string, number> };
 
 function loadPersist(key: string): Persist | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
-    return JSON.parse(raw) as Persist;
+    const parsed = JSON.parse(raw) as Persist & { order?: string[] };
+    return { widths: parsed.widths ?? {} };
   } catch {
     return null;
   }
@@ -69,46 +70,39 @@ export function DataTable<T>({
   empty,
   onRowClick,
 }: Props<T>) {
-  const defaults = useMemo(() => {
+  const defaultWidths = useMemo(() => {
     const widths: Record<string, number> = {};
     for (const c of columns) widths[c.id] = c.width ?? 140;
-    return { order: columns.map((c) => c.id), widths };
+    return widths;
   }, [columns]);
 
-  const [order, setOrder] = useState<string[]>(defaults.order);
-  const [widths, setWidths] = useState<Record<string, number>>(defaults.widths);
-  const dragCol = useRef<string | null>(null);
+  const [widths, setWidths] = useState<Record<string, number>>(defaultWidths);
   const resize = useRef<{ id: string; startX: number; startW: number } | null>(null);
 
   useEffect(() => {
     const saved = loadPersist(storageKey);
-    if (!saved) return;
-    const known = new Set(columns.map((c) => c.id));
-    const nextOrder = [
-      ...saved.order.filter((id) => known.has(id)),
-      ...columns.map((c) => c.id).filter((id) => !saved.order.includes(id)),
-    ];
-    const nextWidths = { ...defaults.widths, ...saved.widths };
-    setOrder(nextOrder);
-    setWidths(nextWidths);
+    if (!saved?.widths) return;
+    setWidths({ ...defaultWidths, ...saved.widths });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   useEffect(() => {
-    savePersist(storageKey, { order, widths });
-  }, [storageKey, order, widths]);
+    savePersist(storageKey, { widths });
+  }, [storageKey, widths]);
 
   const byId = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns]);
-  const visible = order.map((id) => byId.get(id)).filter(Boolean) as DataTableColumn<T>[];
 
-  const onResizeMove = useCallback((e: MouseEvent) => {
-    const r = resize.current;
-    if (!r) return;
-    const col = byId.get(r.id);
-    const min = col?.minWidth ?? 80;
-    const next = Math.max(min, r.startW + (e.clientX - r.startX));
-    setWidths((prev) => ({ ...prev, [r.id]: next }));
-  }, [byId]);
+  const onResizeMove = useCallback(
+    (e: MouseEvent) => {
+      const r = resize.current;
+      if (!r) return;
+      const col = byId.get(r.id);
+      const min = col?.minWidth ?? 80;
+      const next = Math.max(min, r.startW + (e.clientX - r.startX));
+      setWidths((prev) => ({ ...prev, [r.id]: next }));
+    },
+    [byId]
+  );
 
   const onResizeUp = useCallback(() => {
     resize.current = null;
@@ -124,30 +118,6 @@ export function DataTable<T>({
     window.addEventListener("mouseup", onResizeUp);
   };
 
-  const onDragStart = (id: string) => {
-    dragCol.current = id;
-  };
-
-  const onDragOver = (e: React.DragEvent, overId: string) => {
-    e.preventDefault();
-    const from = dragCol.current;
-    if (!from || from === overId) return;
-    setOrder((prev) => {
-      const next = [...prev];
-      const fromIdx = next.indexOf(from);
-      const toIdx = next.indexOf(overId);
-      if (fromIdx < 0 || toIdx < 0) return prev;
-      next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, from);
-      return next;
-    });
-    dragCol.current = overId;
-  };
-
-  const onDragEnd = () => {
-    dragCol.current = null;
-  };
-
   if (!rows.length && !isFetching) {
     return (
       <div className="rounded-[var(--radius)] border border-[var(--border)] bg-white px-4 py-8 text-center text-[13px] text-muted">
@@ -156,6 +126,8 @@ export function DataTable<T>({
     );
   }
 
+  const minWidth = columns.reduce((s, c) => s + (widths[c.id] ?? 140), 0);
+
   return (
     <div className="relative overflow-x-auto rounded-[var(--radius)] border border-[var(--border)] bg-white">
       {isFetching ? (
@@ -163,26 +135,25 @@ export function DataTable<T>({
           <div className="h-full w-1/3 animate-pulse bg-[var(--accent)]" />
         </div>
       ) : null}
-      <table className="w-full border-separate border-spacing-0 text-left text-[13px]" style={{ tableLayout: "fixed", minWidth: visible.reduce((s, c) => s + (widths[c.id] ?? 140), 0) }}>
+      <table
+        className="w-full border-collapse text-left text-[13px]"
+        style={{ tableLayout: "fixed", minWidth }}
+      >
         <colgroup>
-          {visible.map((c) => (
+          {columns.map((c) => (
             <col key={c.id} style={{ width: widths[c.id] ?? 140 }} />
           ))}
         </colgroup>
-        <thead className="border-b border-[var(--border)] text-muted">
-          <tr>
-            {visible.map((c) => {
+        <thead>
+          <tr className="bg-[#f4f6f8]">
+            {columns.map((c) => {
               const sortKey = c.sortKey ?? c.id;
               const active = Boolean(c.sortable && sort === sortKey);
               return (
                 <th
                   key={c.id}
-                  draggable
-                  onDragStart={() => onDragStart(c.id)}
-                  onDragOver={(e) => onDragOver(e, c.id)}
-                  onDragEnd={onDragEnd}
                   className={cn(
-                    "relative select-none border-b border-[var(--border)] bg-white px-3 py-2 font-medium",
+                    "relative border border-[var(--border)] px-3 py-2 font-medium text-muted",
                     c.className
                   )}
                   style={{ width: widths[c.id] } as CSSProperties}
@@ -208,7 +179,7 @@ export function DataTable<T>({
                     role="separator"
                     aria-orientation="vertical"
                     aria-label={`Ширина: ${c.label}`}
-                    className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-[var(--accent)]/30"
+                    className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize hover:bg-[var(--accent)]/35"
                     onMouseDown={(e) => startResize(c.id, e)}
                   />
                 </th>
@@ -217,19 +188,22 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row, idx) => (
             <tr
               key={rowKey(row)}
               className={cn(
-                "border-b border-[var(--border)] last:border-0",
-                onRowClick ? "cursor-pointer hover:bg-[#f7f8fa]" : null
+                idx % 2 === 1 ? "bg-[#fafbfc]" : "bg-white",
+                onRowClick ? "cursor-pointer hover:bg-[#eef3f6]" : null
               )}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
-              {visible.map((c) => (
+              {columns.map((c) => (
                 <td
                   key={c.id}
-                  className={cn("truncate px-3 py-2 align-middle", c.className)}
+                  className={cn(
+                    "truncate border border-[var(--border)] px-3 py-2 align-middle",
+                    c.className
+                  )}
                   style={{ width: widths[c.id] }}
                 >
                   {c.cell(row)}

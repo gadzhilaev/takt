@@ -162,9 +162,10 @@ async def update_user(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: uuid.UUID,
-    admin: Annotated[User, Depends(require_platform_admin)],
+    admin: Annotated[User, Depends(require_super_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    """Удаление аккаунта — только super_admin."""
     try:
         await pas.delete_user(db, admin, user_id)
     except pas.PlatformError as e:

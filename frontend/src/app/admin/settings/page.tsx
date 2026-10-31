@@ -103,6 +103,20 @@ export default function AdminSettingsPage() {
         <p className="mt-1 text-[13px] text-muted">Входы, поддержка и политика конфиденциальности.</p>
       </div>
 
+      <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4 text-[13px]">
+        <h2 className="text-[14px] font-semibold">Роли платформы</h2>
+        <ul className="mt-2 space-y-1.5 text-muted">
+          <li>
+            <span className="font-medium text-foreground">Админ</span> — пользователи (без удаления и
+            назначения ролей), проекты, ограничения, модерация, обзор, система
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Суперадмин</span> — всё выше + удаление
+            пользователей, роли платформы, эти настройки
+          </li>
+        </ul>
+      </section>
+
       <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
         <h2 className="text-[14px] font-semibold">Способы входа</h2>
         <ul className="mt-3 space-y-2">

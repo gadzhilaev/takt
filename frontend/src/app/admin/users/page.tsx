@@ -128,7 +128,7 @@ export default function AdminUsersPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Пользователи</h1>
         <p className="mt-1 text-[13px] text-muted">
-          Сортировка по заголовку · ширину тяните за край колонки · порядок — перетаскиванием
+          Сортировка по заголовку · ширину колонки тяните за правый край
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

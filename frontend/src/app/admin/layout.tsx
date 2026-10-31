@@ -10,14 +10,15 @@ import { BrandLogo } from "@/components/brand-mark";
 import { cn } from "@/lib/utils";
 import { platformRoleLabel } from "@/lib/types";
 
-const NAV = [
+const NAV_BASE = [
   { href: "/admin", label: "Обзор", exact: true },
   { href: "/admin/users", label: "Пользователи" },
   { href: "/admin/projects", label: "Проекты" },
   { href: "/admin/moderation", label: "Модерация" },
   { href: "/admin/system", label: "Система" },
-  { href: "/admin/settings", label: "Настройки" },
-];
+] as const;
+
+const NAV_SUPER = [{ href: "/admin/settings", label: "Настройки" }] as const;
 
 type PlatformMe = { platform_role: string; name: string; email: string };
 
@@ -87,6 +88,9 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
     );
   }
 
+  const nav =
+    user.platform_role === "super_admin" ? [...NAV_BASE, ...NAV_SUPER] : [...NAV_BASE];
+
   return (
     <div className="platform-admin min-h-screen text-[#202938]">
       <header className="border-b border-[#dce2e7] bg-white">
@@ -112,8 +116,9 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
         <nav className="hidden w-48 shrink-0 md:block" aria-label="Разделы админки">
           <ul className="space-y-1">
-            {NAV.map((item) => {
-              const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+            {nav.map((item) => {
+              const exact = "exact" in item && item.exact;
+              const active = exact ? pathname === item.href : pathname.startsWith(item.href);
               return (
                 <li key={item.href}>
                   <Link

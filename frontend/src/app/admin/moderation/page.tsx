@@ -108,31 +108,35 @@ export default function AdminModerationPage() {
 
       {items.length > 0 ? (
         <div className="overflow-x-auto rounded-[var(--radius)] border border-[var(--border)] bg-white">
-          <table className="w-full min-w-[760px] text-left text-[13px]">
-            <thead className="border-b border-[var(--border)] text-muted">
-              <tr>
-                <th className="px-3 py-2 font-medium">Причина</th>
-                <th className="px-3 py-2 font-medium">Цель</th>
-                <th className="px-3 py-2 font-medium">Статус</th>
-                <th className="px-3 py-2 font-medium">Создана</th>
-                <th className="px-3 py-2 font-medium">Решение</th>
+          <table className="w-full min-w-[760px] border-collapse text-left text-[13px]">
+            <thead>
+              <tr className="bg-[#f4f6f8] text-muted">
+                <th className="border border-[var(--border)] px-3 py-2 font-medium">Причина</th>
+                <th className="border border-[var(--border)] px-3 py-2 font-medium">Цель</th>
+                <th className="border border-[var(--border)] px-3 py-2 font-medium">Статус</th>
+                <th className="border border-[var(--border)] px-3 py-2 font-medium">Создана</th>
+                <th className="border border-[var(--border)] px-3 py-2 font-medium">Решение</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((r) => {
+              {items.map((r, idx) => {
                 const open = r.status === "open" || r.status === "in_review";
                 return (
-                  <tr key={r.id} className="border-b border-[var(--border)] last:border-0">
-                    <td className="px-3 py-2 font-medium">{r.reason_code}</td>
-                    <td className="px-3 py-2 text-muted">
+                  <tr key={r.id} className={idx % 2 === 1 ? "bg-[#fafbfc]" : "bg-white"}>
+                    <td className="border border-[var(--border)] px-3 py-2 font-medium">
+                      {r.reason_code}
+                    </td>
+                    <td className="border border-[var(--border)] px-3 py-2 text-muted">
                       {TARGET_LABELS[r.target_type] ?? r.target_type}
                       <span className="ml-1 font-mono text-[11px]">{r.target_id.slice(0, 8)}…</span>
                     </td>
-                    <td className="px-3 py-2">{STATUS_LABELS[r.status] ?? r.status}</td>
-                    <td className="px-3 py-2 tabular-nums text-muted">
+                    <td className="border border-[var(--border)] px-3 py-2">
+                      {STATUS_LABELS[r.status] ?? r.status}
+                    </td>
+                    <td className="border border-[var(--border)] px-3 py-2 tabular-nums text-muted">
                       {r.created_at ? new Date(r.created_at).toLocaleString("ru-RU") : "—"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {open ? (
                         <div className="flex flex-wrap gap-1.5">
                           <Button

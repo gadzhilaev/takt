@@ -291,29 +291,30 @@ export default function AdminUserDetailPage() {
         </div>
       </section>
 
-      <section className="space-y-2 rounded-[var(--radius)] border border-[var(--danger)]/30 bg-white p-4">
-        <h2 className="text-[14px] font-semibold text-[var(--danger)]">Удаление</h2>
-        <p className="text-[13px] text-muted">
-          Аккаунт удаляется безвозвратно. Задачи пользователя переназначаются на вас как автора;
-          членства и сессии снимаются.
-        </p>
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={remove.isPending}
-          onClick={() => {
-            const ok = window.confirm(
-              `Удалить пользователя «${u.name}» (${u.email})? Это действие нельзя отменить.`
-            );
-            if (ok) remove.mutate();
-          }}
-        >
-          {remove.isPending ? "Удаляем…" : "Удалить пользователя"}
-        </Button>
-        {remove.isError ? (
-          <p className="text-[13px] text-[var(--danger)]">{(remove.error as Error).message}</p>
-        ) : null}
-      </section>
+      {isSuper ? (
+        <section className="space-y-2 rounded-[var(--radius)] border border-[var(--danger)]/30 bg-white p-4">
+          <h2 className="text-[14px] font-semibold text-[var(--danger)]">Удаление</h2>
+          <p className="text-[13px] text-muted">
+            Только суперадмин. Задачи переназначаются на вас; членства и сессии снимаются.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={remove.isPending}
+            onClick={() => {
+              const ok = window.confirm(
+                `Удалить пользователя «${u.name}» (${u.email})? Это действие нельзя отменить.`
+              );
+              if (ok) remove.mutate();
+            }}
+          >
+            {remove.isPending ? "Удаляем…" : "Удалить пользователя"}
+          </Button>
+          {remove.isError ? (
+            <p className="text-[13px] text-[var(--danger)]">{(remove.error as Error).message}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       <section>
         <h2 className="text-[14px] font-semibold">История админ-действий</h2>
