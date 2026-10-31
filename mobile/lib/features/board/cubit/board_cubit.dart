@@ -160,17 +160,29 @@ class BoardCubit extends Cubit<BoardState> {
       final projects = await this.projects.listProjects();
       await cache.saveProjects(projects);
       final visible = projects.where((p) => !taktIsTestProject(p)).toList();
+      // Сервер — источник истины: пустой список затирает локальный кэш на экране.
+      if (visible.isEmpty) {
+        emit(state.copyWith(
+          projects: const [],
+          loading: false,
+          refreshing: false,
+          clearProject: true,
+          offline: false,
+          clearError: true,
+        ));
+        return;
+      }
       String? openId = preferProjectId;
       if (openId != null && openId.isNotEmpty) {
         final match = visible.where((p) => p.id == openId).toList();
         if (match.isEmpty) openId = null;
       }
       if (openId != null) {
-        await openProject(openId, projects: projects, forceLoading: forceLoading);
+        await openProject(openId, projects: visible, forceLoading: forceLoading);
         return;
       }
       emit(state.copyWith(
-        projects: projects,
+        projects: visible,
         loading: false,
         refreshing: false,
         clearProject: true,
@@ -231,6 +243,12 @@ class BoardCubit extends Cubit<BoardState> {
 
   void clearProject() {
     emit(state.copyWith(clearProject: true, clearError: true));
+  }
+
+  /// Сброс памяти + диска (logout или когда на сервере больше нет проектов).
+  Future<void> clearLocal() async {
+    await cache.clearAll();
+    emit(const BoardState());
   }
 
   /// Opens a project: hydrate from memory/disk first, then fetch in background.

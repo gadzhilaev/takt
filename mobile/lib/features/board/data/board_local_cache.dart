@@ -26,8 +26,32 @@ class BoardLocalCache {
       final prefs = await SharedPreferences.getInstance();
       final raw = jsonEncode(projects.map((p) => p.toJson()).toList());
       await prefs.setString(_projectsKey, raw);
+      await _pruneBoardKeys(prefs, projects.map((p) => p.id).toSet());
     } catch (_) {
       /* ignore cache write failures */
+    }
+  }
+
+  /// Полная очистка локального кэша (logout / сервер опустел).
+  Future<void> clearAll() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((k) => k.startsWith('takt_cache_') || k == 'takt_last_project_id').toList();
+      for (final k in keys) {
+        await prefs.remove(k);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  Future<void> _pruneBoardKeys(SharedPreferences prefs, Set<String> keepIds) async {
+    final prefix = 'takt_cache_board_v1_';
+    for (final k in prefs.getKeys().where((k) => k.startsWith(prefix)).toList()) {
+      final id = k.substring(prefix.length);
+      if (!keepIds.contains(id)) {
+        await prefs.remove(k);
+      }
     }
   }
 

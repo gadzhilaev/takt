@@ -154,7 +154,9 @@ class _TaktAppState extends State<TaktApp> {
                   _consumeDeepLink();
                 });
               } else if (state is AuthGuest) {
-                context.read<BoardCubit>().setCurrentUserId(null);
+                final board = context.read<BoardCubit>();
+                board.setCurrentUserId(null);
+                unawaited(board.clearLocal());
               }
             },
             child: ListenableBuilder(

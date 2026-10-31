@@ -6,9 +6,8 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import { api } from "@/lib/api";
 import type { Project } from "@/lib/types";
 import { KanbanBoard } from "@/components/kanban-board";
-import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { setLastProjectId } from "@/lib/last-project";
+import { clearLastProjectId, setLastProjectId } from "@/lib/last-project";
 
 function ProjectBoardInner() {
   const { id } = useParams<{ id: string }>();
@@ -38,14 +37,17 @@ function ProjectBoardInner() {
     queryFn: () => api<{ project: Project }>(`/api/v1/projects/${id}`),
   });
 
+  // Удалённый / чужой project id в URL — на экран создания / список, без ErrorState.
+  useEffect(() => {
+    if (projectQuery.isLoading) return;
+    if (!projectQuery.isError && projectQuery.data?.project) return;
+    clearLastProjectId();
+    router.replace("/app/projects");
+  }, [projectQuery.isLoading, projectQuery.isError, projectQuery.data?.project, router]);
+
   if (projectQuery.isLoading) return <Skeleton className="h-64 w-full shrink-0" />;
   if (projectQuery.isError || !projectQuery.data?.project) {
-    return (
-      <ErrorState
-        message={(projectQuery.error as Error)?.message || "Проект не найден"}
-        onRetry={() => projectQuery.refetch()}
-      />
-    );
+    return <Skeleton className="h-64 w-full shrink-0" />;
   }
 
   const project = projectQuery.data.project;

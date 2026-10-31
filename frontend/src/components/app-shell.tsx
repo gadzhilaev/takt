@@ -16,7 +16,7 @@ import { NotificationsDrawer } from "@/components/notifications-drawer";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { ProfileDrawer } from "@/components/profile-drawer";
 import { ThemeMenu } from "@/components/ui/theme-menu";
-import { getLastProjectId, setLastProjectId } from "@/lib/last-project";
+import { clearLastProjectId, getLastProjectId, setLastProjectId } from "@/lib/last-project";
 import { cn } from "@/lib/utils";
 
 type InviteItem = {
@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   });
 
   const user = data?.user;
-  const projects = projectsData?.items ?? [];
+  const projects = useMemo(() => projectsData?.items ?? [], [projectsData?.items]);
   const myInvites = invitesData?.items ?? [];
   const unreadCount = notifMeta?.unread ?? 0;
 
@@ -90,13 +90,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (currentProjectId) setLastProjectId(currentProjectId);
   }, [currentProjectId]);
 
+  // Старый id в URL после wipe / потери доступа — на главный экран проектов.
+  useEffect(() => {
+    if (!projectsData || !currentProjectId) return;
+    if (projects.some((p) => p.id === currentProjectId)) return;
+    clearLastProjectId();
+    router.replace("/app/projects");
+  }, [projectsData, projects, currentProjectId, router]);
+
   useEffect(() => {
     if (!pathname.startsWith("/app/inbox")) return;
     setNotificationsOpen(true);
     setMobileOpen(false);
     const fallback = getLastProjectId();
-    router.replace(fallback ? `/app/projects/${fallback}` : "/app/projects");
-  }, [pathname, router]);
+    const valid = fallback && projects.some((p) => p.id === fallback) ? fallback : null;
+    router.replace(valid ? `/app/projects/${valid}` : "/app/projects");
+  }, [pathname, router, projects]);
 
   const createProject = useMutation({
     mutationFn: () =>
