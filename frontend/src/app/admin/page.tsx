@@ -28,11 +28,20 @@ type Analytics = {
 
 const RANGES = [7, 30, 90] as const;
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
   return (
     <div className="rounded-[var(--radius)] border border-[var(--border)] bg-white px-4 py-3">
-      <p className="text-[12px] text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+      <p className="text-[13px] font-medium leading-snug">{label}</p>
+      {hint ? <p className="mt-0.5 text-[12px] leading-snug text-muted">{hint}</p> : null}
+      <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
     </div>
   );
 }
@@ -116,13 +125,39 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Пользователи" value={d.users_total} />
-        <Stat label="Новые / 7д" value={d.users_new_7d} />
-        <Stat label="Проекты" value={d.projects_total} />
-        <Stat label="Задачи" value={d.tasks_total} />
-        <Stat label="DAU / WAU / MAU" value={`${d.dau} / ${d.wau} / ${d.mau}`} />
-        <Stat label="Жалобы · блок." value={`${d.open_reports} · ${d.active_blocks}`} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <Stat
+          label="Всего пользователей"
+          hint="Зарегистрированные аккаунты"
+          value={d.users_total}
+        />
+        <Stat
+          label="Новые за неделю"
+          hint="Аккаунты за последние 7 дней"
+          value={d.users_new_7d}
+        />
+        <Stat label="Проекты" hint="Все доски на платформе" value={d.projects_total} />
+        <Stat label="Задачи" hint="Неудалённые задачи во всех проектах" value={d.tasks_total} />
+        <Stat
+          label="Заходили за сутки"
+          hint="Уникальные пользователи с входом за 24 часа"
+          value={d.dau}
+        />
+        <Stat
+          label="Заходили за неделю"
+          hint="Уникальные пользователи с входом за 7 дней"
+          value={d.wau}
+        />
+        <Stat
+          label="Заходили за месяц"
+          hint="Уникальные пользователи с входом за 30 дней"
+          value={d.mau}
+        />
+        <Stat
+          label="Жалобы и блокировки"
+          hint="Открытые жалобы · заблокированные аккаунты"
+          value={`${d.open_reports} · ${d.active_blocks}`}
+        />
       </div>
 
       {analytics.isLoading && !a ? (
