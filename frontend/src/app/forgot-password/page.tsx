@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { BrandLogo } from "@/components/brand-mark";
 import { paths } from "@/lib/paths";
 
@@ -109,7 +110,7 @@ export default function ForgotPasswordPage() {
           </div>
 
           {step === "email" ? (
-            <form className="space-y-3.5" onSubmit={onSend}>
+            <form className="space-y-3.5" noValidate onSubmit={onSend}>
               <div>
                 <label className="label-text" htmlFor="forgot-email">
                   Email
@@ -156,9 +157,8 @@ export default function ForgotPasswordPage() {
                 <label className="label-text" htmlFor="forgot-pass">
                   Новый пароль
                 </label>
-                <Input
+                <PasswordInput
                   id="forgot-pass"
-                  type="password"
                   autoComplete="new-password"
                   value={password}
                   onChange={(ev) => setPassword(ev.target.value)}
@@ -170,9 +170,8 @@ export default function ForgotPasswordPage() {
                 <label className="label-text" htmlFor="forgot-pass2">
                   Подтверждение пароля
                 </label>
-                <Input
+                <PasswordInput
                   id="forgot-pass2"
-                  type="password"
                   autoComplete="new-password"
                   value={passwordConfirm}
                   onChange={(ev) => setPasswordConfirm(ev.target.value)}

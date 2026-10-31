@@ -156,7 +156,9 @@ class _LoginPageState extends State<LoginPage> {
                                             ),
                                             validator: (v) {
                                               final value = (v ?? '').trim();
-                                              if (value.isEmpty || !value.contains('@')) return '';
+                                              if (value.isEmpty || !value.contains('@')) {
+                                                return 'Введите корректный email';
+                                              }
                                               return null;
                                             },
                                           ),
@@ -183,7 +185,7 @@ class _LoginPageState extends State<LoginPage> {
                                               ),
                                             ),
                                             validator: (v) =>
-                                                (v == null || v.isEmpty) ? '' : null,
+                                                (v == null || v.isEmpty) ? 'Введите пароль' : null,
                                           ),
                                           Align(
                                             alignment: Alignment.centerRight,

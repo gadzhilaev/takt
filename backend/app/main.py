@@ -89,16 +89,26 @@ async def _validation_ru_handler(request: Request, exc: RequestValidationError):
     # Pydantic ValueError из model_validator: "Value error, Пароли не совпадают"
     if raw.startswith("Value error, "):
         raw = raw[len("Value error, ") :].strip()
+    loc_l = loc.lower()
     if raw and typ == "value_error":
         message = raw
     elif typ.endswith("missing") or typ == "missing":
         message = "Заполните обязательные поля"
-    elif "email" in loc.lower() or "email" in typ:
+    elif "email" in loc_l or "email" in typ:
         message = "Введите корректный email"
-    elif "password" in loc.lower():
+    elif "password" in loc_l and ("too_short" in typ or "min_length" in typ):
+        message = "Пароль не короче 8 символов"
+    elif "password" in loc_l:
         message = "Проверьте пароль"
+    elif "too_short" in typ or "min_length" in typ:
+        message = "Слишком короткое значение"
+    elif "too_long" in typ or "max_length" in typ:
+        message = "Слишком длинное значение"
+    elif "string_type" in typ or "type_error" in typ:
+        message = "Некорректный формат данных"
     else:
-        message = raw if raw else "Некорректные данные запроса"
+        # Не отдаём сырой английский текст pydantic пользователю.
+        message = "Некорректные данные запроса"
     return JSONResponse(
         status_code=422,
         content={"detail": {"error": {"code": "validation_error", "message": message}}},

@@ -143,7 +143,26 @@ class ApiClient {
     }
   }
 
-  /// Текст ошибки только с сервера (`detail.error.message`). Без локальных словарей.
+  static String _localize(String raw) {
+    final msg = raw.trim();
+    if (msg.isEmpty) return msg;
+    final lower = msg.toLowerCase();
+    if (lower.contains('invalid email') || lower.contains('not a valid email')) {
+      return 'Введите корректный email';
+    }
+    if (lower.contains('at least 8') || lower.contains('string should have at least')) {
+      return 'Пароль не короче 8 символов';
+    }
+    if (lower.contains('field required') || lower == 'required') {
+      return 'Заполните обязательные поля';
+    }
+    if (RegExp(r'^[a-z][a-z0-9_]+$', caseSensitive: false).hasMatch(msg)) {
+      return 'Ошибка запроса';
+    }
+    return msg;
+  }
+
+  /// Текст ошибки с сервера; английские validation-фразы переводим.
   String messageFromError(Object error) {
     if (error is MissingPluginException) {
       return 'Плагин не подключён. Полностью перезапустите приложение (stop + flutter run).';
@@ -156,25 +175,27 @@ class ApiClient {
           final err = detail['error'];
           if (err is Map) {
             final message = err['message'];
-            if (message is String && message.trim().isNotEmpty) return message.trim();
+            if (message is String && message.trim().isNotEmpty) {
+              return _localize(message);
+            }
           }
           final nested = detail['message'];
-          if (nested is String && nested.trim().isNotEmpty) return nested.trim();
+          if (nested is String && nested.trim().isNotEmpty) return _localize(nested);
         }
-        if (detail is String && detail.trim().isNotEmpty) return detail.trim();
+        if (detail is String && detail.trim().isNotEmpty) return _localize(detail);
         if (detail is List && detail.isNotEmpty) {
           final first = detail.first;
           if (first is Map) {
             final msg = first['msg'];
-            if (msg is String && msg.trim().isNotEmpty) return msg.trim();
+            if (msg is String && msg.trim().isNotEmpty) return _localize(msg);
           }
         }
         final top = data['error'];
         if (top is Map) {
           final message = top['message'];
-          if (message is String && message.trim().isNotEmpty) return message.trim();
+          if (message is String && message.trim().isNotEmpty) return _localize(message);
         }
-        if (top is String && top.trim().isNotEmpty) return top.trim();
+        if (top is String && top.trim().isNotEmpty) return _localize(top);
       }
       if (error.type == DioExceptionType.connectionError ||
           error.type == DioExceptionType.connectionTimeout) {
@@ -183,6 +204,6 @@ class ApiClient {
       final code = error.response?.statusCode;
       return code != null ? 'Ошибка $code' : 'Ошибка сети';
     }
-    return error.toString();
+    return _localize(error.toString());
   }
 }

@@ -201,7 +201,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                               ),
                                             ),
                                             validator: (v) =>
-                                                (v == null || v.trim().isEmpty) ? '' : null,
+                                                (v == null || v.trim().isEmpty) ? 'Укажите имя' : null,
                                           ),
                                           const SizedBox(height: 12),
                                           TextFormField(
@@ -217,7 +217,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                             ),
                                             validator: (v) {
                                               final value = (v ?? '').trim();
-                                              if (value.isEmpty || !value.contains('@')) return '';
+                                              if (value.isEmpty || !value.contains('@')) {
+                                                return 'Введите корректный email';
+                                              }
                                               return null;
                                             },
                                           ),
@@ -241,7 +243,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                               ),
                                             ),
                                             validator: (v) {
-                                              if (v == null || v.length < 8) return '';
+                                              if (v == null || v.length < 8) {
+                                                return 'Пароль не короче 8 символов';
+                                              }
                                               return null;
                                             },
                                           ),
@@ -251,16 +255,24 @@ class _RegisterPageState extends State<RegisterPage> {
                                             obscureText: _obscure,
                                             textInputAction: TextInputAction.done,
                                             onFieldSubmitted: (_) => loading ? null : _sendCode(),
-                                            decoration: const InputDecoration(
+                                            decoration: InputDecoration(
                                               labelText: 'Повтор пароля',
-                                              prefixIcon: Padding(
+                                              prefixIcon: const Padding(
                                                 padding: EdgeInsets.all(12),
                                                 child: AppIcon(AppIcons.lock, size: 20),
+                                              ),
+                                              suffixIcon: IconButton(
+                                                tooltip: _obscure ? 'Показать пароль' : 'Скрыть пароль',
+                                                onPressed: () => setState(() => _obscure = !_obscure),
+                                                icon: AppIcon(
+                                                  _obscure ? AppIcons.eye : AppIcons.eyeOff,
+                                                  size: 20,
+                                                ),
                                               ),
                                             ),
                                             validator: (v) {
                                               if (v == null || v.isEmpty || v != _password.text) {
-                                                return '';
+                                                return 'Пароли не совпадают';
                                               }
                                               return null;
                                             },

@@ -235,6 +235,21 @@ export function TaskDrawer({
                     <p className="text-sm text-muted">Не назначены</p>
                   )}
                 </div>
+                <div>
+                  <p className="label-text">Автор</p>
+                  {task.author?.name ? (
+                    <div className="mt-1 flex items-center gap-2 text-sm">
+                      <UserAvatar
+                        name={task.author.name}
+                        avatarUrl={task.author.avatar_url}
+                        size={6}
+                      />
+                      <span>{task.author.name}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted">—</p>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="label-text">Столбец</p>

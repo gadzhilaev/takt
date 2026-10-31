@@ -9,6 +9,7 @@ import { z } from "zod";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
 import { paths } from "@/lib/paths";
@@ -19,16 +20,15 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
-// Без клиентских текстов ошибок — тексты приходят с API (validation + auth).
 const schema = z
   .object({
-    name: z.string().min(1),
-    email: z.string().email(),
-    password: z.string().min(8),
-    password_confirm: z.string().min(8),
+    name: z.string().min(1, "Укажите имя"),
+    email: z.string().min(1, "Укажите email").email("Введите корректный email"),
+    password: z.string().min(8, "Пароль не короче 8 символов"),
+    password_confirm: z.string().min(8, "Подтвердите пароль"),
   })
   .refine((v) => v.password === v.password_confirm, {
-    message: " ",
+    message: "Пароли не совпадают",
     path: ["password_confirm"],
   });
 
@@ -77,7 +77,6 @@ function RegisterForm() {
           code: code.trim(),
         },
       });
-      // Invite membership only after explicit accept on /invite/{token}.
       router.push(safeNext(next));
     } catch (err) {
       setError(err instanceof Error ? err.message : "");
@@ -126,7 +125,7 @@ function RegisterForm() {
           {step === "form" ? (
             <>
               {emailPassword ? (
-                <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+                <form className="space-y-3" noValidate onSubmit={form.handleSubmit(onSubmit)}>
                   <div>
                     <label className="label-text" htmlFor="reg-name">
                       Имя
@@ -149,7 +148,11 @@ function RegisterForm() {
                     <label className="label-text" htmlFor="reg-pass">
                       Пароль
                     </label>
-                    <Input id="reg-pass" type="password" autoComplete="new-password" {...form.register("password")} />
+                    <PasswordInput
+                      id="reg-pass"
+                      autoComplete="new-password"
+                      {...form.register("password")}
+                    />
                     {form.formState.errors.password && (
                       <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
                     )}
@@ -158,9 +161,8 @@ function RegisterForm() {
                     <label className="label-text" htmlFor="reg-pass2">
                       Подтверждение пароля
                     </label>
-                    <Input
+                    <PasswordInput
                       id="reg-pass2"
-                      type="password"
                       autoComplete="new-password"
                       {...form.register("password_confirm")}
                     />

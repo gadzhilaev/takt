@@ -191,7 +191,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                               ),
                                               validator: (v) {
                                                 final value = (v ?? '').trim();
-                                                if (value.isEmpty || !value.contains('@')) return '';
+                                                if (value.isEmpty || !value.contains('@')) {
+                                                  return 'Введите корректный email';
+                                                }
                                                 return null;
                                               },
                                             ),
@@ -279,7 +281,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                                 ),
                                               ),
                                               validator: (v) {
-                                                if (v == null || v.length < 8) return '';
+                                                if (v == null || v.length < 8) {
+                                                  return 'Пароль не короче 8 символов';
+                                                }
                                                 return null;
                                               },
                                             ),
@@ -289,11 +293,20 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                               obscureText: _obscure,
                                               textInputAction: TextInputAction.done,
                                               onFieldSubmitted: (_) => _busy ? null : _confirmReset(),
-                                              decoration: const InputDecoration(
+                                              decoration: InputDecoration(
                                                 labelText: 'Подтверждение пароля',
+                                                suffixIcon: IconButton(
+                                                  onPressed: () => setState(() => _obscure = !_obscure),
+                                                  icon: AppIcon(
+                                                    _obscure ? AppIcons.eye : AppIcons.eyeOff,
+                                                    size: 20,
+                                                  ),
+                                                ),
                                               ),
                                               validator: (v) {
-                                                if (v != _password.text) return '';
+                                                if (v != _password.text) {
+                                                  return 'Пароли не совпадают';
+                                                }
                                                 return null;
                                               },
                                             ),

@@ -1,6 +1,5 @@
 "use client";
 
-import { AppIcon } from "@/components/ui/app-icon";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -9,15 +8,15 @@ import { z } from "zod";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
 import { paths } from "@/lib/paths";
 
-// Клиентская валидация без текстов — сообщения ошибок только с API.
 const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().min(1, "Укажите email").email("Введите корректный email"),
+  password: z.string().min(1, "Введите пароль"),
 });
 
 function safeNext(raw: string | null): string {
@@ -37,7 +36,6 @@ function serverFacingText(raw: string | null): string {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [show, setShow] = useState(false);
   const rawMessage = searchParams.get("message");
   const hasOauthError = Boolean(searchParams.get("oauth_error"));
   const fromServer = serverFacingText(rawMessage);
@@ -119,12 +117,21 @@ function LoginForm() {
             </p>
           </div>
           {emailPassword ? (
-            <form className="space-y-3.5" method="post" action="#" onSubmit={form.handleSubmit(onSubmit)}>
+            <form
+              className="space-y-3.5"
+              method="post"
+              action="#"
+              noValidate
+              onSubmit={form.handleSubmit(onSubmit)}
+            >
               <div>
                 <label className="label-text" htmlFor="login-email">
                   Email
                 </label>
                 <Input id="login-email" type="email" autoComplete="email" {...form.register("email")} />
+                {form.formState.errors.email && (
+                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.email.message}</p>
+                )}
               </div>
               <div>
                 <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -138,22 +145,14 @@ function LoginForm() {
                     Забыли пароль?
                   </Link>
                 </div>
-                <div className="relative">
-                  <Input
-                    id="login-password"
-                    type={show ? "text" : "password"}
-                    autoComplete="current-password"
-                    {...form.register("password")}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-sm)] p-1.5 text-muted hover:bg-[var(--surface-2)]"
-                    onClick={() => setShow((s) => !s)}
-                    aria-label={show ? "Скрыть пароль" : "Показать пароль"}
-                  >
-                    {show ? <AppIcon name="eye-off" size={16} /> : <AppIcon name="eye" size={16} />}
-                  </button>
-                </div>
+                <PasswordInput
+                  id="login-password"
+                  autoComplete="current-password"
+                  {...form.register("password")}
+                />
+                {form.formState.errors.password && (
+                  <p className="mt-1 text-xs text-[var(--danger)]">{form.formState.errors.password.message}</p>
+                )}
               </div>
               {info && !error && (
                 <p className="rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] px-3 py-2 text-sm text-[var(--accent)]">

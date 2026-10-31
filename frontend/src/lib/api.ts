@@ -8,6 +8,27 @@ function csrfToken(): string | undefined {
 
 type ApiOptions = RequestInit & { json?: unknown; _retried?: boolean };
 
+/** Translate leftover English validation / network phrases to Russian. */
+function localizeErrorText(raw: string): string {
+  const msg = raw.trim();
+  if (!msg) return msg;
+  const lower = msg.toLowerCase();
+  if (lower.includes("invalid email") || lower.includes("value is not a valid email")) {
+    return "Введите корректный email";
+  }
+  if (lower.includes("string should have at least") || lower.includes("at least 8 character")) {
+    return "Пароль не короче 8 символов";
+  }
+  if (lower.includes("field required") || lower === "required" || lower.includes("missing")) {
+    return "Заполните обязательные поля";
+  }
+  if (lower.includes("failed to fetch") || lower.includes("networkerror") || lower.includes("load failed")) {
+    return "Нет соединения с сервером";
+  }
+  if (/^[a-z][a-z0-9_]+$/i.test(msg)) return "Ошибка запроса";
+  return msg;
+}
+
 /** FastAPI `{detail:{error:{message}}}`, SlowAPI `{error:"…"}`, validation `detail:[]`. */
 export function messageFromApiError(err: unknown): string | undefined {
   if (!err || typeof err !== "object") return undefined;
@@ -19,23 +40,35 @@ export function messageFromApiError(err: unknown): string | undefined {
     const error = detail.error;
     if (error && typeof error === "object" && !Array.isArray(error)) {
       const message = (error as Record<string, unknown>).message;
-      if (typeof message === "string" && message.trim()) return message;
+      if (typeof message === "string" && message.trim()) return localizeErrorText(message);
     }
-    if (typeof detail.message === "string" && detail.message.trim()) return detail.message;
+    if (typeof detail.message === "string" && detail.message.trim()) {
+      return localizeErrorText(detail.message);
+    }
   }
-  if (typeof nested === "string" && nested.trim()) return nested;
+  if (typeof nested === "string" && nested.trim()) return localizeErrorText(nested);
   if (Array.isArray(nested) && nested.length > 0) {
-    const first = nested[0] as { msg?: unknown };
-    if (typeof first?.msg === "string" && first.msg.trim()) return first.msg;
+    const first = nested[0] as { msg?: unknown; type?: unknown; loc?: unknown[] };
+    if (typeof first?.msg === "string" && first.msg.trim()) {
+      const loc = Array.isArray(first.loc) ? first.loc.map(String).join(".") : "";
+      const typ = String(first.type || "");
+      if (loc.toLowerCase().includes("email") || typ.includes("email")) {
+        return "Введите корректный email";
+      }
+      if (loc.toLowerCase().includes("password")) {
+        return "Проверьте пароль";
+      }
+      return localizeErrorText(first.msg);
+    }
   }
 
   const top = body.error;
   if (typeof top === "string" && top.trim()) {
-    return top;
+    return localizeErrorText(top);
   }
   if (top && typeof top === "object" && !Array.isArray(top)) {
     const message = (top as Record<string, unknown>).message;
-    if (typeof message === "string" && message.trim()) return message;
+    if (typeof message === "string" && message.trim()) return localizeErrorText(message);
   }
   return undefined;
 }
