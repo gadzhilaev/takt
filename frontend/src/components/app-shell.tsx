@@ -45,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const qc = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -215,6 +216,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/app/projects/${id}`);
   }
 
+  function toggleExpand(id: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
   const settingsProject = useMemo(
     () => projects.find((p) => p.id === settingsProjectId) ?? null,
     [projects, settingsProjectId]
@@ -321,41 +328,66 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-2 pb-3" aria-label="Проекты">
         {projects.map((p) => {
           const active = p.id === currentProjectId;
+          const open = !!expanded[p.id];
+          const isOwner = p.members.some((m) => m.user_id === user?.id && m.role === "admin");
+          const adminCount = p.members.filter((m) => m.role === "admin").length;
           return (
-            <div
-              key={p.id}
-              className={cn(
-                "flex items-center gap-0.5 rounded-[var(--radius)] px-1 py-0.5",
-                active && "bg-[var(--surface-2)]"
-              )}
-            >
-              <span
-                className="ml-1.5 h-2 w-2 shrink-0 rounded-full"
-                style={{ background: p.color || "#315F72" }}
-                aria-hidden
-              />
-              <button
-                type="button"
+            <div key={p.id} className="rounded-[var(--radius)]">
+              <div
                 className={cn(
-                  "min-w-0 flex-1 truncate py-2 pr-1 text-left text-[14px] leading-snug",
-                  active ? "font-semibold text-foreground" : "text-[var(--muted-fg)] hover:text-foreground"
+                  "flex items-center gap-0.5 rounded-[var(--radius)] px-1 py-0.5",
+                  active && "bg-[var(--surface-2)]"
                 )}
-                onClick={() => openProject(p.id)}
               >
-                {p.name}
-              </button>
-              <button
-                type="button"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius)] text-muted hover:bg-[var(--surface)] hover:text-foreground"
-                aria-label={`Настройки «${p.name}»`}
-                title="Настройки проекта"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSettingsProjectId(p.id);
-                }}
-              >
-                <AppIcon name="settings" size={16} />
-              </button>
+                <button
+                  type="button"
+                  className="flex h-8 w-7 shrink-0 items-center justify-center rounded text-muted hover:text-foreground"
+                  aria-label={open ? "Свернуть участников" : "Показать участников"}
+                  title={open ? "Свернуть участников" : "Участники"}
+                  onClick={(e) => toggleExpand(p.id, e)}
+                >
+                  {open ? <AppIcon name="chevron-down" size={16} /> : <AppIcon name="chevron-right" size={16} />}
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "min-w-0 flex-1 truncate py-2 pr-1 text-left text-[14px] leading-snug",
+                    active ? "font-semibold text-foreground" : "text-[var(--muted-fg)] hover:text-foreground"
+                  )}
+                  onClick={() => openProject(p.id)}
+                >
+                  {p.name}
+                </button>
+                <button
+                  type="button"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius)] text-muted hover:bg-[var(--surface)] hover:text-foreground"
+                  aria-label={`Настройки «${p.name}»`}
+                  title="Настройки проекта"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSettingsProjectId(p.id);
+                  }}
+                >
+                  <AppIcon name="settings" size={16} />
+                </button>
+              </div>
+              {open && (
+                <ProjectMembersPanel
+                  project={p}
+                  userId={user?.id}
+                  isOwner={isOwner}
+                  adminCount={adminCount}
+                  onInvite={() => {
+                    setInviteOpen(p.id);
+                    setInviteEmail("");
+                    setInviteNote("");
+                    setCopiedHint("");
+                  }}
+                  onRemove={(m) => removeMember(p.id, m)}
+                  onLeave={() => requestLeave(p.id, p.name)}
+                  onDecideLeave={(reqId, approve) => decideLeave(p.id, reqId, approve)}
+                />
+              )}
             </div>
           );
         })}
@@ -612,6 +644,106 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 const PROJECT_COLORS = ["#315F72", "#607FA4", "#347FA4", "#9062B8", "#398A62", "#C47A3A", "#B85C5C"];
+
+function ProjectMembersPanel({
+  project,
+  userId,
+  isOwner,
+  adminCount,
+  onInvite,
+  onRemove,
+  onLeave,
+  onDecideLeave,
+}: {
+  project: Project;
+  userId?: string;
+  isOwner: boolean;
+  adminCount: number;
+  onInvite: () => void;
+  onRemove: (m: Project["members"][number]) => void;
+  onLeave: () => void;
+  onDecideLeave: (requestId: string, approve: boolean) => void;
+}) {
+  const { data: leaveData } = useQuery({
+    queryKey: ["leave-requests", project.id],
+    enabled: isOwner,
+    queryFn: () => api<{ items: LeaveRequest[] }>(`/api/v1/projects/${project.id}/leave-requests`),
+    staleTime: 15_000,
+  });
+  const pending = (leaveData?.items ?? []).filter((r) => r.status === "pending");
+
+  return (
+    <ul className="mb-1 ml-7 space-y-0.5 border-l border-hairline pl-2">
+      {project.members.map((m) => {
+        const isSelf = m.user_id === userId;
+        const canRemove = isOwner && !isSelf;
+        const canLeave = !!isSelf && !(m.role === "admin" && adminCount <= 1);
+        return (
+          <li key={m.user_id} className="flex items-center gap-1.5 py-1.5 text-[13px] text-muted">
+            <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={6} />
+            <span className="min-w-0 flex-1 truncate text-foreground">{m.name}</span>
+            {m.role === "admin" && <span className="shrink-0 text-[11px]">владелец</span>}
+            {canRemove && (
+              <button
+                type="button"
+                className="shrink-0 rounded p-0.5 text-muted hover:text-[var(--danger)]"
+                title="Удалить из проекта"
+                onClick={() => onRemove(m)}
+              >
+                <AppIcon name="delete" size={16} />
+              </button>
+            )}
+            {canLeave && (
+              <button
+                type="button"
+                className="shrink-0 text-[12px] font-medium text-[var(--accent)]"
+                onClick={onLeave}
+              >
+                Выйти
+              </button>
+            )}
+          </li>
+        );
+      })}
+      {isOwner && pending.length > 0 && (
+        <li className="space-y-1 pt-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Заявки на выход</p>
+          {pending.map((req) => (
+            <div key={req.id} className="flex items-center gap-1.5 text-[13px]">
+              <UserAvatar name={req.user_name} avatarUrl={req.avatar_url} size={5} />
+              <span className="min-w-0 flex-1 truncate">{req.user_name}</span>
+              <button
+                type="button"
+                className="text-[12px] text-muted hover:text-foreground"
+                onClick={() => onDecideLeave(req.id, false)}
+              >
+                Нет
+              </button>
+              <button
+                type="button"
+                className="text-[12px] font-medium text-[var(--accent)]"
+                onClick={() => onDecideLeave(req.id, true)}
+              >
+                Удалить
+              </button>
+            </div>
+          ))}
+        </li>
+      )}
+      {isOwner && (
+        <li>
+          <button
+            type="button"
+            className="py-1.5 text-[13px] font-medium text-[var(--accent)]"
+            onClick={onInvite}
+          >
+            + Добавить участника
+          </button>
+        </li>
+      )}
+    </ul>
+  );
+}
 
 function ProjectSettingsDialog({
   project,
