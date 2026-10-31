@@ -33,9 +33,9 @@ export function NotificationsMenu({
       )}
       onClick={onOpen}
     >
-      <AppIcon name="notifications" size={16} />
+      <AppIcon name="notifications" size={18} />
       {unread > 0 && (
-        <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--priority-urgent)]" />
+        <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[var(--priority-urgent)]" />
       )}
     </button>
   );
