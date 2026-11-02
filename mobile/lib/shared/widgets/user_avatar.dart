@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import '../../core/avatar_cache.dart';
 import '../../core/config.dart';
 import '../../core/theme.dart';
 
@@ -26,8 +30,8 @@ String? resolveAvatarUrl(String? url) {
   return '$base/$trimmed';
 }
 
-/// Full circular avatar — solid fill, centered initials, thin border (как web).
-class TaktUserAvatar extends StatelessWidget {
+/// Full circular avatar — disk-cached image when possible (no network flash after splash).
+class TaktUserAvatar extends StatefulWidget {
   const TaktUserAvatar({
     super.key,
     required this.name,
@@ -42,16 +46,60 @@ class TaktUserAvatar extends StatelessWidget {
   final double? fontSize;
 
   @override
+  State<TaktUserAvatar> createState() => _TaktUserAvatarState();
+}
+
+class _TaktUserAvatarState extends State<TaktUserAvatar> {
+  File? _file;
+  String? _resolved;
+
+  @override
+  void initState() {
+    super.initState();
+    _bind(widget.avatarUrl);
+  }
+
+  @override
+  void didUpdateWidget(covariant TaktUserAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.avatarUrl != widget.avatarUrl) {
+      _bind(widget.avatarUrl);
+    }
+  }
+
+  void _bind(String? raw) {
+    final url = resolveAvatarUrl(raw);
+    _resolved = url;
+    if (url == null) {
+      _file = null;
+      return;
+    }
+    final hit = AvatarCache.instance.lookupSync(url);
+    _file = hit;
+    if (hit == null) {
+      unawaited(_load(url));
+    }
+  }
+
+  Future<void> _load(String url) async {
+    final file = await AvatarCache.instance.ensure(url);
+    if (!mounted || _resolved != url) return;
+    if (file != null) {
+      setState(() => _file = file);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final fs = fontSize ?? (size * 0.42).clamp(9.0, 16.0);
-    final bg = taktAvatarColor(name);
+    final fs = widget.fontSize ?? (widget.size * 0.42).clamp(9.0, 16.0);
+    final bg = taktAvatarColor(widget.name);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final border = dark ? TaktColors.borderStrongDark : TaktColors.borderStrong;
-    final resolved = resolveAvatarUrl(avatarUrl);
+    final file = _file;
 
     return SizedBox(
-      width: size,
-      height: size,
+      width: widget.size,
+      height: widget.size,
       child: DecoratedBox(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
@@ -59,19 +107,16 @@ class TaktUserAvatar extends StatelessWidget {
           border: Border.all(color: border, width: 1),
         ),
         child: ClipOval(
-          child: resolved != null
-              ? Image.network(
-                  resolved,
+          child: file != null
+              ? Image.file(
+                  file,
                   fit: BoxFit.cover,
-                  width: size,
-                  height: size,
-                  errorBuilder: (_, _, _) => _Initials(name: name, fontSize: fs),
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return _Initials(name: name, fontSize: fs);
-                  },
+                  width: widget.size,
+                  height: widget.size,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => _Initials(name: widget.name, fontSize: fs),
                 )
-              : _Initials(name: name, fontSize: fs),
+              : _Initials(name: widget.name, fontSize: fs),
         ),
       ),
     );

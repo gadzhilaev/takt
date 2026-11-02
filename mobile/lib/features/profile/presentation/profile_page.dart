@@ -16,11 +16,10 @@ import '../../../shared/widgets/takt_sheet.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../auth/cubit/auth_cubit.dart';
-import '../../auth/data/auth_repository.dart';
-import '../../auth/presentation/oauth_buttons.dart';
 import '../../board/cubit/board_cubit.dart';
 import '../../projects/data/projects_repository.dart';
 import '../data/profile_repository.dart';
+import 'sign_in_methods_section.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, this.embeddedInShell = false});
@@ -144,13 +143,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
                       onTap: () => _editProfile(context),
                     ),
-                    TaktListTile(
-                      leading: AppIcon(AppIcons.lock, size: 20, color: muted),
-                      title: 'Сменить пароль',
-                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
-                      onTap: _changePassword,
-                    ),
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: SignInMethodsSection(
+                  onMessage: (m) => setState(() => _message = m),
                 ),
               ),
               TaktSection(
@@ -251,20 +250,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
                       onTap: () => _openPrivacy(context),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Связанные аккаунты',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const OAuthButtons(link: true),
                   ],
                 ),
               ),
@@ -438,66 +423,6 @@ class _ProfilePageState extends State<ProfilePage> {
         _avatarUrl = user.avatarUrl;
         _message = 'Сохранено';
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _message = api.messageFromError(e));
-    }
-  }
-
-  Future<void> _changePassword() async {
-    final current = TextEditingController();
-    final next = TextEditingController();
-    final confirm = TextEditingController();
-    final ok = await showTaktSheet(
-      context: context,
-      title: 'Смена пароля',
-      confirmLabel: 'Получить код',
-      body: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TaktTextField(controller: current, label: 'Текущий', obscureText: true),
-          const SizedBox(height: 8),
-          TaktTextField(controller: next, label: 'Новый', obscureText: true),
-          const SizedBox(height: 8),
-          TaktTextField(controller: confirm, label: 'Повтор', obscureText: true),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final authRepo = context.read<AuthRepository>();
-    final api = context.read<ApiClient>();
-    final authCubit = context.read<AuthCubit>();
-    try {
-      await authRepo.sendChangePasswordCode(
-        currentPassword: current.text,
-        newPassword: next.text,
-        newPasswordConfirm: confirm.text,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _message = api.messageFromError(e));
-      return;
-    }
-    if (!mounted) return;
-    final codeCtrl = TextEditingController();
-    final confirmed = await showTaktSheet(
-      context: context,
-      title: 'Код из письма',
-      confirmLabel: 'Подтвердить',
-      body: TaktTextField(
-        controller: codeCtrl,
-        label: 'Код',
-        keyboardType: TextInputType.number,
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await authRepo.confirmChangePassword(code: codeCtrl.text);
-      if (!mounted) return;
-      setState(() => _message = 'Пароль обновлён — войдите снова');
-      await authCubit.logout();
-      if (!mounted) return;
-      context.go('/login');
     } catch (e) {
       if (!mounted) return;
       setState(() => _message = api.messageFromError(e));

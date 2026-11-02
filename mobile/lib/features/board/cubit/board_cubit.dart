@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/avatar_cache.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/project_visibility.dart';
 import '../../projects/data/projects_repository.dart';
@@ -164,17 +165,48 @@ class BoardCubit extends Cubit<BoardState> {
     return true;
   }
 
+  Future<void> _prefetchAvatars({
+    List<Project>? projects,
+    List<TaskItem>? tasks,
+  }) async {
+    final proj = projects ?? state.projects;
+    final taskList = tasks ?? state.tasks;
+    final urls = <String?>[
+      ...proj.expand((p) => p.members.map((m) => m.avatarUrl)),
+      ...taskList.expand((t) => t.assignees.map((a) => a.avatarUrl)),
+    ];
+    await AvatarCache.instance.prefetch(urls);
+  }
+
   /// Disk → memory without network. Splash / cold start show data immediately.
   Future<void> hydrateFromCache() async {
-    if (state.projects.isNotEmpty) return;
+    await AvatarCache.instance.warm();
+    if (state.projects.isNotEmpty) {
+      await _prefetchAvatars();
+      return;
+    }
     final list = await cache.loadProjects();
     if (list.isEmpty) return;
     final visible = list.where((p) => !taktIsTestProject(p)).toList();
+    final projects = visible.isEmpty ? list : visible;
     emit(state.copyWith(
-      projects: visible.isEmpty ? list : visible,
+      projects: projects,
       loading: false,
       clearError: true,
     ));
+    // Прогреть аватары с диска/сети до ухода со splash.
+    final taskUrls = <String?>[];
+    for (final p in projects.take(8)) {
+      final board = await cache.loadBoard(p.id);
+      if (board == null) continue;
+      for (final t in board.tasks) {
+        for (final a in t.assignees) {
+          taskUrls.add(a.avatarUrl);
+        }
+      }
+    }
+    await _prefetchAvatars(projects: projects, tasks: const []);
+    await AvatarCache.instance.prefetch(taskUrls);
   }
 
   /// First open / cold start. Shows disk/memory cache immediately, then syncs.
@@ -402,6 +434,7 @@ class BoardCubit extends Cubit<BoardState> {
         columns: loaded.columns,
         tasks: loaded.tasks,
       );
+      unawaited(_prefetchAvatars(projects: nextProjects, tasks: loaded.tasks));
       await _publishWidget();
     } catch (e) {
       emit(state.copyWith(

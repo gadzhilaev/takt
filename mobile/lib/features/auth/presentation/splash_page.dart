@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/avatar_cache.dart';
 import '../../../core/push/fcm_bootstrap.dart';
 import '../../../core/theme.dart';
 import '../../board/cubit/board_cubit.dart';
@@ -64,11 +65,13 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     await Future.wait<void>([
       oauth.prefetchProviders(),
       _waitAuth(auth),
+      AvatarCache.instance.warm(),
     ]);
 
     final state = auth.state;
     if (state is AuthAuthenticated) {
       board.setCurrentUserId(state.user.id);
+      // Кэш проектов + файлы аватаров на диске до ухода со splash.
       await board.hydrateFromCache();
       if (!mounted) return;
       try {

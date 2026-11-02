@@ -241,13 +241,17 @@ class OAuthRepository {
     await _tokens.saveTokens(access: access, refresh: refresh);
   }
 
-  Future<List<Map<String, dynamic>>> identities() async {
+  Future<({List<Map<String, dynamic>> items, bool hasPassword})> identitiesDetailed() async {
     final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/oauth/identities');
     final items = res.data?['items'];
-    if (items is List) {
-      return items.cast<Map<String, dynamic>>();
-    }
-    return [];
+    final list = items is List ? items.cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
+    final hasPassword = res.data?['has_password'] as bool? ?? false;
+    return (items: list, hasPassword: hasPassword);
+  }
+
+  Future<List<Map<String, dynamic>>> identities() async {
+    final detailed = await identitiesDetailed();
+    return detailed.items;
   }
 
   Future<void> unlink(String identityId) async {

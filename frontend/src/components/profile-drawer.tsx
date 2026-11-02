@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
 import { disableWebPush, enableWebPush, getPushStatus } from "@/lib/web-push";
-import { OAuthButtons } from "@/components/oauth/oauth-buttons";
+import { SignInMethodsSection } from "@/components/sign-in-methods";
 import Link from "next/link";
 
 export function ProfileDrawer({
@@ -31,10 +31,6 @@ export function ProfileDrawer({
   const [email, setEmail] = useState(user.email);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [passwordCode, setPasswordCode] = useState("");
-  const [passwordStep, setPasswordStep] = useState<"form" | "code">("form");
   const [pushMsg, setPushMsg] = useState("");
   const [pushBusy, setPushBusy] = useState(false);
   const [pushState, setPushState] = useState<Awaited<ReturnType<typeof getPushStatus>> | null>(null);
@@ -54,10 +50,6 @@ export function ProfileDrawer({
       setMsg("");
       setErr("");
       setPushMsg("");
-      setPasswordStep("form");
-      setPasswordCode("");
-      setCurrentPassword("");
-      setNewPassword("");
       getPushStatus().then(setPushState).catch(() => null);
     }
   }, [open, user]);
@@ -77,34 +69,6 @@ export function ProfileDrawer({
       qc.invalidateQueries({ queryKey: ["me"] });
       setMsg("Профиль сохранён");
       setErr("");
-    },
-    onError: (e: Error) => setErr(e.message),
-  });
-
-  const sendPasswordCode = useMutation({
-    mutationFn: () =>
-      api("/api/v1/auth/change-password/send-code", {
-        method: "POST",
-        json: { current_password: currentPassword, new_password: newPassword },
-      }),
-    onSuccess: () => {
-      setErr("");
-      setMsg("Код отправлен на email");
-      setPasswordStep("code");
-    },
-    onError: (e: Error) => setErr(e.message),
-  });
-
-  const confirmPasswordCode = useMutation({
-    mutationFn: () =>
-      api("/api/v1/auth/change-password/confirm", {
-        method: "POST",
-        json: { code: passwordCode.trim() },
-      }),
-    onSuccess: async () => {
-      setMsg("Пароль изменён. Войдите снова");
-      await api("/api/v1/auth/logout", { method: "POST" }).catch(() => null);
-      router.push("/login");
     },
     onError: (e: Error) => setErr(e.message),
   });
@@ -292,93 +256,16 @@ export function ProfileDrawer({
             </div>
           </div>
 
-          <div className="border-t border-hairline pt-4">
-            <p className="mb-2 text-sm font-semibold">Смена пароля</p>
-            {passwordStep === "form" ? (
-              <form
-                className="space-y-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  sendPasswordCode.mutate();
-                }}
-              >
-                <div>
-                  <label className="label-text" htmlFor="cur-pass">
-                    Текущий пароль
-                  </label>
-                  <Input
-                    id="cur-pass"
-                    type="password"
-                    autoComplete="current-password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label-text" htmlFor="new-pass">
-                    Новый пароль
-                  </label>
-                  <Input
-                    id="new-pass"
-                    type="password"
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="secondary"
-                  disabled={sendPasswordCode.isPending || newPassword.length < 8}
-                >
-                  Получить код на email
-                </Button>
-              </form>
-            ) : (
-              <form
-                className="space-y-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  confirmPasswordCode.mutate();
-                }}
-              >
-                <p className="text-xs text-muted">Код отправлен на {user.email}</p>
-                <div>
-                  <label className="label-text" htmlFor="pwd-code">
-                    Код из письма
-                  </label>
-                  <Input
-                    id="pwd-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={passwordCode}
-                    onChange={(e) => setPasswordCode(e.target.value)}
-                    placeholder="6 цифр"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="secondary"
-                  disabled={confirmPasswordCode.isPending || passwordCode.trim().length < 4}
-                >
-                  Подтвердить и сменить
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={sendPasswordCode.isPending}
-                  onClick={() => sendPasswordCode.mutate()}
-                >
-                  Отправить код ещё раз
-                </Button>
-              </form>
-            )}
-          </div>
-
-          <LinkedAccountsSection />
+          <SignInMethodsSection
+            onMessage={(m) => {
+              setMsg(m);
+              setErr("");
+            }}
+            onError={(m) => {
+              setErr(m);
+              if (m) setMsg("");
+            }}
+          />
 
           {msg && <p className="text-sm text-[var(--success)]">{msg}</p>}
           {err && <p className="text-sm text-[var(--danger)]">{err}</p>}
@@ -394,49 +281,3 @@ export function ProfileDrawer({
   );
 }
 
-function LinkedAccountsSection() {
-  const qc = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ["oauth-identities"],
-    queryFn: () =>
-      api<{ items: { id: string; provider: string; email: string | null }[]; has_password: boolean }>(
-        "/api/v1/auth/oauth/identities"
-      ),
-  });
-  const unlink = useMutation({
-    mutationFn: (id: string) => api(`/api/v1/auth/oauth/identities/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["oauth-identities"] }),
-  });
-
-  return (
-    <div className="space-y-2 border-t border-hairline pt-4">
-      <p className="text-[13px] font-semibold">Связанные аккаунты</p>
-      <ul className="space-y-1 text-[13px]">
-        {(data?.items ?? []).map((i) => (
-          <li key={i.id} className="flex items-center justify-between gap-2">
-            <span>
-              {i.provider}
-              {i.email ? ` · ${i.email}` : ""}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={unlink.isPending}
-              onClick={() => {
-                if (window.confirm(`Отвязать ${i.provider}?`)) unlink.mutate(i.id);
-              }}
-            >
-              Отвязать
-            </Button>
-          </li>
-        ))}
-        {(data?.items ?? []).length === 0 && <li className="text-muted">Пока нет OAuth-привязок</li>}
-      </ul>
-      {!data?.has_password && (
-        <p className="text-[11px] text-muted">Задайте пароль, прежде чем отвязывать последний способ входа.</p>
-      )}
-      <OAuthButtons mode="link" />
-    </div>
-  );
-}
