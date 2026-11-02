@@ -70,7 +70,10 @@ class Settings(BaseSettings):
 
     # OAuth / OIDC — secrets stay server-side only. Empty = provider disabled.
     OAUTH_WEB_REDIRECT_URI: str = "http://localhost:3000/api/v1/auth/oauth/callback"
-    OAUTH_MOBILE_REDIRECT_URI: str = "takt://oauth/callback"
+    # Mobile VK/Yandex: same HTTPS callback as web (registered in provider consoles).
+    # /callback then bounces to OAUTH_MOBILE_DEEP_LINK for ASWebAuthenticationSession.
+    OAUTH_MOBILE_REDIRECT_URI: str = "https://taktapp.ru/api/v1/auth/oauth/callback"
+    OAUTH_MOBILE_DEEP_LINK: str = "takt://oauth/callback"
     OAUTH_ALLOWED_REDIRECT_URIS: str = (
         "http://localhost:3000/api/v1/auth/oauth/callback,"
         "https://taktapp.ru/api/v1/auth/oauth/callback,"

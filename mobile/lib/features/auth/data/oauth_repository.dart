@@ -5,6 +5,7 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/config.dart';
 import '../../../core/token_storage.dart';
 import '../../../shared/models/models.dart';
 import 'oauth_models.dart';
@@ -14,7 +15,13 @@ class OAuthRepository {
 
   final ApiClient _api;
 
-  static const mobileRedirectUri = 'takt://oauth/callback';
+  /// HTTPS callback registered in VK/Yandex consoles. Server bounces to [callbackDeepLink].
+  static String get mobileRedirectUri =>
+      '${AppConfig.apiBase}/api/v1/auth/oauth/callback';
+
+  /// Deep link captured by ASWebAuthenticationSession after the HTTPS bounce.
+  static const callbackDeepLink = 'takt://oauth/callback';
+  static const callbackUrlScheme = 'takt';
 
   TokenStorage get _tokens => _api.tokens;
 
@@ -53,7 +60,7 @@ class OAuthRepository {
   }
 
   /// Полный вход/регистрация через провайдера. Apple — системный sheet;
-  /// VK / Яндекс — ASWebAuthenticationSession (не внешний Safari).
+  /// VK / Яндекс — ASWebAuthenticationSession (HTTPS callback → takt:// bounce).
   Future<UserProfile> signIn(String provider, {bool link = false}) async {
     debugPrint('── OAuth → start provider=$provider link=$link');
     try {
@@ -112,11 +119,12 @@ class OAuthRepository {
   }
 
   Future<UserProfile> _signInBrowserProvider(String provider, {bool link = false}) async {
-    debugPrint('── OAuth $provider → /start (in-app browser)');
+    debugPrint('── OAuth $provider → /start (in-app browser, https callback)');
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/api/v1/auth/oauth/$provider/start',
       queryParameters: {
         'client': 'mobile',
+        // Server ignores custom schemes for mobile and uses HTTPS callback.
         'redirect_uri': mobileRedirectUri,
         if (link) 'link': 'true',
       },
@@ -127,16 +135,24 @@ class OAuthRepository {
       throw const OAuthException('Сервер вернул некорректный ответ для входа');
     }
 
+    await _preflightAuthorizeHost(url);
+
     late final String callback;
     try {
       callback = await FlutterWebAuth2.authenticate(
         url: url,
-        callbackUrlScheme: 'takt',
+        callbackUrlScheme: callbackUrlScheme,
+        options: const FlutterWebAuth2Options(preferEphemeral: false),
       );
     } on Exception catch (e) {
       final text = e.toString().toLowerCase();
       if (text.contains('cancel') || text.contains('cancell')) {
-        throw const OAuthException('Вход отменён', cancelled: true);
+        // Not marked cancelled: blank/DNS Safari sheet looks the same as user close —
+        // show a hint instead of silently ignoring.
+        throw const OAuthException(
+          'Вход не завершён. Если страница провайдера не открылась — проверьте интернет '
+          'или попробуйте на телефоне (симулятор часто не открывает oauth.yandex.ru / id.vk.com).',
+        );
       }
       throw OAuthException(_api.messageFromError(e));
     }
@@ -163,6 +179,37 @@ class OAuthRepository {
       deviceId: deviceId,
       link: link,
     );
+  }
+
+  /// Early DNS/connectivity check so we don't show a blank Safari sheet.
+  Future<void> _preflightAuthorizeHost(String authorizeUrl) async {
+    final host = Uri.tryParse(authorizeUrl)?.origin;
+    if (host == null || host.isEmpty) return;
+    try {
+      final probe = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 8),
+          followRedirects: true,
+          validateStatus: (_) => true,
+        ),
+      );
+      await probe.head(host);
+    } on DioException catch (e) {
+      debugPrint('── OAuth preflight ✕ $host: $e');
+      final dns = e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          (e.message ?? '').toLowerCase().contains('failed host lookup');
+      if (dns) {
+        throw OAuthException(
+          'Не удаётся открыть $host. Проверьте интернет / DNS. '
+          'На iOS Simulator это частая проблема — проверьте вход на телефоне.',
+        );
+      }
+      // Other probe failures (405 etc.) are fine — host is reachable.
+    } catch (e) {
+      debugPrint('── OAuth preflight ✕ $host: $e');
+    }
   }
 
   Future<UserProfile> _completeMobile({

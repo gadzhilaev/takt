@@ -16,10 +16,14 @@ Backend FastAPI — единый центр. Client secrets и Apple private key
 
 ## Общие redirect URI
 
-Добавьте в allowlist (`OAUTH_ALLOWED_REDIRECT_URIS`):
+Добавьте в allowlist (`OAUTH_ALLOWED_REDIRECT_URIS`) и в кабинеты VK / Яндекс:
 
-- Web: `https://taktapp.ru/api/v1/auth/oauth/callback` (и localhost для dev)
-- Mobile deep link: `takt://oauth/callback`
+- Web + Mobile (authorize): `https://taktapp.ru/api/v1/auth/oauth/callback` (и localhost для dev)
+
+Mobile VK / Яндекс: в authorize уходит **тот же HTTPS** callback. Сервер по `client_kind=mobile`
+отдаёт HTML-bounce на deep link `takt://oauth/callback` (схема в Info.plist / AndroidManifest);
+приложение забирает `code` через ASWebAuthenticationSession и завершает вход `POST /oauth/mobile`.
+Custom-scheme `takt://…` в кабинетах провайдеров **не** регистрируем — они его не принимают.
 
 ## Apple (только mobile; на сайте кнопок нет)
 
@@ -44,7 +48,7 @@ Bundle ID приложения: `ru.gadzhilaev.takt`.
    ```
 6. Рестарт backend. В админке `/admin/settings` включите **Apple**.
 7. В приложении кнопка появится после `enabled` у `/api/v1/auth/oauth/providers`.
-8. Mobile: **Apple** — нативный Sign in with Apple (системный sheet, не Safari) → `id_token` на `POST /api/v1/auth/oauth/mobile`. **VK / Яндекс** — `ASWebAuthenticationSession` (`flutter_web_auth_2`) с callback `takt://oauth/callback`, затем тот же `/mobile` с `code` + `state` (PKCE verifier на сервере). Private key **только** на сервере.
+8. Mobile: **Apple** — нативный Sign in with Apple (системный sheet, не Safari) → `id_token` на `POST /api/v1/auth/oauth/mobile`. **VK / Яндекс** — `ASWebAuthenticationSession` (`flutter_web_auth_2`): authorize с HTTPS callback → bounce на `takt://oauth/callback` → `POST /mobile` с `code` + `state` (PKCE verifier на сервере). Private key **только** на сервере.
 
 Пока `OAUTH_OPERATOR_REGION=ru` и `OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR=false`, Apple останется выключенным политикой (149-ФЗ).
 
