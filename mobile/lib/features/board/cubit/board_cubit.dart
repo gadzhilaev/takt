@@ -137,24 +137,68 @@ class BoardCubit extends Cubit<BoardState> {
     );
   }
 
+  bool _sameProjects(List<Project> a, List<Project> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  bool _sameBoardData({
+    required List<StatusColumn> columns,
+    required List<TaskItem> tasks,
+    Project? project,
+  }) {
+    if (project != null && state.project != project) return false;
+    if (columns.length != state.columns.length || tasks.length != state.tasks.length) {
+      return false;
+    }
+    for (var i = 0; i < columns.length; i++) {
+      if (columns[i] != state.columns[i]) return false;
+    }
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i] != state.tasks[i]) return false;
+    }
+    return true;
+  }
+
+  /// Disk → memory without network. Splash / cold start show data immediately.
+  Future<void> hydrateFromCache() async {
+    if (state.projects.isNotEmpty) return;
+    final list = await cache.loadProjects();
+    if (list.isEmpty) return;
+    final visible = list.where((p) => !taktIsTestProject(p)).toList();
+    emit(state.copyWith(
+      projects: visible.isEmpty ? list : visible,
+      loading: false,
+      clearError: true,
+    ));
+  }
+
   /// First open / cold start. Shows disk/memory cache immediately, then syncs.
-  /// [forceLoading] blanks the UI (pull-to-refresh / explicit reload).
+  /// [forceLoading] blanks the UI only when there is nothing local.
   Future<void> bootstrap({String? preferProjectId, bool forceLoading = false}) async {
     var list = state.projects;
     if (list.isEmpty) {
       list = await cache.loadProjects();
       if (list.isNotEmpty) {
-        emit(state.copyWith(projects: list, loading: false, clearError: true));
+        final visible = list.where((p) => !taktIsTestProject(p)).toList();
+        emit(state.copyWith(
+          projects: visible.isEmpty ? list : visible,
+          loading: false,
+          clearError: true,
+        ));
+        list = state.projects;
       }
     }
 
     final hasLocal = list.isNotEmpty;
-    // После splash не бланкуем UI: loading только если совсем пусто и нужен флаг для кнопки.
-    emit(state.copyWith(
-      loading: !hasLocal,
-      refreshing: hasLocal,
-      clearError: true,
-    ));
+    // Не бланкуем UI: loading только если совсем пусто.
+    if (!hasLocal) {
+      emit(state.copyWith(loading: true, clearError: true));
+    }
 
     try {
       final projects = await this.projects.listProjects();
@@ -162,6 +206,7 @@ class BoardCubit extends Cubit<BoardState> {
       final visible = projects.where((p) => !taktIsTestProject(p)).toList();
       // Сервер — источник истины: пустой список затирает локальный кэш на экране.
       if (visible.isEmpty) {
+        await cache.clearAll();
         emit(state.copyWith(
           projects: const [],
           loading: false,
@@ -181,13 +226,18 @@ class BoardCubit extends Cubit<BoardState> {
         await openProject(openId, projects: visible, forceLoading: forceLoading);
         return;
       }
-      emit(state.copyWith(
-        projects: visible,
-        loading: false,
-        refreshing: false,
-        clearProject: true,
-        offline: false,
-      ));
+      if (_sameProjects(visible, state.projects) && state.project == null) {
+        emit(state.copyWith(loading: false, refreshing: false, offline: false, clearError: true));
+      } else {
+        emit(state.copyWith(
+          projects: visible,
+          loading: false,
+          refreshing: false,
+          clearProject: true,
+          offline: false,
+          clearError: true,
+        ));
+      }
     } catch (e) {
       emit(state.copyWith(
         loading: false,
@@ -198,37 +248,41 @@ class BoardCubit extends Cubit<BoardState> {
     }
   }
 
-  /// Silent by default — keeps hub content on screen.
+  /// Silent by default — keeps hub content on screen (no spinner except pull-to-refresh UI).
   Future<void> refreshProjects({bool forceLoading = false}) async {
     if (forceLoading && state.projects.isEmpty) {
       emit(state.copyWith(loading: true, clearError: true));
-    } else {
-      emit(state.copyWith(refreshing: true, clearError: true));
     }
     try {
       final projects = await this.projects.listProjects();
       await cache.saveProjects(projects);
+      final visible = projects.where((p) => !taktIsTestProject(p)).toList();
       final currentId = state.project?.id;
       Project? project = state.project;
       if (currentId != null) {
-        final matches = projects.where((p) => p.id == currentId);
+        final matches = visible.where((p) => p.id == currentId);
         project = matches.isEmpty ? null : matches.first;
       }
       if (project == null && currentId != null) {
         emit(state.copyWith(
-          projects: projects,
+          projects: visible,
           clearProject: true,
           loading: false,
           refreshing: false,
           offline: false,
+          clearError: true,
         ));
+      } else if (_sameProjects(visible, state.projects) &&
+          (project == null || project == state.project)) {
+        emit(state.copyWith(loading: false, refreshing: false, offline: false, clearError: true));
       } else {
         emit(state.copyWith(
-          projects: projects,
+          projects: visible,
           project: project,
           loading: false,
           refreshing: false,
           offline: false,
+          clearError: true,
         ));
       }
     } catch (e) {
@@ -271,7 +325,7 @@ class BoardCubit extends Cubit<BoardState> {
     var hasLocal = memoryHit;
 
     if (memoryHit && !forceLoading) {
-      emit(state.copyWith(refreshing: true, clearError: true));
+      // Тихий фон: без флагов loading/refreshing — UI уже с кэша.
       unawaited(_fetchBoard(projectId: projectId, list: list, project: project));
       return;
     }
@@ -289,7 +343,7 @@ class BoardCubit extends Cubit<BoardState> {
           tasks: cached.tasks,
           columnIndex: 0,
           loading: false,
-          refreshing: true,
+          refreshing: false,
           clearError: true,
         ));
         if (!forceLoading) {
@@ -299,8 +353,8 @@ class BoardCubit extends Cubit<BoardState> {
       }
     }
 
-    if (forceLoading || !hasLocal) {
-      emit(state.copyWith(loading: !hasLocal, refreshing: hasLocal, clearError: true));
+    if (!hasLocal) {
+      emit(state.copyWith(loading: true, clearError: true));
     }
 
     await _fetchBoard(projectId: projectId, list: list, project: project);
@@ -326,16 +380,23 @@ class BoardCubit extends Cubit<BoardState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastProjectKey, projectId);
       final keepColumn = state.project?.id == projectId ? state.columnIndex : 0;
-      emit(state.copyWith(
-        projects: list.isEmpty ? [project] : list,
-        project: project,
-        columns: loaded.columns,
-        tasks: loaded.tasks,
-        columnIndex: keepColumn.clamp(0, loaded.columns.isEmpty ? 0 : loaded.columns.length - 1),
-        loading: false,
-        refreshing: false,
-        offline: false,
-      ));
+      final nextProjects = list.isEmpty ? [project] : list;
+      if (_sameBoardData(columns: loaded.columns, tasks: loaded.tasks, project: project) &&
+          _sameProjects(nextProjects, state.projects)) {
+        emit(state.copyWith(loading: false, refreshing: false, offline: false, clearError: true));
+      } else {
+        emit(state.copyWith(
+          projects: nextProjects,
+          project: project,
+          columns: loaded.columns,
+          tasks: loaded.tasks,
+          columnIndex: keepColumn.clamp(0, loaded.columns.isEmpty ? 0 : loaded.columns.length - 1),
+          loading: false,
+          refreshing: false,
+          offline: false,
+          clearError: true,
+        ));
+      }
       await cache.saveBoard(
         project: project,
         columns: loaded.columns,
@@ -352,14 +413,13 @@ class BoardCubit extends Cubit<BoardState> {
     }
   }
 
-  /// Explicit user refresh of the open board (RefreshIndicator — content stays).
+  /// Pull-to-refresh: визуальный индикатор у RefreshIndicator, контент не бланкуем.
   Future<void> refreshBoard({bool forceLoading = false}) async {
     final project = state.project;
     if (project == null) {
       await refreshProjects(forceLoading: forceLoading);
       return;
     }
-    // Await network; local board stays visible (forceLoading + hasLocal → refreshing).
     await openProject(project.id, forceLoading: true);
   }
 

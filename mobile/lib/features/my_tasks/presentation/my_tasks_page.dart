@@ -164,17 +164,29 @@ class _MyTasksPageState extends State<MyTasksPage> {
                         itemBuilder: (context, i) {
                           final col = state.columns[i];
                           final tasks = _mineInColumn(state, col.id);
-                          return KanbanColumnPane(
-                            column: col,
-                            tasks: tasks,
-                            dark: dark,
-                            onAdd: () => context.push('/task-create?status=${col.id}'),
-                            onOpenTask: (task) async {
-                              final cubit = context.read<BoardCubit>();
-                              final projectId = state.project?.id;
-                              await context.push('/task/${task.id}');
-                              if (!mounted || projectId == null) return;
-                              await cubit.openProject(projectId);
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              return SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(
+                                  parent: ClampingScrollPhysics(),
+                                ),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                                  child: KanbanColumnPane(
+                                    column: col,
+                                    tasks: tasks,
+                                    dark: dark,
+                                    onAdd: () => context.push('/task-create?status=${col.id}'),
+                                    onOpenTask: (task) async {
+                                      final cubit = context.read<BoardCubit>();
+                                      final projectId = state.project?.id;
+                                      await context.push('/task/${task.id}');
+                                      if (!mounted || projectId == null) return;
+                                      await cubit.openProject(projectId);
+                                    },
+                                  ),
+                                ),
+                              );
                             },
                           );
                         },

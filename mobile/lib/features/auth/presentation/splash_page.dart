@@ -54,7 +54,8 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  /// Пока виден splash — сессия, способы входа и (если залогинен) проекты.
+  /// Пока виден splash — сессия, способы входа и (если залогинен) проекты из кэша + сеть.
+  /// Если сеть дольше 10с — уходим с кэшем, sync продолжается в фоне.
   Future<void> _warm() async {
     final auth = context.read<AuthCubit>();
     final oauth = context.read<OAuthRepository>();
@@ -68,12 +69,14 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     final state = auth.state;
     if (state is AuthAuthenticated) {
       board.setCurrentUserId(state.user.id);
-      if (board.state.projects.isEmpty) {
-        try {
-          await board.bootstrap();
-        } catch (e) {
-          debugPrint('── splash board warm ✕ $e');
-        }
+      await board.hydrateFromCache();
+      if (!mounted) return;
+      try {
+        await board.bootstrap().timeout(const Duration(seconds: 10));
+      } on TimeoutException {
+        debugPrint('── splash: cache ready, network sync continues');
+      } catch (e) {
+        debugPrint('── splash board warm ✕ $e');
       }
     }
 

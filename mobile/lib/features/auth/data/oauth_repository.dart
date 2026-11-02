@@ -137,40 +137,21 @@ class OAuthRepository {
       );
     }
 
-    // Сначала taktapp.ru (резолвится), потом 302 на VK/Яндекс — иначе Simulator
-    // часто не открывает oauth.yandex.ru / id.vk.com напрямую.
+    // Сначала taktapp.ru (резолвится), потом 302 на VK/Яндекс.
+    // Callback scheme только `takt` (Info.plist): https-scheme без Associated Domains
+    // на iOS сразу даёт cancel и sheet даже не открывается.
     final launchUri = Uri.parse('${AppConfig.apiBase}/api/v1/auth/oauth/launch').replace(
       queryParameters: {'url': authorizeUrl},
     );
-    final apiHost = Uri.parse(AppConfig.apiBase).host;
-    final callbackPath = Uri.parse(mobileRedirectUri).path;
 
-    debugPrint('── OAuth $provider → launch via $apiHost');
+    debugPrint('── OAuth $provider → launch via taktapp.ru → $callbackUrlScheme');
     late final String callback;
     try {
-      // HTTPS callback (iOS 17.4+): session closes on our /callback without takt://.
-      // Older iOS / если https-scheme недоступен — custom scheme + HTML bounce.
-      try {
-        callback = await FlutterWebAuth2.authenticate(
-          url: launchUri.toString(),
-          callbackUrlScheme: 'https',
-          options: FlutterWebAuth2Options(
-            preferEphemeral: false,
-            httpsHost: apiHost,
-            httpsPath: callbackPath,
-          ),
-        );
-      } on Exception catch (httpsErr) {
-        final t = httpsErr.toString().toLowerCase();
-        final cancelled = t.contains('cancel') || t.contains('cancell');
-        if (cancelled) rethrow;
-        debugPrint('── OAuth https-scheme ✕ $httpsErr → takt:// fallback');
-        callback = await FlutterWebAuth2.authenticate(
-          url: launchUri.toString(),
-          callbackUrlScheme: callbackUrlScheme,
-          options: const FlutterWebAuth2Options(preferEphemeral: false),
-        );
-      }
+      callback = await FlutterWebAuth2.authenticate(
+        url: launchUri.toString(),
+        callbackUrlScheme: callbackUrlScheme,
+        options: const FlutterWebAuth2Options(preferEphemeral: false),
+      );
     } on Exception catch (e) {
       final text = e.toString().toLowerCase();
       if (text.contains('cancel') || text.contains('cancell')) {

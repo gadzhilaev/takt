@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config.dart';
 import '../../core/theme.dart';
 
+/// Одна буква — как на сайте для коротких/одиночных имён.
 String taktInitials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-  if (parts.isEmpty) return '?';
-  if (parts.length == 1) {
-    final s = parts.first;
-    return s.substring(0, s.length >= 2 ? 2 : 1).toUpperCase();
-  }
-  return (parts[0][0] + parts[1][0]).toUpperCase();
+  final t = name.trim();
+  if (t.isEmpty) return '?';
+  return t[0].toUpperCase();
 }
 
 Color taktAvatarColor(String name) {
@@ -17,7 +15,18 @@ Color taktAvatarColor(String name) {
   return TaktColors.avatarPalette[name.codeUnitAt(0) % TaktColors.avatarPalette.length];
 }
 
-/// Full circular avatar — solid fill, centered initials, no grey half-rings.
+/// Backend отдаёт `/api/v1/files/avatars/...` — на web это same-origin, в mobile нужен абсолютный URL.
+String? resolveAvatarUrl(String? url) {
+  if (url == null) return null;
+  final trimmed = url.trim();
+  if (trimmed.isEmpty) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  final base = AppConfig.apiBase.replaceFirst(RegExp(r'/+$'), '');
+  if (trimmed.startsWith('/')) return '$base$trimmed';
+  return '$base/$trimmed';
+}
+
+/// Full circular avatar — solid fill, centered initials, thin border (как web).
 class TaktUserAvatar extends StatelessWidget {
   const TaktUserAvatar({
     super.key,
@@ -34,25 +43,36 @@ class TaktUserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fs = fontSize ?? (size * 0.36).clamp(8.0, 14.0);
+    final fs = fontSize ?? (size * 0.42).clamp(9.0, 16.0);
     final bg = taktAvatarColor(name);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final border = dark ? TaktColors.borderStrongDark : TaktColors.borderStrong;
+    final resolved = resolveAvatarUrl(avatarUrl);
 
     return SizedBox(
       width: size,
       height: size,
-      child: Material(
-        color: bg,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: avatarUrl != null && avatarUrl!.isNotEmpty
-            ? Image.network(
-                avatarUrl!,
-                fit: BoxFit.cover,
-                width: size,
-                height: size,
-                errorBuilder: (_, _, _) => _Initials(name: name, fontSize: fs),
-              )
-            : _Initials(name: name, fontSize: fs),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: bg,
+          border: Border.all(color: border, width: 1),
+        ),
+        child: ClipOval(
+          child: resolved != null
+              ? Image.network(
+                  resolved,
+                  fit: BoxFit.cover,
+                  width: size,
+                  height: size,
+                  errorBuilder: (_, _, _) => _Initials(name: name, fontSize: fs),
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return _Initials(name: name, fontSize: fs);
+                  },
+                )
+              : _Initials(name: name, fontSize: fs),
+        ),
       ),
     );
   }

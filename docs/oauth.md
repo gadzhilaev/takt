@@ -20,10 +20,11 @@ Backend FastAPI — единый центр. Client secrets и Apple private key
 
 - Web + Mobile (authorize): `https://taktapp.ru/api/v1/auth/oauth/callback` (и localhost для dev)
 
-Mobile VK / Яндекс: authorize открывается через `GET /oauth/launch?url=…` (302 на провайдера,
-чтобы DNS шёл с нашего домена), callback — **тот же HTTPS**, что в кабинетах. ASWebAuthenticationSession
-ловит `https://…/oauth/callback` (или bounce на `takt://oauth/callback`). Затем `POST /oauth/mobile`.
-Custom-scheme в кабинетах провайдеров **не** регистрируем.
+Mobile VK / Яндекс: authorize через `GET /oauth/launch?url=…` (302 на провайдера).
+В authorize у провайдера — HTTPS callback как в кабинете; сервер bounce → `takt://oauth/callback`
+(ASWebAuthenticationSession слушает схему `takt`). Затем `POST /oauth/mobile`.
+В кабинетах VK/Яндекс достаточно уже существующего
+`https://taktapp.ru/api/v1/auth/oauth/callback` — **ничего менять не нужно**.
 
 ## Apple (только mobile; на сайте кнопок нет)
 

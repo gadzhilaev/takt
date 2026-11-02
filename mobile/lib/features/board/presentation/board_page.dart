@@ -196,12 +196,24 @@ class _BoardPageState extends State<BoardPage> {
                             final col = state.columns[i];
                             final tasks = state.tasks.where((t) => t.statusId == col.id).toList()
                               ..sort((a, b) => a.position.compareTo(b.position));
-                            return KanbanColumnPane(
-                              column: col,
-                              tasks: tasks,
-                              dark: dark,
-                              onAdd: () => context.push('/task-create?status=${col.id}'),
-                              onOpenTask: (task) => context.push('/task/${task.id}'),
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SingleChildScrollView(
+                                  physics: const AlwaysScrollableScrollPhysics(
+                                    parent: ClampingScrollPhysics(),
+                                  ),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                                    child: KanbanColumnPane(
+                                      column: col,
+                                      tasks: tasks,
+                                      dark: dark,
+                                      onAdd: () => context.push('/task-create?status=${col.id}'),
+                                      onOpenTask: (task) => context.push('/task/${task.id}'),
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),

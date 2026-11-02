@@ -107,7 +107,7 @@ class TaktTaskCard extends StatelessWidget {
                           child: TaktAssigneeRow(
                             names: task.assignees.map((a) => a.name).toList(),
                             avatarUrls: task.assignees.map((a) => a.avatarUrl).toList(),
-                            size: 18,
+                            size: 22,
                           ),
                         ),
                       ],
