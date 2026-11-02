@@ -15,11 +15,11 @@ class OAuthRepository {
 
   final ApiClient _api;
 
-  /// HTTPS callback registered in VK/Yandex consoles. Server bounces to [callbackDeepLink].
+  /// HTTPS callback registered in VK/Yandex consoles. Server bounces to [callbackDeepLink]
+  /// when the session does not capture the HTTPS redirect itself.
   static String get mobileRedirectUri =>
       '${AppConfig.apiBase}/api/v1/auth/oauth/callback';
 
-  /// Deep link captured by ASWebAuthenticationSession after the HTTPS bounce.
   static const callbackDeepLink = 'takt://oauth/callback';
   static const callbackUrlScheme = 'takt';
 
@@ -60,7 +60,7 @@ class OAuthRepository {
   }
 
   /// Полный вход/регистрация через провайдера. Apple — системный sheet;
-  /// VK / Яндекс — ASWebAuthenticationSession (HTTPS callback → takt:// bounce).
+  /// VK / Яндекс — ASWebAuthenticationSession (launch → provider → HTTPS callback).
   Future<UserProfile> signIn(String provider, {bool link = false}) async {
     debugPrint('── OAuth → start provider=$provider link=$link');
     try {
@@ -89,19 +89,17 @@ class OAuthRepository {
       debugPrint('── OAuth Apple ← credential (hasToken=${credential.identityToken != null})');
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
-        throw const OAuthException('Вход отменён', cancelled: true);
+        throw const OAuthException('', cancelled: true);
       }
-      throw OAuthException(e.message);
+      // Системный текст Apple / иначе через API-слой при complete.
+      throw OAuthException(_api.messageFromError(e));
     } on MissingPluginException catch (e) {
-      debugPrint('── OAuth Apple ✕ MissingPluginException: $e');
-      throw const OAuthException(
-        'Плагин Apple не подключён. Полностью остановите приложение и снова запустите flutter run.',
-      );
+      throw OAuthException(_api.messageFromError(e));
     }
 
     final idToken = credential.identityToken;
     if (idToken == null || idToken.isEmpty) {
-      throw const OAuthException('Apple не вернул токен');
+      throw const OAuthException('', cancelled: true);
     }
 
     final parts = <String>[
@@ -119,40 +117,64 @@ class OAuthRepository {
   }
 
   Future<UserProfile> _signInBrowserProvider(String provider, {bool link = false}) async {
-    debugPrint('── OAuth $provider → /start (in-app browser, https callback)');
+    debugPrint('── OAuth $provider → /start');
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/api/v1/auth/oauth/$provider/start',
       queryParameters: {
         'client': 'mobile',
-        // Server ignores custom schemes for mobile and uses HTTPS callback.
         'redirect_uri': mobileRedirectUri,
         if (link) 'link': 'true',
       },
     );
-    final url = res.data?['authorize_url'] as String?;
+    final authorizeUrl = res.data?['authorize_url'] as String?;
     final state = res.data?['state'] as String?;
-    if (url == null || url.isEmpty || state == null || state.isEmpty) {
-      throw const OAuthException('Сервер вернул некорректный ответ для входа');
+    if (authorizeUrl == null || authorizeUrl.isEmpty || state == null || state.isEmpty) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        response: res,
+        type: DioExceptionType.badResponse,
+        message: 'invalid_oauth_start',
+      );
     }
 
-    await _preflightAuthorizeHost(url);
+    // Сначала taktapp.ru (резолвится), потом 302 на VK/Яндекс — иначе Simulator
+    // часто не открывает oauth.yandex.ru / id.vk.com напрямую.
+    final launchUri = Uri.parse('${AppConfig.apiBase}/api/v1/auth/oauth/launch').replace(
+      queryParameters: {'url': authorizeUrl},
+    );
+    final apiHost = Uri.parse(AppConfig.apiBase).host;
+    final callbackPath = Uri.parse(mobileRedirectUri).path;
 
+    debugPrint('── OAuth $provider → launch via $apiHost');
     late final String callback;
     try {
-      callback = await FlutterWebAuth2.authenticate(
-        url: url,
-        callbackUrlScheme: callbackUrlScheme,
-        options: const FlutterWebAuth2Options(preferEphemeral: false),
-      );
+      // HTTPS callback (iOS 17.4+): session closes on our /callback without takt://.
+      // Older iOS / если https-scheme недоступен — custom scheme + HTML bounce.
+      try {
+        callback = await FlutterWebAuth2.authenticate(
+          url: launchUri.toString(),
+          callbackUrlScheme: 'https',
+          options: FlutterWebAuth2Options(
+            preferEphemeral: false,
+            httpsHost: apiHost,
+            httpsPath: callbackPath,
+          ),
+        );
+      } on Exception catch (httpsErr) {
+        final t = httpsErr.toString().toLowerCase();
+        final cancelled = t.contains('cancel') || t.contains('cancell');
+        if (cancelled) rethrow;
+        debugPrint('── OAuth https-scheme ✕ $httpsErr → takt:// fallback');
+        callback = await FlutterWebAuth2.authenticate(
+          url: launchUri.toString(),
+          callbackUrlScheme: callbackUrlScheme,
+          options: const FlutterWebAuth2Options(preferEphemeral: false),
+        );
+      }
     } on Exception catch (e) {
       final text = e.toString().toLowerCase();
       if (text.contains('cancel') || text.contains('cancell')) {
-        // Not marked cancelled: blank/DNS Safari sheet looks the same as user close —
-        // show a hint instead of silently ignoring.
-        throw const OAuthException(
-          'Вход не завершён. Если страница провайдера не открылась — проверьте интернет '
-          'или попробуйте на телефоне (симулятор часто не открывает oauth.yandex.ru / id.vk.com).',
-        );
+        throw const OAuthException('', cancelled: true);
       }
       throw OAuthException(_api.messageFromError(e));
     }
@@ -160,6 +182,7 @@ class OAuthRepository {
     final uri = Uri.parse(callback);
     final error = uri.queryParameters['error'] ?? uri.queryParameters['oauth_error'];
     if (error != null && error.isNotEmpty) {
+      // Текст с сервера (bounce / callback query `message`).
       final msg = uri.queryParameters['message']?.trim();
       throw OAuthException(
         (msg != null && msg.isNotEmpty) ? msg : error,
@@ -169,7 +192,7 @@ class OAuthRepository {
     final returnedState = uri.queryParameters['state'] ?? state;
     final deviceId = uri.queryParameters['device_id'];
     if (code == null || code.isEmpty) {
-      throw const OAuthException('Провайдер не вернул код авторизации');
+      throw const OAuthException('', cancelled: true);
     }
 
     return _completeMobile(
@@ -179,37 +202,6 @@ class OAuthRepository {
       deviceId: deviceId,
       link: link,
     );
-  }
-
-  /// Early DNS/connectivity check so we don't show a blank Safari sheet.
-  Future<void> _preflightAuthorizeHost(String authorizeUrl) async {
-    final host = Uri.tryParse(authorizeUrl)?.origin;
-    if (host == null || host.isEmpty) return;
-    try {
-      final probe = Dio(
-        BaseOptions(
-          connectTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
-          followRedirects: true,
-          validateStatus: (_) => true,
-        ),
-      );
-      await probe.head(host);
-    } on DioException catch (e) {
-      debugPrint('── OAuth preflight ✕ $host: $e');
-      final dns = e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout ||
-          (e.message ?? '').toLowerCase().contains('failed host lookup');
-      if (dns) {
-        throw OAuthException(
-          'Не удаётся открыть $host. Проверьте интернет / DNS. '
-          'На iOS Simulator это частая проблема — проверьте вход на телефоне.',
-        );
-      }
-      // Other probe failures (405 etc.) are fine — host is reachable.
-    } catch (e) {
-      debugPrint('── OAuth preflight ✕ $host: $e');
-    }
   }
 
   Future<UserProfile> _completeMobile({
@@ -235,13 +227,23 @@ class OAuthRepository {
       },
     );
     final data = res.data;
-    if (data == null) throw const OAuthException('Пустой ответ сервера');
+    if (data == null) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        response: res,
+        type: DioExceptionType.badResponse,
+      );
+    }
     if (!link) {
       await _persistTokens(data);
     }
     final userJson = data['user'];
     if (userJson is! Map<String, dynamic>) {
-      throw const OAuthException('Сервер не вернул профиль пользователя');
+      throw DioException(
+        requestOptions: res.requestOptions,
+        response: res,
+        type: DioExceptionType.badResponse,
+      );
     }
     return UserProfile.fromJson(userJson);
   }
@@ -250,7 +252,10 @@ class OAuthRepository {
     final access = data['access_token'] as String?;
     final refresh = data['refresh_token'] as String?;
     if (access == null || refresh == null) {
-      throw const OAuthException('Сервер не вернул токены');
+      throw DioException(
+        requestOptions: RequestOptions(path: '/api/v1/auth/oauth/mobile'),
+        type: DioExceptionType.badResponse,
+      );
     }
     await _tokens.saveTokens(access: access, refresh: refresh);
   }

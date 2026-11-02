@@ -20,10 +20,10 @@ Backend FastAPI — единый центр. Client secrets и Apple private key
 
 - Web + Mobile (authorize): `https://taktapp.ru/api/v1/auth/oauth/callback` (и localhost для dev)
 
-Mobile VK / Яндекс: в authorize уходит **тот же HTTPS** callback. Сервер по `client_kind=mobile`
-отдаёт HTML-bounce на deep link `takt://oauth/callback` (схема в Info.plist / AndroidManifest);
-приложение забирает `code` через ASWebAuthenticationSession и завершает вход `POST /oauth/mobile`.
-Custom-scheme `takt://…` в кабинетах провайдеров **не** регистрируем — они его не принимают.
+Mobile VK / Яндекс: authorize открывается через `GET /oauth/launch?url=…` (302 на провайдера,
+чтобы DNS шёл с нашего домена), callback — **тот же HTTPS**, что в кабинетах. ASWebAuthenticationSession
+ловит `https://…/oauth/callback` (или bounce на `takt://oauth/callback`). Затем `POST /oauth/mobile`.
+Custom-scheme в кабинетах провайдеров **не** регистрируем.
 
 ## Apple (только mobile; на сайте кнопок нет)
 

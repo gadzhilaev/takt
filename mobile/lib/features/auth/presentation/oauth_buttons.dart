@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -77,15 +76,11 @@ class _OAuthButtonsState extends State<OAuthButtons> {
         setState(() => _busy = null);
         return;
       }
-      final String msg;
-      if (e is OAuthException) {
-        msg = e.message;
-      } else if (e is MissingPluginException) {
-        msg =
-            'Плагин не подключён. Полностью остановите приложение (q в терминале) и снова запустите flutter run.';
-      } else {
-        msg = context.read<ApiClient>().messageFromError(e);
-      }
+      // Только тексты с API / bounce (`message`); без локальных длинных подсказок.
+      final api = context.read<ApiClient>();
+      final msg = e is OAuthException && e.message.trim().isNotEmpty
+          ? e.message
+          : api.messageFromError(e);
       setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _busy = null);

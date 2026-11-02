@@ -6,7 +6,7 @@ import html
 import json
 import uuid
 from typing import Annotated, Literal
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -25,6 +25,17 @@ from app.services.activity_service import record_activity
 
 router = APIRouter(prefix="/auth/oauth", tags=["oauth"])
 
+# Mobile opens authorize via our domain first (DNS), then 302 to the provider.
+_OAUTH_AUTHORIZE_HOSTS = frozenset(
+    {
+        "oauth.yandex.ru",
+        "id.vk.com",
+        "id.vk.ru",
+        "login.vk.com",
+        "appleid.apple.com",
+    }
+)
+
 
 def _oauth_http(e: oauth_service.OAuthError) -> HTTPException:
     return HTTPException(
@@ -36,6 +47,28 @@ def _oauth_http(e: oauth_service.OAuthError) -> HTTPException:
 @router.get("/providers")
 async def list_providers(db: Annotated[AsyncSession, Depends(get_db)]):
     return await oauth_service.provider_availability(db)
+
+
+@router.get("/launch")
+@limiter.limit("30/minute")
+async def oauth_launch(
+    request: Request,
+    url: str = Query(..., min_length=8, max_length=4000),
+):
+    """302 на authorize URL провайдера. Только allowlist хостов."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or host not in _OAUTH_AUTHORIZE_HOSTS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "code": "invalid_authorize_url",
+                    "message": "Некорректный адрес входа",
+                }
+            },
+        )
+    return RedirectResponse(url, status_code=302)
 
 
 @router.get("/{provider}/start")

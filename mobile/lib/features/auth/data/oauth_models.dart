@@ -105,7 +105,7 @@ class OAuthStart extends Equatable {
     final url = json['authorization_url'] as String?;
     final state = json['state'] as String?;
     if (url == null || url.isEmpty || state == null || state.isEmpty) {
-      throw const OAuthException('Сервер вернул некорректный ответ для входа');
+      throw const FormatException('invalid_oauth_start');
     }
     return OAuthStart(
       authorizationUrl: url,
