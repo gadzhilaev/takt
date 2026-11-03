@@ -20,4 +20,31 @@ void main() {
     expect(formatTimeInStatus(null), isNull);
     expect(formatTimeInStatus('nope'), isNull);
   });
+
+  test('done task uses created → closed duration', () {
+    final created = DateTime.utc(2026, 11, 1, 10);
+    final closed = DateTime.utc(2026, 11, 3, 12);
+    expect(
+      formatTaskTimeLabel(
+        isDone: true,
+        createdAt: created.toIso8601String(),
+        closedAt: closed.toIso8601String(),
+        statusEnteredAt: closed.toIso8601String(),
+        now: closed,
+      ),
+      '2 д.',
+    );
+  });
+
+  test('active task uses time in column', () {
+    expect(
+      formatTaskTimeLabel(
+        isDone: false,
+        createdAt: base.subtract(const Duration(days: 5)).toIso8601String(),
+        statusEnteredAt: base.subtract(const Duration(hours: 3)).toIso8601String(),
+        now: base,
+      ),
+      '3 ч.',
+    );
+  });
 }

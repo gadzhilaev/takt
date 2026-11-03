@@ -242,14 +242,36 @@ class _MyTasksPageState extends State<MyTasksPage> {
         : peers.map((t) => t.position).reduce((a, b) => a < b ? a : b);
     final position = peers.isEmpty ? 0.0 : minPos - 1024;
 
-    // Optimistic local update.
-    final optimistic = task.copyWith(statusId: toStatusId, position: position);
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    StatusColumn? target;
+    for (final c in section.columns) {
+      if (c.id == toStatusId) {
+        target = c;
+        break;
+      }
+    }
+    // Optimistic local update (timer + disk cache).
+    final optimistic = task.copyWith(
+      statusId: toStatusId,
+      position: position,
+      statusEnteredAt: nowIso,
+      closedAt: target?.isDone == true ? nowIso : null,
+    );
     setState(() {
       final i = _sections.indexWhere((s) => s.projectId == section.projectId);
       if (i < 0) return;
       final nextTasks = _sections[i].tasks.map((t) => t.id == task.id ? optimistic : t).toList();
       _sections[i] = _sections[i].copyWith(tasks: nextTasks);
     });
+    final cubit = context.read<BoardCubit>();
+    final cached = await cubit.cache.loadBoard(section.projectId);
+    if (cached != null) {
+      await cubit.cache.saveBoard(
+        project: cached.project,
+        columns: cached.columns,
+        tasks: cached.tasks.map((t) => t.id == task.id ? optimistic : t).toList(),
+      );
+    }
 
     try {
       final updated = await boardRepo.moveTask(
@@ -264,6 +286,14 @@ class _MyTasksPageState extends State<MyTasksPage> {
         final nextTasks = _sections[i].tasks.map((t) => t.id == updated.id ? updated : t).toList();
         _sections[i] = _sections[i].copyWith(tasks: nextTasks);
       });
+      final after = await cubit.cache.loadBoard(section.projectId);
+      if (after != null) {
+        await cubit.cache.saveBoard(
+          project: after.project,
+          columns: after.columns,
+          tasks: after.tasks.map((t) => t.id == updated.id ? updated : t).toList(),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       // Revert via reload.
@@ -304,11 +334,6 @@ class _MyTasksPageState extends State<MyTasksPage> {
     _pageController = null;
     _pageIndex = 0;
     context.go('/projects');
-  }
-
-  List<TaskItem> _mineInColumn(List<TaskItem> tasks, String statusId) {
-    return tasks.where((t) => t.statusId == statusId).toList()
-      ..sort((a, b) => a.position.compareTo(b.position));
   }
 
   List<TaskItem> _mineInBoardColumn(BoardState state, String statusId) {
@@ -512,13 +537,11 @@ class _MyTasksPageState extends State<MyTasksPage> {
       );
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    final columnWidth = width * 0.9;
     final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 24),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
       itemCount: _sections.length,
       itemBuilder: (context, index) {
         final section = _sections[index];
@@ -532,7 +555,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
                 child: Row(
                   children: [
                     Expanded(
@@ -579,7 +602,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Text('Загрузка…', style: TextStyle(fontSize: 13, color: muted)),
                   )
-                else if (section.columns.isEmpty)
+                else if (section.columns.isEmpty || total == 0)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                     child: Text(
@@ -588,36 +611,121 @@ class _MyTasksPageState extends State<MyTasksPage> {
                     ),
                   )
                 else
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: _dragging
-                        ? const NeverScrollableScrollPhysics()
-                        : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
-                    padding: const EdgeInsets.only(right: 8, bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final col in section.columns)
-                          SizedBox(
-                            width: columnWidth,
-                            child: KanbanColumnPane(
-                              column: col,
-                              tasks: _mineInColumn(section.tasks, col.id),
-                              dark: dark,
-                              onAdd: () => _addInProject(section.projectId, col.id),
-                              onOpenTask: (task) => _openTask(task, projectId: section.projectId),
-                              onDraggingChanged: (v) => setState(() => _dragging = v),
-                              onTaskDropped: (task) => _moveInAllProjects(section, task, col.id),
-                            ),
-                          ),
-                      ],
-                    ),
+                  _MyTasksSectionPager(
+                    key: ValueKey('pager-${section.projectId}'),
+                    columns: section.columns,
+                    tasks: section.tasks,
+                    dark: dark,
+                    dragging: _dragging,
+                    onDraggingChanged: (v) => setState(() => _dragging = v),
+                    onAdd: (colId) => _addInProject(section.projectId, colId),
+                    onOpenTask: (task) => _openTask(task, projectId: section.projectId),
+                    onTaskDropped: (task, colId) => _moveInAllProjects(section, task, colId),
                   ),
               ],
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Same PageView as [BoardPage]: viewportFraction 0.9, padEnds false, peek next column.
+class _MyTasksSectionPager extends StatefulWidget {
+  const _MyTasksSectionPager({
+    super.key,
+    required this.columns,
+    required this.tasks,
+    required this.dark,
+    required this.dragging,
+    required this.onDraggingChanged,
+    required this.onAdd,
+    required this.onOpenTask,
+    required this.onTaskDropped,
+  });
+
+  final List<StatusColumn> columns;
+  final List<TaskItem> tasks;
+  final bool dark;
+  final bool dragging;
+  final ValueChanged<bool> onDraggingChanged;
+  final ValueChanged<String> onAdd;
+  final ValueChanged<TaskItem> onOpenTask;
+  final void Function(TaskItem task, String columnId) onTaskDropped;
+
+  @override
+  State<_MyTasksSectionPager> createState() => _MyTasksSectionPagerState();
+}
+
+class _MyTasksSectionPagerState extends State<_MyTasksSectionPager> {
+  late final PageController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(viewportFraction: 0.9);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<TaskItem> _mineIn(String statusId) {
+    return widget.tasks.where((t) => t.statusId == statusId).toList()
+      ..sort((a, b) => a.position.compareTo(b.position));
+  }
+
+  double _heightFor(BuildContext context) {
+    var maxTasks = 0;
+    for (final col in widget.columns) {
+      final n = _mineIn(col.id).length;
+      if (n > maxTasks) maxTasks = n;
+    }
+    // header + pads + cards (approx.); cap so the list stays scrollable
+    final content = 64.0 + (maxTasks == 0 ? 48.0 : maxTasks * 128.0);
+    final maxH = MediaQuery.sizeOf(context).height * 0.62;
+    return content.clamp(140.0, maxH);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final height = _heightFor(context);
+    return SizedBox(
+      height: height,
+      child: PageView.builder(
+        controller: _controller,
+        itemCount: widget.columns.length,
+        padEnds: false,
+        physics: widget.dragging
+            ? const NeverScrollableScrollPhysics()
+            : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
+        itemBuilder: (context, i) {
+          final col = widget.columns[i];
+          final tasks = _mineIn(col.id);
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: KanbanColumnPane(
+                    column: col,
+                    tasks: tasks,
+                    dark: widget.dark,
+                    onAdd: () => widget.onAdd(col.id),
+                    onOpenTask: widget.onOpenTask,
+                    onDraggingChanged: widget.onDraggingChanged,
+                    onTaskDropped: (task) => widget.onTaskDropped(task, col.id),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

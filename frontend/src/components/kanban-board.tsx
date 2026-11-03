@@ -167,8 +167,21 @@ export function KanbanBoard({
       const key = ["tasks", projectId];
       const prev = qc.getQueryData<{ items: Task[] }>(key);
       if (prev) {
+        const now = new Date().toISOString();
+        const targetDone = Boolean(statusById[status_id]?.is_done);
         qc.setQueryData(key, {
-          items: prev.items.map((t) => (t.id === id ? { ...t, status_id, position } : t)),
+          items: prev.items.map((t) =>
+            t.id === id
+              ? {
+                  ...t,
+                  status_id,
+                  position,
+                  // Local clock so the timer badge updates immediately and survives cache.
+                  status_entered_at: t.status_id === status_id ? t.status_entered_at : now,
+                  closed_at: targetDone ? now : null,
+                }
+              : t
+          ),
         });
       }
       return { prev, key };

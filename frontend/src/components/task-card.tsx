@@ -6,7 +6,8 @@ import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Status, Task } from "@/lib/types";
 import { UserAvatar } from "@/components/user-avatar";
 import { Select } from "@/components/ui/select";
-import { formatTimeInStatus } from "@/lib/time-in-status";
+import { useTickingNow } from "@/hooks/use-ticking-now";
+import { formatTaskTimeLabel, taskTimeTitle } from "@/lib/time-in-status";
 import { urgencyCssVars, urgencyLabel } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 
@@ -86,7 +87,9 @@ export function TaskCard({
     disabled: !draggable || overlay || isDragging,
   });
   const urgencyVars = urgencyCssVars(task.priority);
-  const timeInStatus = formatTimeInStatus(task.status_entered_at ?? task.updated_at ?? task.created_at);
+  const done = isDone || Boolean(task.closed_at);
+  const now = useTickingNow(!done);
+  const timeLabel = formatTaskTimeLabel(task, { isDone: done, now });
 
   return (
     <div
@@ -133,13 +136,13 @@ export function TaskCard({
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="kanban-urgency-badge">{urgencyLabel(task.priority)}</span>
-            {timeInStatus && (
+            {timeLabel && (
               <span
                 className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted"
-                title="Сколько задача в этом столбце"
+                title={taskTimeTitle(done)}
               >
                 <AppIcon name="timer" size={12} className="opacity-70" />
-                {timeInStatus}
+                {timeLabel}
               </span>
             )}
           </div>

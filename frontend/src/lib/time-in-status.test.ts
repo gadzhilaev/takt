@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTimeInStatus } from "./time-in-status";
+import { formatTaskTimeLabel, formatTimeInStatus } from "./time-in-status";
 
 describe("formatTimeInStatus", () => {
   const base = Date.parse("2026-11-03T12:00:00.000Z");
@@ -18,5 +18,36 @@ describe("formatTimeInStatus", () => {
   it("returns null for bad input", () => {
     expect(formatTimeInStatus(null)).toBeNull();
     expect(formatTimeInStatus("nope")).toBeNull();
+  });
+});
+
+describe("formatTaskTimeLabel", () => {
+  const created = "2026-11-01T10:00:00.000Z";
+  const closed = "2026-11-03T12:00:00.000Z";
+  const now = Date.parse(closed);
+
+  it("active task uses time in column", () => {
+    expect(
+      formatTaskTimeLabel(
+        {
+          created_at: created,
+          status_entered_at: new Date(now - 3 * 3600_000).toISOString(),
+        },
+        { now }
+      )
+    ).toBe("3 ч.");
+  });
+
+  it("done task uses created → closed duration", () => {
+    expect(
+      formatTaskTimeLabel(
+        {
+          created_at: created,
+          closed_at: closed,
+          status_entered_at: closed,
+        },
+        { isDone: true, now }
+      )
+    ).toBe("2 д.");
   });
 });

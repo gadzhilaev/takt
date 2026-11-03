@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/kanban_colors.dart';
@@ -84,8 +86,7 @@ class TaktTaskCard extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           UrgencyBadge(priority: task.priority),
-                          if (formatTimeInStatus(task.timeInStatusIso) case final t?)
-                            _TimeInStatusChip(label: t, dark: dark),
+                          _TaskTimeChip(task: task, isDone: done, dark: dark),
                         ],
                       ),
                       if (hasDesc) ...[
@@ -133,38 +134,99 @@ class TaktTaskCard extends StatelessWidget {
   }
 }
 
-class _TimeInStatusChip extends StatelessWidget {
-  const _TimeInStatusChip({required this.label, required this.dark});
+/// Live timer chip: ticks for open tasks; fixed duration for done.
+class _TaskTimeChip extends StatefulWidget {
+  const _TaskTimeChip({
+    required this.task,
+    required this.isDone,
+    required this.dark,
+  });
 
-  final String label;
+  final TaskItem task;
+  final bool isDone;
   final bool dark;
 
   @override
+  State<_TaskTimeChip> createState() => _TaskTimeChipState();
+}
+
+class _TaskTimeChipState extends State<_TaskTimeChip> {
+  Timer? _timer;
+  late DateTime _now;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    _syncTicker();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TaskTimeChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isDone != widget.isDone ||
+        oldWidget.task.statusEnteredAt != widget.task.statusEnteredAt ||
+        oldWidget.task.closedAt != widget.task.closedAt) {
+      _now = DateTime.now();
+      _syncTicker();
+    }
+  }
+
+  void _syncTicker() {
+    _timer?.cancel();
+    _timer = null;
+    if (widget.isDone) return;
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
-    final soft = dark ? TaktColors.surface2Dark : TaktColors.surface2;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: soft,
-        borderRadius: BorderRadius.circular(TaktRadii.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.timer_outlined, size: 12, color: muted.withValues(alpha: 0.85)),
-          const SizedBox(width: 3),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              height: 1.2,
-              fontFeatures: const [FontFeature.tabularFigures()],
-              color: muted,
+    final label = formatTaskTimeLabel(
+      isDone: widget.isDone,
+      createdAt: widget.task.createdAt,
+      closedAt: widget.task.closedAt,
+      statusEnteredAt: widget.task.statusEnteredAt,
+      updatedAt: widget.task.updatedAt,
+      now: _now,
+    );
+    if (label == null) return const SizedBox.shrink();
+
+    final muted = widget.dark ? TaktColors.mutedDark : TaktColors.muted;
+    final soft = widget.dark ? TaktColors.surface2Dark : TaktColors.surface2;
+    return Tooltip(
+      message: taskTimeTitle(widget.isDone),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: soft,
+          borderRadius: BorderRadius.circular(TaktRadii.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.timer_outlined, size: 12, color: muted.withValues(alpha: 0.85)),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                height: 1.2,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: muted,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

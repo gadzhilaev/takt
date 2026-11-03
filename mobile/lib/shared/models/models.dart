@@ -231,6 +231,8 @@ class TaskItem extends Equatable {
     );
   }
 
+  static const Object _unset = Object();
+
   TaskItem copyWith({
     String? title,
     String? description,
@@ -238,8 +240,8 @@ class TaskItem extends Equatable {
     String? priority,
     String? projectId,
     List<TaskAssignee>? assignees,
-    String? closedAt,
-    String? statusEnteredAt,
+    Object? closedAt = _unset,
+    Object? statusEnteredAt = _unset,
     String? updatedAt,
     String? createdAt,
     String? statusName,
@@ -254,8 +256,9 @@ class TaskItem extends Equatable {
         projectId: projectId ?? this.projectId,
         description: description ?? this.description,
         assignees: assignees ?? this.assignees,
-        closedAt: closedAt ?? this.closedAt,
-        statusEnteredAt: statusEnteredAt ?? this.statusEnteredAt,
+        closedAt: identical(closedAt, _unset) ? this.closedAt : closedAt as String?,
+        statusEnteredAt:
+            identical(statusEnteredAt, _unset) ? this.statusEnteredAt : statusEnteredAt as String?,
         updatedAt: updatedAt ?? this.updatedAt,
         createdAt: createdAt ?? this.createdAt,
         statusName: statusName ?? this.statusName,

@@ -512,11 +512,32 @@ class BoardCubit extends Cubit<BoardState> {
       emit(state.copyWith(error: 'Нет сети: перемещение заблокировано'));
       return;
     }
+    if (task.statusId == statusId) return;
     final peers = state.tasks.where((t) => t.statusId == statusId && t.id != task.id);
     final minPos = peers.isEmpty
         ? 0.0
         : peers.map((t) => t.position).reduce((a, b) => a < b ? a : b);
     final position = peers.isEmpty ? 0.0 : minPos - 1024;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    StatusColumn? target;
+    for (final c in state.columns) {
+      if (c.id == statusId) {
+        target = c;
+        break;
+      }
+    }
+    final optimistic = task.copyWith(
+      statusId: statusId,
+      position: position,
+      statusEnteredAt: nowIso,
+      closedAt: target?.isDone == true ? nowIso : null,
+    );
+    final before = state.tasks;
+    emit(state.copyWith(
+      tasks: before.map((t) => t.id == task.id ? optimistic : t).toList(),
+      clearError: true,
+    ));
+    await _persistBoard();
     try {
       final updated = await board.moveTask(
         taskId: task.id,
@@ -528,7 +549,8 @@ class BoardCubit extends Cubit<BoardState> {
       await _persistBoard();
       await _publishWidget();
     } catch (e) {
-      emit(state.copyWith(error: api.messageFromError(e)));
+      emit(state.copyWith(tasks: before, error: api.messageFromError(e)));
+      await _persistBoard();
     }
   }
 
