@@ -412,7 +412,7 @@ class _MemberRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(TaktRadii.sm),
               ),
               child: Text(
-                'админ',
+                'владелец',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,

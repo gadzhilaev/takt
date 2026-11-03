@@ -99,13 +99,7 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
           backgroundColor: bg,
           appBar: TaktAppBar(
             title: 'Takt',
-            leading: const Padding(
-              padding: EdgeInsets.only(left: 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TaktMark(height: 22),
-              ),
-            ),
+            titleWidget: const TaktLogo(height: 26),
             actions: [
               IconButton(
                 tooltip: 'Уведомления',

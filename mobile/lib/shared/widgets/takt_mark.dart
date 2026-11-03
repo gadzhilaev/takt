@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// Official Takt symbol from `frontend/public/brand/takt-symbol.svg`.
+import '../../core/theme.dart';
+
+/// Official Takt symbol only (no wordmark) — `takt-symbol.svg`.
 class TaktMark extends StatelessWidget {
   const TaktMark({super.key, this.height = 22, this.size, this.semanticLabel = 'Takt'});
 
@@ -28,7 +30,40 @@ class TaktMark extends StatelessWidget {
   }
 }
 
-/// Full logo (symbol + wordmark). Swaps asset for dark surfaces.
+/// Mobile brand: symbol + UI text «Takt» (not the logo wordmark SVG).
+class TaktBrandLockup extends StatelessWidget {
+  const TaktBrandLockup({super.key, this.markHeight = 22});
+
+  final double markHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
+    return Semantics(
+      label: 'Takt',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TaktMark(height: markHeight, semanticLabel: null),
+          const SizedBox(width: 8),
+          Text(
+            'Takt',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.35,
+              height: 1,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full logo (symbol + wordmark). Prefer [TaktBrandLockup] in app chrome.
 class TaktLogo extends StatelessWidget {
   const TaktLogo({super.key, this.height = 28});
 

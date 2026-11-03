@@ -12,6 +12,8 @@ export const paths = {
     `/app/projects/${projectId}?task=${taskId}`,
   myTasks: "/app/my-tasks",
   profile: "/app/profile",
+  /** Opens ProfileDrawer on the projects hub (not the legacy /app/profile page). */
+  profileDrawer: "/app/projects?profile=1",
   notifications: "/app/inbox",
   admin: "/app/admin",
   adminSettings: "/app/admin/settings",
@@ -23,4 +25,11 @@ export const paths = {
 export function loginWithNext(nextPath?: string | null) {
   if (!nextPath || nextPath === "/" || nextPath.startsWith("/login")) return paths.login;
   return `${paths.login}?next=${encodeURIComponent(nextPath)}`;
+}
+
+/** Return to the in-app profile drawer, optionally with a flash message. */
+export function profileDrawerPath(message?: string | null) {
+  if (!message) return paths.profileDrawer;
+  const q = new URLSearchParams({ profile: "1", message });
+  return `${paths.projects}?${q.toString()}`;
 }

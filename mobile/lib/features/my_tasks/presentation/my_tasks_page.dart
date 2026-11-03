@@ -407,17 +407,6 @@ class _MyTasksPageState extends State<MyTasksPage> {
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: Text(
-                  'Мои задачи',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: dark ? TaktColors.mutedDark : TaktColors.muted,
-                  ),
-                ),
-              ),
               if (userId == null || userId.isEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -678,53 +667,55 @@ class _MyTasksSectionPagerState extends State<_MyTasksSectionPager> {
       ..sort((a, b) => a.position.compareTo(b.position));
   }
 
+  /// Height fits the tallest column fully (no mid-card clip). Only very tall
+  /// columns scroll inside; outer list scrolls between projects.
   double _heightFor(BuildContext context) {
     var maxTasks = 0;
     for (final col in widget.columns) {
       final n = _mineIn(col.id).length;
       if (n > maxTasks) maxTasks = n;
     }
-    // header + pads + cards (approx.); cap so the list stays scrollable
-    final content = 64.0 + (maxTasks == 0 ? 48.0 : maxTasks * 128.0);
-    final maxH = MediaQuery.sizeOf(context).height * 0.62;
-    return content.clamp(140.0, maxH);
+    // Column chrome (accent + header + pads) ≈ 56; card ≈ 120 with desc/avatar.
+    const chrome = 56.0;
+    const card = 120.0;
+    final content = chrome + (maxTasks == 0 ? 44.0 : maxTasks * card);
+    final maxH = MediaQuery.sizeOf(context).height * 0.72;
+    // Prefer full content height so the column bottom edge stays complete.
+    if (content <= maxH) return content;
+    return maxH;
   }
 
   @override
   Widget build(BuildContext context) {
     final height = _heightFor(context);
-    return SizedBox(
-      height: height,
-      child: PageView.builder(
-        controller: _controller,
-        itemCount: widget.columns.length,
-        padEnds: false,
-        physics: widget.dragging
-            ? const NeverScrollableScrollPhysics()
-            : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
-        itemBuilder: (context, i) {
-          final col = widget.columns[i];
-          final tasks = _mineIn(col.id);
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: KanbanColumnPane(
-                    column: col,
-                    tasks: tasks,
-                    dark: widget.dark,
-                    onAdd: () => widget.onAdd(col.id),
-                    onOpenTask: widget.onOpenTask,
-                    onDraggingChanged: widget.onDraggingChanged,
-                    onTaskDropped: (task) => widget.onTaskDropped(task, col.id),
-                  ),
-                ),
-              );
-            },
-          );
-        },
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: SizedBox(
+        height: height,
+        child: PageView.builder(
+          controller: _controller,
+          itemCount: widget.columns.length,
+          padEnds: false,
+          physics: widget.dragging
+              ? const NeverScrollableScrollPhysics()
+              : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
+          itemBuilder: (context, i) {
+            final col = widget.columns[i];
+            final tasks = _mineIn(col.id);
+            return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: KanbanColumnPane(
+                column: col,
+                tasks: tasks,
+                dark: widget.dark,
+                onAdd: () => widget.onAdd(col.id),
+                onOpenTask: widget.onOpenTask,
+                onDraggingChanged: widget.onDraggingChanged,
+                onTaskDropped: (task) => widget.onTaskDropped(task, col.id),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

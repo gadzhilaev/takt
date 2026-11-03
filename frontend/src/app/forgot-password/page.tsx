@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { BrandLogo } from "@/components/brand-mark";
-import { paths } from "@/lib/paths";
+import { paths, profileDrawerPath } from "@/lib/paths";
 
 type SendCodeResponse = { ok?: boolean; message?: string; email?: string };
 
@@ -82,7 +82,7 @@ function ForgotPasswordInner() {
       });
       const msg = res.message || "";
       if (setMode) {
-        router.push(msg ? `${paths.profile}?message=${encodeURIComponent(msg)}` : paths.profile);
+        router.push(profileDrawerPath(msg || null));
       } else {
         router.push(msg ? `${paths.login}?message=${encodeURIComponent(msg)}` : paths.login);
       }
@@ -234,7 +234,7 @@ function ForgotPasswordInner() {
 
           <p className="mt-5 text-center text-sm text-muted">
             {setMode ? (
-              <Link href={paths.profile} className="font-medium text-[var(--accent)]">
+              <Link href={paths.profileDrawer} className="font-medium text-[var(--accent)]">
                 Назад в профиль
               </Link>
             ) : (

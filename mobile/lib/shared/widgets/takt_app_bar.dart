@@ -8,6 +8,7 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
   const TaktAppBar({
     super.key,
     required this.title,
+    this.titleWidget,
     this.leading,
     this.actions,
     this.onBack,
@@ -16,6 +17,8 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   final String title;
+  /// When set, replaces the string [title] (e.g. [TaktBrandLockup]).
+  final Widget? titleWidget;
   final Widget? leading;
   final List<Widget>? actions;
   final VoidCallback? onBack;
@@ -54,19 +57,20 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
       letterSpacing: -0.2,
       color: fg,
     );
-    final titleWidget = Text(
-      title,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: titleStyle,
-    );
+    final resolvedTitle = titleWidget ??
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: titleStyle,
+        );
 
     return AppBar(
       toolbarHeight: height,
       titleSpacing: lead == null ? 16 : 0,
       centerTitle: centerTitle,
       leading: lead,
-      title: titleWidget,
+      title: resolvedTitle,
       actions: actions,
     );
   }

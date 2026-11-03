@@ -123,6 +123,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.replace(valid ? `/app/projects/${valid}` : "/app/projects");
   }, [pathname, router, projects]);
 
+  // /app/projects?profile=1 — открыть drawer профиля (возврат из «Задать пароль»).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!pathname.startsWith("/app/")) return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("profile") !== "1") return;
+    setProfileOpen(true);
+    setMobileOpen(false);
+    void qc.invalidateQueries({ queryKey: ["me"] });
+    sp.delete("profile");
+    sp.delete("message");
+    const qs = sp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname, router, qc]);
+
   const createProject = useMutation({
     mutationFn: () =>
       api<{ project: Project }>("/api/v1/projects", {
