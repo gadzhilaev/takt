@@ -893,10 +893,10 @@ export function KanbanBoard({
     );
   }
 
-  /* Desktop: 1/3 мои задачи, 2/3 доска проекта; ≥5 столбцов + край 6-го */
+  /* Desktop: 2/5 мои задачи, 3/5 доска проекта; 4 столбца + край 5-го */
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-      <div className="flex min-h-0 basis-[33%] max-h-[33%] flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-[2] flex-col overflow-hidden">
         <MemberTasksSection
           projectId={projectId}
           members={members}
@@ -907,7 +907,7 @@ export function KanbanBoard({
           onMoveTask={(args) => moveMutation.mutate(args)}
         />
       </div>
-      <div className="flex min-h-0 flex-[2] flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-[3] flex-col overflow-hidden">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}

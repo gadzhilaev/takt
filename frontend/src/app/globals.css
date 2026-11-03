@@ -165,8 +165,8 @@ body {
 
 @layer components {
   /**
-   * Горизонтальный трек доски: 5 полных столбцов + край 6-го.
-   * gap-3 = 0.75rem → 5 промежутков между 5.25 «слотами».
+   * Горизонтальный трек доски: 4 полных столбца + край 5-го.
+   * gap-3 = 0.75rem → 4 промежутка между 4.25 «слотами».
    */
   .kanban-board-track {
     container-type: inline-size;
@@ -174,7 +174,7 @@ body {
   }
 
   .kanban-col-width {
-    width: clamp(10.5rem, calc((100cqi - 5 * 0.75rem) / 5.25), 17.5rem);
+    width: clamp(11rem, calc((100cqi - 4 * 0.75rem) / 4.25), 17.5rem);
   }
 
   .kanban-column-shell {
