@@ -2,16 +2,51 @@
 
 import { AppIcon } from "@/components/ui/app-icon";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { useEffect, useMemo, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragOverlay,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { ProjectMember, Status, Task, User } from "@/lib/types";
+import { ColumnStartDroppable, KanbanColumn } from "@/components/kanban-column";
 import { TaskCard } from "@/components/task-card";
 import { UserAvatar } from "@/components/user-avatar";
 import { columnShellStyle } from "@/lib/column-colors";
 import { isProjectMember, memberTasksTitle, tasksForMember } from "@/lib/member-tasks";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
+
+function midPosition(before?: number, after?: number) {
+  if (before == null && after == null) return 1024;
+  if (before == null) {
+    const a = after as number;
+    return a === 0 ? -1024 : a / 2;
+  }
+  if (after == null) return before + 1024;
+  if (before === after) return before - 1024;
+  return (before + after) / 2;
+}
+
+function parseColumnDropId(overId: string): { statusId: string; atStart: boolean } | null {
+  if (!overId.startsWith("col-")) return null;
+  if (overId.endsWith("-start")) {
+    return { statusId: overId.slice(4, -6), atStart: true };
+  }
+  return { statusId: overId.slice(4), atStart: false };
+}
+
+type DropIndicator =
+  | { kind: "column"; statusId: string }
+  | { kind: "start"; statusId: string }
+  | { kind: "task"; statusId: string; taskId: string; edge: "before" | "after" };
 
 function MemberSelect({
   members,
@@ -92,12 +127,17 @@ export function MemberTasksSection({
   statuses,
   tasks,
   onOpenTask,
+  fillParent = false,
+  onMoveTask,
 }: {
   projectId: string;
   members: ProjectMember[];
   statuses: Status[];
   tasks: Task[];
   onOpenTask: (taskId: string) => void;
+  /** Desktop board: occupy parent (1/3) with internal scroll. */
+  fillParent?: boolean;
+  onMoveTask?: (args: { id: string; status_id: string; position: number }) => void;
 }) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const { data: meData } = useQuery({
@@ -108,6 +148,11 @@ export function MemberTasksSection({
   const meId = meData?.user?.id;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const canDrag = Boolean(onMoveTask) && isDesktop;
 
   useEffect(() => {
     setSelectedId(null);
@@ -123,12 +168,10 @@ export function MemberTasksSection({
   const canShow = !!meId && isProjectMember(members, meId);
   const effectiveId =
     canShow && selectedId && members.some((m) => m.user_id === selectedId) ? selectedId : meId ?? "";
-
   const filtered = useMemo(
     () => (canShow && effectiveId ? tasksForMember(tasks, effectiveId) : []),
     [canShow, effectiveId, tasks]
   );
-
   const byStatus = useMemo(() => {
     const map: Record<string, Task[]> = {};
     for (const s of statuses) map[s.id] = [];
@@ -136,9 +179,182 @@ export function MemberTasksSection({
       if (!map[t.status_id]) map[t.status_id] = [];
       map[t.status_id].push(t);
     }
-    for (const id of Object.keys(map)) map[id].sort((a, b) => a.position - b.position);
+    for (const id of Object.keys(map)) {
+      map[id].sort((a, b) => a.position - b.position);
+    }
     return map;
   }, [statuses, filtered]);
+
+  const resolveDrop = useCallback(
+    (taskId: string, overId: string): { statusId: string; position: number } | null => {
+      if (!filtered.some((t) => t.id === taskId)) return null;
+
+      if (dropIndicator?.kind === "start") {
+        const column = [...(byStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
+        return {
+          statusId: dropIndicator.statusId,
+          position: midPosition(undefined, column[0]?.position),
+        };
+      }
+      if (dropIndicator?.kind === "column") {
+        const column = [...(byStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
+        const last = column[column.length - 1];
+        return {
+          statusId: dropIndicator.statusId,
+          position: midPosition(last?.position, undefined),
+        };
+      }
+      if (dropIndicator?.kind === "task") {
+        const column = [...(byStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
+        const idx = column.findIndex((t) => t.id === dropIndicator.taskId);
+        if (idx < 0) {
+          const last = column[column.length - 1];
+          return {
+            statusId: dropIndicator.statusId,
+            position: midPosition(last?.position, undefined),
+          };
+        }
+        if (dropIndicator.edge === "before") {
+          const before = idx > 0 ? column[idx - 1]?.position : undefined;
+          const after = column[idx]?.position;
+          return { statusId: dropIndicator.statusId, position: midPosition(before, after) };
+        }
+        const before = column[idx]?.position;
+        const after = column[idx + 1]?.position;
+        return { statusId: dropIndicator.statusId, position: midPosition(before, after) };
+      }
+
+      const colDrop = parseColumnDropId(overId);
+      if (colDrop) {
+        const column = [...(byStatus[colDrop.statusId] ?? [])].filter((t) => t.id !== taskId);
+        if (colDrop.atStart) {
+          return {
+            statusId: colDrop.statusId,
+            position: midPosition(undefined, column[0]?.position),
+          };
+        }
+        const last = column[column.length - 1];
+        return {
+          statusId: colDrop.statusId,
+          position: midPosition(last?.position, undefined),
+        };
+      }
+
+      const overTask = filtered.find((t) => t.id === overId);
+      if (!overTask) return null;
+      const column = [...(byStatus[overTask.status_id] ?? [])].filter((t) => t.id !== taskId);
+      const idx = column.findIndex((t) => t.id === overTask.id);
+      const before = idx > 0 ? column[idx - 1]?.position : undefined;
+      const after = column[idx]?.position;
+      return { statusId: overTask.status_id, position: midPosition(before, after) };
+    },
+    [byStatus, dropIndicator, filtered]
+  );
+
+  const onDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
+      if (!over) {
+        setDropIndicator(null);
+        return;
+      }
+      const overId = String(over.id);
+      const activeIdStr = String(active.id);
+      if (overId === activeIdStr) {
+        setDropIndicator(null);
+        return;
+      }
+
+      const colDrop = parseColumnDropId(overId);
+      if (colDrop) {
+        if (colDrop.atStart) {
+          setDropIndicator({ kind: "start", statusId: colDrop.statusId });
+          return;
+        }
+        const colTasks = (byStatus[colDrop.statusId] ?? []).filter((t) => t.id !== activeIdStr);
+        if (!colTasks.length) {
+          setDropIndicator({ kind: "column", statusId: colDrop.statusId });
+        } else {
+          const last = colTasks[colTasks.length - 1];
+          setDropIndicator({ kind: "task", statusId: colDrop.statusId, taskId: last.id, edge: "after" });
+        }
+        return;
+      }
+
+      const overTask = filtered.find((t) => t.id === overId);
+      if (!overTask) {
+        setDropIndicator(null);
+        return;
+      }
+
+      const activeRect = active.rect.current.translated ?? active.rect.current.initial;
+      let edge: "before" | "after" = "before";
+      if (activeRect) {
+        const activeMidY = activeRect.top + activeRect.height / 2;
+        const overMidY = over.rect.top + over.rect.height / 2;
+        edge = activeMidY < overMidY ? "before" : "after";
+      }
+
+      const colPeers = (byStatus[overTask.status_id] ?? []).filter((t) => t.id !== activeIdStr);
+      if (edge === "before" && colPeers[0]?.id === overId) {
+        setDropIndicator({ kind: "start", statusId: overTask.status_id });
+        return;
+      }
+
+      setDropIndicator({ kind: "task", statusId: overTask.status_id, taskId: overId, edge });
+    },
+    [byStatus, filtered]
+  );
+
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      const taskId = String(active.id);
+      setActiveId(null);
+
+      if (!over || !onMoveTask) {
+        setDropIndicator(null);
+        return;
+      }
+
+      const resolved = resolveDrop(taskId, String(over.id));
+      setDropIndicator(null);
+      if (!resolved) return;
+
+      const activeTask = filtered.find((t) => t.id === taskId);
+      if (!activeTask) return;
+      if (
+        activeTask.status_id === resolved.statusId &&
+        Math.abs(activeTask.position - resolved.position) < 0.0001
+      ) {
+        return;
+      }
+      onMoveTask({
+        id: taskId,
+        status_id: resolved.statusId,
+        position: resolved.position,
+      });
+    },
+    [filtered, onMoveTask, resolveDrop]
+  );
+
+  function moveToStatus(task: Task, statusId: string) {
+    if (!onMoveTask || task.status_id === statusId) return;
+    const col = [...(byStatus[statusId] ?? [])].filter((t) => t.id !== task.id);
+    const last = col[col.length - 1];
+    onMoveTask({
+      id: task.id,
+      status_id: statusId,
+      position: midPosition(last?.position, undefined),
+    });
+  }
+
+  function taskDropEdge(taskId: string): "before" | "after" | null {
+    if (dropIndicator?.kind === "task" && dropIndicator.taskId === taskId) {
+      return dropIndicator.edge;
+    }
+    return null;
+  }
 
   if (!canShow || !meId) return null;
 
@@ -146,18 +362,126 @@ export function MemberTasksSection({
   const empty = filtered.length === 0;
   const mobileStatus = statuses.find((s) => s.id === mobileStatusId) ?? statuses[0];
   const mobileTasks = mobileStatus ? byStatus[mobileStatus.id] ?? [] : [];
+  const selectValue = effectiveId || meId;
+  const activeTask = activeId ? filtered.find((t) => t.id === activeId) : null;
+
+  const desktopBoard = (
+    <div
+      className={cn(
+        "kanban-board-track flex gap-3 overflow-x-auto pb-1",
+        fillParent ? "min-h-0 flex-1 items-stretch overflow-y-hidden" : "items-start"
+      )}
+    >
+      {statuses.map((status) => {
+        const colTasks = byStatus[status.id] ?? [];
+        const emptyDrop =
+          dropIndicator?.kind === "column" &&
+          dropIndicator.statusId === status.id &&
+          colTasks.length === 0;
+
+        if (!canDrag) {
+          return (
+            <div
+              key={status.id}
+              className={cn(
+                "kanban-col-width flex shrink-0 flex-col",
+                fillParent ? "min-h-0 self-stretch" : "self-start"
+              )}
+            >
+              <div
+                className={cn(
+                  "kanban-column-shell flex w-full flex-col rounded-[var(--radius-lg)] border p-2",
+                  fillParent && "h-full min-h-0 overflow-hidden"
+                )}
+                style={columnShellStyle(status.color || "#607FA4")}
+              >
+                <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
+                <div className="mb-2 flex shrink-0 items-center gap-1.5 px-1">
+                  <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold">{status.name}</h3>
+                  <span className="text-[11px] tabular-nums text-muted">{colTasks.length}</span>
+                </div>
+                <div
+                  className={cn(
+                    "flex flex-col gap-2",
+                    fillParent && "min-h-0 flex-1 overflow-y-auto",
+                    colTasks.length === 0 ? "min-h-[2rem]" : null
+                  )}
+                >
+                  {colTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      draggable={false}
+                      isDone={!!status.is_done}
+                      onOpen={() => onOpenTask(task.id)}
+                    />
+                  ))}
+                  {!colTasks.length && (
+                    <p className="py-2 text-center text-[12px] text-muted">Пусто</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <KanbanColumn key={status.id} id={status.id} showEmptyIndicator={emptyDrop}>
+            <div
+              className={cn(
+                "kanban-column-shell flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+              )}
+              style={columnShellStyle(status.color || "#607FA4")}
+            >
+              <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
+              <div className="mb-2 flex shrink-0 items-center gap-1.5 px-1">
+                <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold">{status.name}</h3>
+                <span className="text-[11px] tabular-nums text-muted">{colTasks.length}</span>
+              </div>
+              <div
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto",
+                  colTasks.length === 0 ? "min-h-[2rem]" : null
+                )}
+              >
+                <ColumnStartDroppable
+                  statusId={status.id}
+                  active={dropIndicator?.kind === "start" && dropIndicator.statusId === status.id}
+                />
+                {colTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    isDone={!!status.is_done}
+                    dropEdge={taskDropEdge(task.id)}
+                    onOpen={() => onOpenTask(task.id)}
+                  />
+                ))}
+                {!colTasks.length && (
+                  <p className="py-2 text-center text-[12px] text-muted">Пусто</p>
+                )}
+              </div>
+            </div>
+          </KanbanColumn>
+        );
+      })}
+    </div>
+  );
 
   return (
     <section
-      className="mt-3 shrink-0 border-b border-hairline pb-4 pt-1"
+      className={cn(
+        "flex min-h-0 flex-col border-b border-hairline",
+        fillParent ? "h-full overflow-hidden pb-2 pt-0" : "mt-3 shrink-0 pb-4 pt-1"
+      )}
       aria-label={title}
     >
-      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <MemberSelect
           members={members}
           currentUserId={meId}
-          value={effectiveId}
+          value={selectValue}
           onChange={setSelectedId}
         />
       </div>
@@ -167,44 +491,35 @@ export function MemberTasksSection({
           У сотрудника пока нет задач
         </p>
       ) : isDesktop ? (
-        <div className="flex items-start gap-3 overflow-x-auto pb-1">
-          {statuses.map((status) => {
-            const colTasks = byStatus[status.id] ?? [];
-            return (
-              <div key={status.id} className="flex w-[17.5rem] shrink-0 flex-col self-start">
-                <div
-                  className="kanban-column-shell flex w-full flex-col rounded-[var(--radius-lg)] border p-2"
-                  style={columnShellStyle(status.color || "#607FA4")}
-                >
-                  <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
-                  <div className="mb-2 flex shrink-0 items-center gap-1.5 px-1">
-                    <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold">{status.name}</h3>
-                    <span className="text-[11px] tabular-nums text-muted">{colTasks.length}</span>
-                  </div>
-                  <div
-                    className={cn(
-                      "flex flex-col gap-2",
-                      colTasks.length === 0 ? "min-h-[2rem]" : null
-                    )}
-                  >
-                    {colTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        draggable={false}
-                        isDone={!!status.is_done}
-                        onOpen={() => onOpenTask(task.id)}
-                      />
-                    ))}
-                    {!colTasks.length && (
-                      <p className="py-2 text-center text-[12px] text-muted">Пусто</p>
-                    )}
-                  </div>
+        canDrag ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={(e) => setActiveId(String(e.active.id))}
+            onDragOver={onDragOver}
+            onDragEnd={onDragEnd}
+            onDragCancel={() => {
+              setActiveId(null);
+              setDropIndicator(null);
+            }}
+          >
+            {desktopBoard}
+            <DragOverlay dropAnimation={null}>
+              {activeTask ? (
+                <div className="w-[16.5rem]">
+                  <TaskCard
+                    task={activeTask}
+                    overlay
+                    isDone={!!statuses.find((s) => s.id === activeTask.status_id)?.is_done}
+                    onOpen={() => {}}
+                  />
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          desktopBoard
+        )
       ) : (
         <div className="space-y-3">
           <div
@@ -247,6 +562,8 @@ export function MemberTasksSection({
                   task={task}
                   draggable={false}
                   isDone={!!mobileStatus.is_done}
+                  statuses={onMoveTask ? statuses : undefined}
+                  onChangeStatus={onMoveTask ? (statusId) => moveToStatus(task, statusId) : undefined}
                   onOpen={() => onOpenTask(task.id)}
                 />
               ))}

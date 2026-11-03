@@ -689,10 +689,14 @@ export function KanbanBoard({
     );
   }
 
-  function renderColumnShell(status: Status, body: ReactNode) {
+  function renderColumnShell(status: Status, body: ReactNode, opts?: { fillHeight?: boolean }) {
+    const fill = opts?.fillHeight !== false;
     return (
       <div
-        className="kanban-column-shell flex w-full max-h-[min(36rem,calc(100dvh-13rem))] flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+        className={cn(
+          "kanban-column-shell flex w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2",
+          fill ? "h-full min-h-0" : "max-h-[min(36rem,calc(100dvh-13rem))]"
+        )}
         style={columnShellStyle(status.color || "#607FA4")}
       >
         <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
@@ -793,18 +797,17 @@ export function KanbanBoard({
     </Dialog>
   );
 
-  const boardFrame = "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain";
-
-  /* Mobile: one column */
+  /* Mobile: one column, vertical scroll */
   if (!isDesktop) {
     return (
-      <div className={boardFrame}>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
         <MemberTasksSection
           projectId={projectId}
           members={members}
           statuses={statuses}
           tasks={tasks}
           onOpenTask={openTask}
+          onMoveTask={(args) => moveMutation.mutate(args)}
         />
         <div className="flex flex-col space-y-3">
           <div className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Столбцы">
@@ -847,7 +850,8 @@ export function KanbanBoard({
               {!mobileTasks.length && (
                 <p className="py-3 text-center text-sm text-muted">Пока пусто</p>
               )}
-            </div>
+            </div>,
+            { fillHeight: false }
           )}
 
           {addingColumn ? (
@@ -889,16 +893,21 @@ export function KanbanBoard({
     );
   }
 
-  /* Desktop */
+  /* Desktop: 1/3 мои задачи, 2/3 доска проекта; ≥5 столбцов + край 6-го */
   return (
-    <div className={boardFrame}>
-      <MemberTasksSection
-        projectId={projectId}
-        members={members}
-        statuses={statuses}
-        tasks={tasks}
-        onOpenTask={openTask}
-      />
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <div className="flex min-h-0 basis-[33%] max-h-[33%] flex-col overflow-hidden">
+        <MemberTasksSection
+          projectId={projectId}
+          members={members}
+          statuses={statuses}
+          tasks={tasks}
+          onOpenTask={openTask}
+          fillParent
+          onMoveTask={(args) => moveMutation.mutate(args)}
+        />
+      </div>
+      <div className="flex min-h-0 flex-[2] flex-col overflow-hidden">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -910,7 +919,7 @@ export function KanbanBoard({
           setDropIndicator(null);
         }}
       >
-        <div className="flex items-start gap-3 overflow-x-auto pb-1">
+        <div className="kanban-board-track flex h-full min-h-0 items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-1">
           {statuses.map((status) => {
             const colTasks = byStatus[status.id] ?? [];
             const emptyDrop =
@@ -923,8 +932,8 @@ export function KanbanBoard({
                   status,
                   <div
                     className={cn(
-                      "flex flex-col gap-2 overflow-y-auto",
-                      colTasks.length === 0 ? "min-h-[2.5rem]" : "min-h-0"
+                      "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto",
+                      colTasks.length === 0 ? "min-h-[2.5rem]" : null
                     )}
                   >
                     <ColumnStartDroppable
@@ -946,7 +955,7 @@ export function KanbanBoard({
             );
           })}
 
-          <div className="w-56 shrink-0 self-start">
+          <div className="kanban-col-width shrink-0 self-start">
             {addingColumn ? (
               <form
                 className="space-y-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/70 p-2.5"
@@ -996,6 +1005,7 @@ export function KanbanBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
+      </div>
       {drawer}
       {deleteColumnDialog}
     </div>
