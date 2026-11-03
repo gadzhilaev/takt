@@ -97,6 +97,7 @@ export function KanbanBoard({
   const [newColumnName, setNewColumnName] = useState("");
   const [deleteColumn, setDeleteColumn] = useState<Status | null>(null);
   const [moveToStatusId, setMoveToStatusId] = useState("");
+  const [mineHasTasks, setMineHasTasks] = useState(false);
 
   const selectedTaskId = searchParams.get("task");
 
@@ -893,21 +894,32 @@ export function KanbanBoard({
     );
   }
 
-  /* Desktop: 2/5 мои задачи, 3/5 доска проекта; 4 столбца + край 5-го */
+  /* Desktop: при задачах — 2/5 мои / 3/5 проект; если пусто — блок сжимается */
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-      <div className="flex min-h-0 flex-[2] flex-col overflow-hidden">
+      <div
+        className={cn(
+          "flex min-h-0 flex-col overflow-hidden",
+          mineHasTasks ? "flex-[2]" : "shrink-0"
+        )}
+      >
         <MemberTasksSection
           projectId={projectId}
           members={members}
           statuses={statuses}
           tasks={tasks}
           onOpenTask={openTask}
-          fillParent
+          fillParent={mineHasTasks}
           onMoveTask={(args) => moveMutation.mutate(args)}
+          onHasTasksChange={setMineHasTasks}
         />
       </div>
-      <div className="flex min-h-0 flex-[3] flex-col overflow-hidden">
+      <div
+        className={cn(
+          "flex min-h-0 flex-col overflow-hidden",
+          mineHasTasks ? "flex-[3]" : "flex-1"
+        )}
+      >
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}

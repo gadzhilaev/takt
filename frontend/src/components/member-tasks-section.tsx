@@ -129,15 +129,18 @@ export function MemberTasksSection({
   onOpenTask,
   fillParent = false,
   onMoveTask,
+  onHasTasksChange,
 }: {
   projectId: string;
   members: ProjectMember[];
   statuses: Status[];
   tasks: Task[];
   onOpenTask: (taskId: string) => void;
-  /** Desktop board: occupy parent (1/3) with internal scroll. */
+  /** Desktop board: occupy parent share when there are tasks. */
   fillParent?: boolean;
   onMoveTask?: (args: { id: string; status_id: string; position: number }) => void;
+  /** Сообщает родителю, есть ли задачи у выбранного сотрудника (для split 2/5). */
+  onHasTasksChange?: (hasTasks: boolean) => void;
 }) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const { data: meData } = useQuery({
@@ -172,6 +175,14 @@ export function MemberTasksSection({
     () => (canShow && effectiveId ? tasksForMember(tasks, effectiveId) : []),
     [canShow, effectiveId, tasks]
   );
+
+  useEffect(() => {
+    if (!canShow) {
+      onHasTasksChange?.(false);
+      return;
+    }
+    onHasTasksChange?.(filtered.length > 0);
+  }, [canShow, filtered.length, onHasTasksChange]);
   const byStatus = useMemo(() => {
     const map: Record<string, Task[]> = {};
     for (const s of statuses) map[s.id] = [];
@@ -472,11 +483,11 @@ export function MemberTasksSection({
     <section
       className={cn(
         "flex min-h-0 flex-col border-b border-hairline",
-        fillParent ? "h-full overflow-hidden pb-2 pt-0" : "mt-3 shrink-0 pb-4 pt-1"
+        fillParent ? "h-full overflow-hidden pb-2 pt-0" : "shrink-0 pb-2 pt-0"
       )}
       aria-label={title}
     >
-      <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
+      <div className="mb-1.5 flex shrink-0 flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <MemberSelect
           members={members}
@@ -487,7 +498,7 @@ export function MemberTasksSection({
       </div>
 
       {empty ? (
-        <p className="rounded-[var(--radius-lg)] border border-dashed border-hairline bg-[var(--surface)] px-4 py-4 text-center text-sm text-muted">
+        <p className="rounded-[var(--radius-lg)] border border-dashed border-hairline bg-[var(--surface)] px-3 py-2.5 text-center text-sm text-muted">
           У сотрудника пока нет задач
         </p>
       ) : isDesktop ? (
