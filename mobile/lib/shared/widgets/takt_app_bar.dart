@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import 'app_icon.dart';
+import 'takt_mark.dart';
 
 /// Standard Takt AppBar: fixed height, left title, optional leading/actions.
+///
+/// By default shows the brand mark before [title]. Pass [titleWidget] to
+/// replace that (e.g. full [TaktLogo] on the home screen).
 class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
   const TaktAppBar({
     super.key,
@@ -14,18 +18,22 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onBack,
     this.onClose,
     this.centerTitle = false,
+    this.showMark = true,
   });
 
   final String title;
-  /// When set, replaces the string [title] (e.g. [TaktBrandLockup]).
+  /// When set, replaces mark + [title] (e.g. [TaktLogo] on home).
   final Widget? titleWidget;
   final Widget? leading;
   final List<Widget>? actions;
   final VoidCallback? onBack;
   final VoidCallback? onClose;
   final bool centerTitle;
+  /// Brand symbol before the title. Ignored when [titleWidget] is set.
+  final bool showMark;
 
   static const double height = 48;
+  static const double markHeight = 20;
 
   @override
   Size get preferredSize => const Size.fromHeight(height);
@@ -57,13 +65,26 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
       letterSpacing: -0.2,
       color: fg,
     );
-    final resolvedTitle = titleWidget ??
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: titleStyle,
-        );
+    final titleText = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: titleStyle,
+    );
+    final Widget resolvedTitle;
+    if (titleWidget != null) {
+      resolvedTitle = titleWidget!;
+    } else if (showMark) {
+      resolvedTitle = Row(
+        children: [
+          const TaktMark(height: markHeight, semanticLabel: null),
+          const SizedBox(width: 8),
+          Expanded(child: titleText),
+        ],
+      );
+    } else {
+      resolvedTitle = titleText;
+    }
 
     return AppBar(
       toolbarHeight: height,

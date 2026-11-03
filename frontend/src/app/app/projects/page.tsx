@@ -140,7 +140,8 @@ function ProjectsInner() {
     );
   }
 
-  return <p className="text-sm text-muted">Открываем доску…</p>;
+  // Редирект делает app-shell / эффект выше — скелетон, без «пустой» загрузки.
+  return <Skeleton className="h-64 w-full shrink-0" />;
 }
 
 export default function ProjectsPage() {

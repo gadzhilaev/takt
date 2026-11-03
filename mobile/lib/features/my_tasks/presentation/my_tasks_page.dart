@@ -544,7 +544,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+                padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
                 child: Row(
                   children: [
                     Expanded(
@@ -574,6 +574,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
                             ),
                             const SizedBox(width: 2),
                             AppIcon(
+                              // Как на главной: закрыто → вниз, открыто → вправо.
                               open ? AppIcons.chevronRight : AppIcons.chevronDown,
                               size: 18,
                               color: muted,

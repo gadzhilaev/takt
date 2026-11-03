@@ -12,7 +12,7 @@ export const paths = {
     `/app/projects/${projectId}?task=${taskId}`,
   myTasks: "/app/my-tasks",
   profile: "/app/profile",
-  /** Opens ProfileDrawer on the projects hub (not the legacy /app/profile page). */
+  /** Opens ProfileDrawer; prefer last project so hub never shows empty redirect. */
   profileDrawer: "/app/projects?profile=1",
   notifications: "/app/inbox",
   admin: "/app/admin",
@@ -29,7 +29,16 @@ export function loginWithNext(nextPath?: string | null) {
 
 /** Return to the in-app profile drawer, optionally with a flash message. */
 export function profileDrawerPath(message?: string | null) {
-  if (!message) return paths.profileDrawer;
-  const q = new URLSearchParams({ profile: "1", message });
-  return `${paths.projects}?${q.toString()}`;
+  let base: string = paths.projects;
+  if (typeof window !== "undefined") {
+    try {
+      const last = localStorage.getItem("takt:lastProjectId");
+      if (last) base = paths.project(last);
+    } catch {
+      /* ignore */
+    }
+  }
+  const q = new URLSearchParams({ profile: "1" });
+  if (message) q.set("message", message);
+  return `${base}?${q.toString()}`;
 }

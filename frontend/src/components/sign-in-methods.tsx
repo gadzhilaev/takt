@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
@@ -11,6 +10,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { AppIcon } from "@/components/ui/app-icon";
 import { useOAuthProviders } from "@/components/oauth/oauth-buttons";
 import { cn } from "@/lib/utils";
+import type { User } from "@/lib/types";
 
 type Identity = { id: string; provider: string; email: string | null };
 type IdentitiesResponse = { items: Identity[]; has_password: boolean };
@@ -39,6 +39,11 @@ export function SignInMethodsSection({
   const qc = useQueryClient();
   const router = useRouter();
   const { data: providersMeta } = useOAuthProviders();
+  const { data: meData } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => api<{ user: User }>("/api/v1/auth/me"),
+    staleTime: 60_000,
+  });
   const { data, isLoading } = useQuery({
     queryKey: ["oauth-identities"],
     queryFn: () => api<IdentitiesResponse>("/api/v1/auth/oauth/identities"),
@@ -48,12 +53,14 @@ export function SignInMethodsSection({
   const [passwordStep, setPasswordStep] = useState<"form" | "code">("form");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [passwordCode, setPasswordCode] = useState("");
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
 
   const linkedByProvider = new Map((data?.items ?? []).map((i) => [i.provider, i]));
   const hasPassword = Boolean(data?.has_password);
   const enabledProviders = WEB_PROVIDERS.filter((id) => providersMeta?.providers?.[id]?.enabled);
+  const email = meData?.user?.email?.trim() ?? "";
 
   const unlink = useMutation({
     mutationFn: (id: string) => api(`/api/v1/auth/oauth/identities/${id}`, { method: "DELETE" }),
@@ -64,7 +71,7 @@ export function SignInMethodsSection({
     onError: (e: Error) => onError?.(e.message),
   });
 
-  const sendPasswordCode = useMutation({
+  const sendChangeCode = useMutation({
     mutationFn: () =>
       api("/api/v1/auth/change-password/send-code", {
         method: "POST",
@@ -77,7 +84,7 @@ export function SignInMethodsSection({
     onError: (e: Error) => onError?.(e.message),
   });
 
-  const confirmPasswordCode = useMutation({
+  const confirmChangeCode = useMutation({
     mutationFn: () =>
       api("/api/v1/auth/change-password/confirm", {
         method: "POST",
@@ -90,6 +97,49 @@ export function SignInMethodsSection({
     },
     onError: (e: Error) => onError?.(e.message),
   });
+
+  const sendSetCode = useMutation({
+    mutationFn: () =>
+      api("/api/v1/auth/forgot-password/send-code", {
+        method: "POST",
+        json: { email },
+      }),
+    onSuccess: () => {
+      onMessage?.("Код отправлен на email");
+      setPasswordStep("code");
+    },
+    onError: (e: Error) => onError?.(e.message),
+  });
+
+  const confirmSetCode = useMutation({
+    mutationFn: () =>
+      api<{ message?: string }>("/api/v1/auth/forgot-password/confirm", {
+        method: "POST",
+        json: {
+          email,
+          code: passwordCode.trim(),
+          new_password: newPassword,
+          new_password_confirm: newPasswordConfirm,
+        },
+      }),
+    onSuccess: async (res) => {
+      onMessage?.(res.message || "Пароль задан. Войдите снова");
+      await api("/api/v1/auth/logout", { method: "POST" }).catch(() => null);
+      const msg = res.message || "Пароль задан. Войдите с новым паролем.";
+      router.push(`/login?message=${encodeURIComponent(msg)}`);
+    },
+    onError: (e: Error) => onError?.(e.message),
+  });
+
+  function openPasswordPanel() {
+    setPwdOpen((v) => !v);
+    setPasswordStep("form");
+    setPasswordCode("");
+    setCurrentPassword("");
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    onError?.("");
+  }
 
   async function linkProvider(provider: string) {
     setBusyProvider(provider);
@@ -105,6 +155,9 @@ export function SignInMethodsSection({
       setBusyProvider(null);
     }
   }
+
+  const setPasswordValid =
+    newPassword.length >= 8 && newPassword === newPasswordConfirm && Boolean(email);
 
   return (
     <div className={cn("space-y-3 border-t border-hairline pt-4", className)}>
@@ -127,32 +180,22 @@ export function SignInMethodsSection({
               {isLoading ? "…" : hasPassword ? "Задан" : "Не задан"}
             </p>
           </div>
-          {hasPassword ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="shrink-0 rounded-full px-3"
-              onClick={() => {
-                setPwdOpen((v) => !v);
-                setPasswordStep("form");
-                setPasswordCode("");
-              }}
-            >
-              Сменить
-            </Button>
-          ) : (
-            <Button type="button" size="sm" variant="secondary" className="shrink-0 rounded-full px-3" asChild>
-              <Link href="/forgot-password?mode=set">Задать</Link>
-            </Button>
-          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="shrink-0 rounded-full px-3"
+            onClick={openPasswordPanel}
+          >
+            {hasPassword ? "Сменить" : "Задать"}
+          </Button>
         </div>
 
-        {pwdOpen && hasPassword && (
+        {pwdOpen && (
           <div className="space-y-2.5 border-t border-hairline bg-[var(--surface-2)] px-3 py-3">
-            {passwordStep === "form" ? (
-              <>
-                {hasPassword && (
+            {hasPassword ? (
+              passwordStep === "form" ? (
+                <>
                   <div>
                     <label className="label-text" htmlFor="signin-cur-pass">
                       Текущий пароль
@@ -164,31 +207,77 @@ export function SignInMethodsSection({
                       onChange={(e) => setCurrentPassword(e.target.value)}
                     />
                   </div>
-                )}
-                <div>
-                  <label className="label-text" htmlFor="signin-new-pass">
-                    Новый пароль
-                  </label>
-                  <PasswordInput
-                    id="signin-new-pass"
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                  <div>
+                    <label className="label-text" htmlFor="signin-new-pass">
+                      Новый пароль
+                    </label>
+                    <PasswordInput
+                      id="signin-new-pass"
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={sendChangeCode.isPending || newPassword.length < 8 || !currentPassword}
+                    onClick={() => sendChangeCode.mutate()}
+                  >
+                    Получить код на email
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-[12px] text-muted">Введите код из письма</p>
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={passwordCode}
+                    onChange={(e) => setPasswordCode(e.target.value)}
+                    placeholder="6 цифр"
                   />
-                </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-full"
+                      disabled={confirmChangeCode.isPending || passwordCode.trim().length < 4}
+                      onClick={() => confirmChangeCode.mutate()}
+                    >
+                      Подтвердить
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={sendChangeCode.isPending}
+                      onClick={() => sendChangeCode.mutate()}
+                    >
+                      Отправить снова
+                    </Button>
+                  </div>
+                </>
+              )
+            ) : passwordStep === "form" ? (
+              <>
+                <p className="text-[12px] text-muted">
+                  Пришлём код на {email || "email"} — после подтверждения зададите пароль для входа.
+                </p>
                 <Button
                   type="button"
                   size="sm"
                   className="rounded-full"
-                  disabled={sendPasswordCode.isPending || newPassword.length < 8}
-                  onClick={() => sendPasswordCode.mutate()}
+                  disabled={sendSetCode.isPending || !email}
+                  onClick={() => sendSetCode.mutate()}
                 >
-                  Получить код на email
+                  Отправить код
                 </Button>
               </>
             ) : (
               <>
-                <p className="text-[12px] text-muted">Введите код из письма</p>
+                <p className="text-[12px] text-muted">Код из письма на {email}</p>
                 <Input
                   inputMode="numeric"
                   autoComplete="one-time-code"
@@ -196,22 +285,48 @@ export function SignInMethodsSection({
                   onChange={(e) => setPasswordCode(e.target.value)}
                   placeholder="6 цифр"
                 />
+                <div>
+                  <label className="label-text" htmlFor="signin-set-pass">
+                    Новый пароль
+                  </label>
+                  <PasswordInput
+                    id="signin-set-pass"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label-text" htmlFor="signin-set-pass-2">
+                    Повтор пароля
+                  </label>
+                  <PasswordInput
+                    id="signin-set-pass-2"
+                    autoComplete="new-password"
+                    value={newPasswordConfirm}
+                    onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                  />
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     size="sm"
                     className="rounded-full"
-                    disabled={confirmPasswordCode.isPending || passwordCode.trim().length < 4}
-                    onClick={() => confirmPasswordCode.mutate()}
+                    disabled={
+                      confirmSetCode.isPending ||
+                      passwordCode.trim().length < 4 ||
+                      !setPasswordValid
+                    }
+                    onClick={() => confirmSetCode.mutate()}
                   >
-                    Подтвердить
+                    Задать пароль
                   </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    disabled={sendPasswordCode.isPending}
-                    onClick={() => sendPasswordCode.mutate()}
+                    disabled={sendSetCode.isPending}
+                    onClick={() => sendSetCode.mutate()}
                   >
                     Отправить снова
                   </Button>
@@ -281,7 +396,6 @@ export function SignInMethodsSection({
           );
         })}
       </div>
-
     </div>
   );
 }

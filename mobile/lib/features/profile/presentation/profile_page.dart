@@ -252,17 +252,19 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 20),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Divider(height: 1, color: border),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Material(
+                  color: surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(TaktRadii.md),
+                    side: BorderSide(color: border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
                   child: TaktButton(
                     label: 'Выйти',
                     variant: TaktButtonVariant.ghost,
                     danger: true,
+                    expand: true,
                     icon: AppIcons.logout,
                     onPressed: () async {
                       final ok = await showTaktSheet(

@@ -123,7 +123,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.replace(valid ? `/app/projects/${valid}` : "/app/projects");
   }, [pathname, router, projects]);
 
-  // /app/projects?profile=1 — открыть drawer профиля (возврат из «Задать пароль»).
+  // /app/projects без id — сразу на последнюю/дефолтную доску (не оставляем «Открываем доску…»).
+  useEffect(() => {
+    if (pathname !== "/app/projects") return;
+    if (!projectsData) return;
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("browse") === "1" || sp.get("new") === "1") return;
+    if (!projects.length) return;
+    const last = getLastProjectId();
+    const lastProject = last ? projects.find((p) => p.id === last) : undefined;
+    const college = projects.find((p) => p.name === "Колледж ДГУ");
+    const target =
+      (lastProject && lastProject.name !== "Демо-доска" ? lastProject : undefined) ||
+      college ||
+      projects.find((p) => p.is_default) ||
+      projects[0];
+    if (!target) return;
+    setLastProjectId(target.id);
+    const next = new URLSearchParams();
+    if (sp.get("profile") === "1") next.set("profile", "1");
+    const message = sp.get("message");
+    if (message) next.set("message", message);
+    const qs = next.toString();
+    router.replace(qs ? `/app/projects/${target.id}?${qs}` : `/app/projects/${target.id}`);
+  }, [pathname, projectsData, projects, router]);
+
+  // ?profile=1 — открыть drawer профиля (в т.ч. возврат из «Задать пароль»).
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!pathname.startsWith("/app/")) return;
