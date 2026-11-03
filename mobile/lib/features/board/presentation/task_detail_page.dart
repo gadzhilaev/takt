@@ -3,13 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/format_created_at.dart';
+import '../../../core/kanban_colors.dart';
 import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_sheet.dart';
 import '../../../shared/widgets/takt_ui.dart';
-import '../../../shared/widgets/urgency_badge.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../cubit/board_cubit.dart';
 import '../data/board_repository.dart';
@@ -34,8 +35,41 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     _resolve();
   }
 
+  TaskItem _enrichAvatars(TaskItem task, BoardState board) {
+    final byId = <String, String?>{};
+    for (final p in board.projects) {
+      for (final m in p.members) {
+        byId[m.userId] = m.avatarUrl;
+      }
+    }
+    final project = board.project;
+    if (project != null) {
+      for (final m in project.members) {
+        byId[m.userId] = m.avatarUrl;
+      }
+    }
+
+    final assignees = task.assignees
+        .map(
+          (a) => TaskAssignee(
+            id: a.id,
+            name: a.name,
+            avatarUrl: a.avatarUrl ?? byId[a.id],
+          ),
+        )
+        .toList();
+    final authorAvatar = task.authorAvatarUrl ??
+        (task.authorId != null ? byId[task.authorId!] : null);
+
+    return task.copyWith(
+      assignees: assignees,
+      authorAvatarUrl: authorAvatar,
+    );
+  }
+
   Future<void> _resolve() async {
-    final board = context.read<BoardCubit>().state;
+    final cubit = context.read<BoardCubit>();
+    final board = cubit.state;
     TaskItem? local;
     for (final t in board.tasks) {
       if (t.id == widget.taskId) {
@@ -45,20 +79,22 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
     if (local != null) {
       setState(() {
-        _task = local;
+        _task = _enrichAvatars(local!, board);
         _loading = false;
       });
-      return;
     }
+
     try {
       final remote = await context.read<BoardRepository>().getTask(widget.taskId);
       if (!mounted) return;
       setState(() {
-        _task = remote;
+        _task = _enrichAvatars(remote, cubit.state);
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
+      if (_task != null) return;
       setState(() {
         _error = context.read<ApiClient>().messageFromError(e);
         _loading = false;
@@ -70,10 +106,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     final board = context.read<BoardCubit>().state;
     for (final t in board.tasks) {
       if (t.id == widget.taskId) {
-        setState(() => _task = t);
+        setState(() => _task = _enrichAvatars(t, board));
         return;
       }
     }
+    await _resolve();
   }
 
   void _leave() {
@@ -88,11 +125,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   Future<void> _openEdit(TaskItem task) async {
     final updated = await context.push<bool>('/task-edit/${task.id}');
     if (updated == true && mounted) await _refreshFromBoard();
-  }
-
-  Future<void> _moveTo(TaskItem task, String statusId) async {
-    await context.read<BoardCubit>().moveToColumn(task, statusId);
-    if (mounted) await _refreshFromBoard();
   }
 
   Future<void> _delete(TaskItem task) async {
@@ -114,7 +146,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
     final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
-    final border = dark ? TaktColors.borderDark : TaktColors.border;
     final cubit = context.watch<BoardCubit>();
     final board = cubit.state;
     final task = _task;
@@ -130,39 +161,39 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         task.authorId != null &&
         task.authorId == authUserId;
 
+    final urgencyLabel = task == null
+        ? ''
+        : KanbanColors.urgency(task.priority, dark: dark).label;
+    final createdLabel = task == null ? null : formatCreatedAt(task.createdAt);
+
     return Scaffold(
       appBar: TaktAppBar(
         title: 'Задача',
         onBack: _leave,
         actions: [
           if (task != null)
-            TextButton(
+            IconButton(
+              tooltip: 'Редактировать',
+              visualDensity: VisualDensity.compact,
               onPressed: () => _openEdit(task),
-              child: const Text('Редактировать'),
+              icon: AppIcon(
+                AppIcons.edit,
+                size: 20,
+                color: dark ? TaktColors.accentDark : TaktColors.accent,
+              ),
             ),
-          if (task != null && board.columns.where((c) => c.id != task.statusId).isNotEmpty)
-            PopupMenuButton<String>(
-              useRootNavigator: true,
-              tooltip: 'Переместить',
-              icon: AppIcon(AppIcons.more, size: 22, color: fg),
-              onSelected: (v) async {
-                if (v == 'done') {
-                  final done = board.columns.where((c) => c.isDone).toList();
-                  if (done.isEmpty) return;
-                  await _moveTo(task, done.first.id);
-                  if (mounted) _leave();
-                } else if (v.startsWith('move:')) {
-                  await _moveTo(task, v.substring(5));
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'done', child: Text('Завершить')),
-                const PopupMenuDivider(),
-                ...board.columns
-                    .where((c) => c.id != task.statusId)
-                    .map((c) => PopupMenuItem(value: 'move:${c.id}', child: Text('В «${c.name}»'))),
-              ],
+          if (task != null && canDelete)
+            IconButton(
+              tooltip: 'Удалить',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => _delete(task),
+              icon: AppIcon(
+                AppIcons.delete,
+                size: 20,
+                color: TaktColors.danger,
+              ),
             ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
@@ -195,6 +226,31 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     : ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                         children: [
+                          Text.rich(
+                            TextSpan(
+                              style: TextStyle(fontSize: 14, height: 1.4, color: fg),
+                              children: [
+                                TextSpan(text: 'Срочность: ', style: TextStyle(color: muted)),
+                                TextSpan(
+                                  text: urgencyLabel,
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                TextSpan(
+                                  text: '  ·  ',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: fg,
+                                  ),
+                                ),
+                                TextSpan(text: 'Статус: ', style: TextStyle(color: muted)),
+                                TextSpan(
+                                  text: statusName ?? '—',
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           TaktFieldLabel('Название'),
                           const SizedBox(height: 6),
                           Text(
@@ -236,7 +292,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                         TaktUserAvatar(
                                           name: a.name,
                                           avatarUrl: a.avatarUrl,
-                                          size: 24,
+                                          size: 28,
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
@@ -254,52 +310,38 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                   ),
                               ],
                             ),
-                          const SizedBox(height: 8),
-                          TaktFieldLabel('Столбец'),
-                          const SizedBox(height: 6),
-                          Text(
-                            statusName ?? '—',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: fg),
-                          ),
-                          const SizedBox(height: 16),
-                          TaktFieldLabel('Срочность'),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: UrgencyBadge(priority: task.priority),
-                          ),
                           if (task.authorName != null && task.authorName!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 8),
                             TaktFieldLabel('Автор'),
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                TaktUserAvatar(name: task.authorName!, size: 24),
+                                TaktUserAvatar(
+                                  name: task.authorName!,
+                                  avatarUrl: task.authorAvatarUrl,
+                                  size: 28,
+                                ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  task.authorName!,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: fg,
+                                Expanded(
+                                  child: Text(
+                                    task.authorName!,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: fg,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ],
-                          if (canDelete) ...[
-                            const SizedBox(height: 24),
-                            Divider(height: 1, color: border),
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TaktButton(
-                                label: 'Удалить задачу',
-                                variant: TaktButtonVariant.ghost,
-                                danger: true,
-                                icon: AppIcons.delete,
-                                onPressed: () => _delete(task),
-                              ),
+                          if (createdLabel != null) ...[
+                            const SizedBox(height: 16),
+                            TaktFieldLabel('Создана'),
+                            const SizedBox(height: 6),
+                            Text(
+                              createdLabel,
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: fg),
                             ),
                           ],
                         ],

@@ -181,6 +181,7 @@ class TaskItem extends Equatable {
     this.statusName,
     this.authorId,
     this.authorName,
+    this.authorAvatarUrl,
     this.commentCount = 0,
   });
 
@@ -199,6 +200,7 @@ class TaskItem extends Equatable {
   final String? statusName;
   final String? authorId;
   final String? authorName;
+  final String? authorAvatarUrl;
   final int commentCount;
 
   bool get isDone => closedAt != null;
@@ -227,6 +229,7 @@ class TaskItem extends Equatable {
       statusName: status?['name'] as String?,
       authorId: json['author_id'] as String? ?? author?['id'] as String?,
       authorName: author?['name'] as String?,
+      authorAvatarUrl: author?['avatar_url'] as String?,
       commentCount: (json['comment_count'] as num?)?.toInt() ?? 0,
     );
   }
@@ -245,6 +248,7 @@ class TaskItem extends Equatable {
     String? updatedAt,
     String? createdAt,
     String? statusName,
+    String? authorAvatarUrl,
     double? position,
   }) =>
       TaskItem(
@@ -264,6 +268,7 @@ class TaskItem extends Equatable {
         statusName: statusName ?? this.statusName,
         authorId: authorId,
         authorName: authorName,
+        authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
         commentCount: commentCount,
       );
 
@@ -284,7 +289,11 @@ class TaskItem extends Equatable {
         'author_id': authorId,
         'author': authorName == null && authorId == null
             ? null
-            : {'id': authorId, 'name': authorName},
+            : {
+                'id': authorId,
+                'name': authorName,
+                'avatar_url': authorAvatarUrl,
+              },
         'comment_count': commentCount,
       };
 

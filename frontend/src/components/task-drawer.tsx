@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { formatCreatedAt } from "@/lib/format-created-at";
 import { URGENCY_OPTIONS, urgencyFromPriority, urgencyLabel } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
@@ -161,18 +162,22 @@ export function TaskDrawer({
                       if (ids.length === 0) return;
                       patch.mutate({ assignee_ids: ids });
                     }}
-                    options={members.map((m) => ({ value: m.user_id, label: m.name }))}
+                    options={members.map((m) => ({
+                      value: m.user_id,
+                      label: m.name,
+                      avatarUrl: m.avatar_url,
+                    }))}
                     placeholder="Выберите исполнителей"
                     minCount={1}
                   />
                 </div>
                 <div>
                   <label className="label-text" htmlFor="drawer-status">
-                    Столбец
+                    Статус
                   </label>
                   <Select
                     id="drawer-status"
-                    aria-label="Столбец"
+                    aria-label="Статус"
                     value={task.status_id}
                     onValueChange={(status_id) => patch.mutate({ status_id })}
                     options={statuses.map((s) => ({ value: s.id, label: s.name }))}
@@ -212,6 +217,13 @@ export function TaskDrawer({
               </>
             ) : (
               <>
+                <p className="text-sm leading-snug text-foreground">
+                  <span className="text-muted">Срочность:</span> {urgencyLabel(task.priority)}
+                  <span className="mx-1.5 font-bold text-foreground" aria-hidden>
+                    ·
+                  </span>
+                  <span className="text-muted">Статус:</span> {statusName}
+                </p>
                 <div>
                   <p className="label-text">Название</p>
                   <p className="text-[15px] font-semibold leading-snug text-foreground">{task.title}</p>
@@ -254,16 +266,12 @@ export function TaskDrawer({
                     <p className="text-sm text-muted">—</p>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                {formatCreatedAt(task.created_at) && (
                   <div>
-                    <p className="label-text">Столбец</p>
-                    <p className="text-sm text-foreground">{statusName}</p>
+                    <p className="label-text">Создана</p>
+                    <p className="text-sm text-foreground">{formatCreatedAt(task.created_at)}</p>
                   </div>
-                  <div>
-                    <p className="label-text">Срочность</p>
-                    <p className="text-sm text-foreground">{urgencyLabel(task.priority)}</p>
-                  </div>
-                </div>
+                )}
               </>
             )
           ) : (

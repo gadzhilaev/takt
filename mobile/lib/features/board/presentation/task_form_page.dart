@@ -114,6 +114,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
             createdAt: _existing!.createdAt,
             authorId: _existing!.authorId,
             authorName: _existing!.authorName,
+            authorAvatarUrl: _existing!.authorAvatarUrl,
             commentCount: _existing!.commentCount,
             statusName: _existing!.statusName,
           ),

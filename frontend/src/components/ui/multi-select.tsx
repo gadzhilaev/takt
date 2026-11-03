@@ -1,10 +1,15 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/app-icon";
+import { UserAvatar } from "@/components/user-avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export type MultiOption = { value: string; label: string };
+export type MultiOption = {
+  value: string;
+  label: string;
+  avatarUrl?: string | null;
+};
 
 export function MultiSelect({
   values,
@@ -78,9 +83,20 @@ export function MultiSelect({
         className="field flex min-h-10 w-full items-center justify-between gap-2 px-3 text-left text-sm"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="min-w-0 flex-1 truncate">
-          {selected.length ? selected.map((s) => s.label).join(", ") : placeholder}
-        </span>
+        {selected.length ? (
+          <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+            <span className="flex shrink-0 items-center">
+              {selected.slice(0, 4).map((s, i) => (
+                <span key={s.value} className={cn(i > 0 && "-ml-1.5")}>
+                  <UserAvatar name={s.label} avatarUrl={s.avatarUrl} size={5} title={s.label} />
+                </span>
+              ))}
+            </span>
+            <span className="min-w-0 truncate">{selected.map((s) => s.label).join(", ")}</span>
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-muted">{placeholder}</span>
+        )}
         <AppIcon name="chevron-down" size={16} className="shrink-0 opacity-60" />
       </button>
       {open && (
@@ -114,13 +130,14 @@ export function MultiSelect({
                   >
                     <span
                       className={cn(
-                        "flex h-4 w-4 items-center justify-center rounded border border-hairline",
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border border-hairline",
                         on && "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
                       )}
                     >
                       {on && <AppIcon name="check" size={16} />}
                     </span>
-                    {opt.label}
+                    <UserAvatar name={opt.label} avatarUrl={opt.avatarUrl} size={6} />
+                    <span className="min-w-0 flex-1 truncate">{opt.label}</span>
                   </button>
                 </li>
               );
@@ -133,11 +150,12 @@ export function MultiSelect({
                 <button
                   key={s.value}
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-2)] py-0.5 pl-0.5 pr-2 text-xs"
                   onClick={() => toggle(s.value)}
                 >
+                  <UserAvatar name={s.label} avatarUrl={s.avatarUrl} size={5} />
                   {s.label}
-                  <AppIcon name="close" size={16} />
+                  <AppIcon name="close" size={14} />
                 </button>
               ))}
             </div>

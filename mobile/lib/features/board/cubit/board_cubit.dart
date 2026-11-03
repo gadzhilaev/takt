@@ -178,6 +178,7 @@ class BoardCubit extends Cubit<BoardState> {
     final urls = <String?>[
       ...proj.expand((p) => p.members.map((m) => m.avatarUrl)),
       ...taskList.expand((t) => t.assignees.map((a) => a.avatarUrl)),
+      ...taskList.map((t) => t.authorAvatarUrl),
     ];
     await AvatarCache.instance.prefetch(urls);
   }

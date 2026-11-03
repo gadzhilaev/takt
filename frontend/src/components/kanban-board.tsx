@@ -561,7 +561,11 @@ export function KanbanBoard({
             aria-label="Исполнители"
             values={draft.assigneeIds}
             onChange={(assigneeIds) => setDraft((d) => ({ ...d, assigneeIds }))}
-            options={members.map((m) => ({ value: m.user_id, label: m.name }))}
+            options={members.map((m) => ({
+              value: m.user_id,
+              label: m.name,
+              avatarUrl: m.avatar_url,
+            }))}
             placeholder="Выберите исполнителей"
             minCount={1}
           />
