@@ -40,9 +40,15 @@ async def test_only_author_can_delete_task(client: AsyncClient):
     await _login(client, "author-del@example.com", "SecurePass123!")
     await _accept_all_invites(client)
     statuses = (await client.get(f"/api/v1/settings/statuses?project_id={pid}")).json()["items"]
+    me = (await client.get("/api/v1/auth/me")).json()["user"]["id"]
     created = await client.post(
         "/api/v1/tasks",
-        json={"title": "Author task", "status_id": statuses[0]["id"], "project_id": pid},
+        json={
+            "title": "Author task",
+            "status_id": statuses[0]["id"],
+            "project_id": pid,
+            "assignee_ids": [me],
+        },
     )
     task_id = created.json()["task"]["id"]
 
@@ -134,9 +140,15 @@ async def test_delete_column_moves_tasks(client: AsyncClient):
     assert len(statuses) == 4
     src = statuses[1]
     dst = statuses[0]
+    me = (await client.get("/api/v1/auth/me")).json()["user"]["id"]
     created = await client.post(
         "/api/v1/tasks",
-        json={"title": "Move me", "status_id": src["id"], "project_id": pid},
+        json={
+            "title": "Move me",
+            "status_id": src["id"],
+            "project_id": pid,
+            "assignee_ids": [me],
+        },
     )
     task_id = created.json()["task"]["id"]
     bad = await client.delete(f"/api/v1/settings/statuses/{src['id']}")
@@ -163,9 +175,15 @@ async def test_task_endpoints_require_project_membership(client: AsyncClient):
     assert proj.status_code == 200, proj.text
     pid = proj.json()["project"]["id"]
     statuses = (await client.get(f"/api/v1/settings/statuses?project_id={pid}")).json()["items"]
+    me = (await client.get("/api/v1/auth/me")).json()["user"]["id"]
     created = await client.post(
         "/api/v1/tasks",
-        json={"title": "Secret", "status_id": statuses[0]["id"], "project_id": pid},
+        json={
+            "title": "Secret",
+            "status_id": statuses[0]["id"],
+            "project_id": pid,
+            "assignee_ids": [me],
+        },
     )
     task_id = created.json()["task"]["id"]
 

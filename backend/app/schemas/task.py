@@ -97,7 +97,7 @@ class TaskCreate(BaseModel):
     priority: TaskPriority = TaskPriority.medium
     description: str | None = None
     due_date: datetime | None = None
-    assignee_ids: list[UUID] = []
+    assignee_ids: list[UUID] = Field(min_length=1)
     label_names: list[str] = []
 
 
@@ -108,7 +108,7 @@ class TaskUpdate(BaseModel):
     priority: TaskPriority | None = None
     due_date: datetime | None = None
     position: float | None = None
-    assignee_ids: list[UUID] | None = None
+    assignee_ids: list[UUID] | None = Field(default=None, min_length=1)
     label_names: list[str] | None = None
     project_id: UUID | None = None
     parent_id: UUID | None = None

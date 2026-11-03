@@ -549,7 +549,8 @@ export function KanbanBoard({
             values={draft.assigneeIds}
             onChange={(assigneeIds) => setDraft((d) => ({ ...d, assigneeIds }))}
             options={members.map((m) => ({ value: m.user_id, label: m.name }))}
-            placeholder="Не назначены"
+            placeholder="Выберите исполнителей"
+            minCount={1}
           />
           <label className="label-text" htmlFor={`quick-urgency-${status.id}`}>
             Срочность
@@ -564,7 +565,15 @@ export function KanbanBoard({
             options={URGENCY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={!draft.title.trim() || createMutation.isPending}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={
+                !draft.title.trim() ||
+                draft.assigneeIds.length === 0 ||
+                createMutation.isPending
+              }
+            >
               Создать
             </Button>
             <Button

@@ -1,10 +1,12 @@
-import pytest
-from httpx import AsyncClient
 from uuid import uuid4
 
-from app.api.serializers import status_to_out, task_to_out
+import pytest
+from httpx import AsyncClient
+
+from app.api.serializers import status_to_out
 from app.models.team import TaskStatus
-from app.schemas.task import StatusOut, ChecklistItemOut
+from app.schemas.task import ChecklistItemOut, StatusOut
+from tests.conftest import current_user_id
 
 
 async def _login_admin(client: AsyncClient):
@@ -51,6 +53,7 @@ async def test_list_statuses_ok(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_list_and_create_task_ok(client: AsyncClient):
     headers = await _login_admin(client)
+    uid = await current_user_id(client)
     statuses = (await client.get("/api/v1/settings/statuses")).json()["items"]
     status_id = statuses[0]["id"]
     listed = await client.get("/api/v1/tasks?page_size=50")
@@ -58,7 +61,12 @@ async def test_list_and_create_task_ok(client: AsyncClient):
     created = await client.post(
         "/api/v1/tasks",
         headers=headers,
-        json={"title": "Regression create", "status_id": status_id, "priority": "medium"},
+        json={
+            "title": "Regression create",
+            "status_id": status_id,
+            "priority": "medium",
+            "assignee_ids": [uid],
+        },
     )
     assert created.status_code == 200, created.text
     task = created.json()["task"]
@@ -94,13 +102,14 @@ async def test_reports_and_export_ok(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_move_returns_fresh_nested_status(client: AsyncClient):
     headers = await _login_admin(client)
+    uid = await current_user_id(client)
     statuses = (await client.get("/api/v1/settings/statuses")).json()["items"]
     todo = next(s for s in statuses if not s["is_done"])
     done = next(s for s in statuses if s["is_done"])
     created = await client.post(
         "/api/v1/tasks",
         headers=headers,
-        json={"title": "Move nested status", "status_id": todo["id"]},
+        json={"title": "Move nested status", "status_id": todo["id"], "assignee_ids": [uid]},
     )
     assert created.status_code == 200, created.text
     tid = created.json()["task"]["id"]
@@ -138,7 +147,11 @@ async def test_patch_saves_due_and_assignees(client: AsyncClient):
     created = await client.post(
         "/api/v1/tasks",
         headers=headers,
-        json={"title": "Patch persistence", "status_id": statuses[0]["id"]},
+        json={
+            "title": "Patch persistence",
+            "status_id": statuses[0]["id"],
+            "assignee_ids": [users[0]["id"]],
+        },
     )
     assert created.status_code == 200, created.text
     tid = created.json()["task"]["id"]
@@ -167,12 +180,13 @@ async def test_patch_saves_due_and_assignees(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_list_comment_count(client: AsyncClient):
     headers = await _login_admin(client)
+    uid = await current_user_id(client)
     statuses = (await client.get("/api/v1/settings/statuses")).json()["items"]
     status_id = statuses[0]["id"]
     created = await client.post(
         "/api/v1/tasks",
         headers=headers,
-        json={"title": "With comment count", "status_id": status_id},
+        json={"title": "With comment count", "status_id": status_id, "assignee_ids": [uid]},
     )
     tid = created.json()["task"]["id"]
     c = await client.post(

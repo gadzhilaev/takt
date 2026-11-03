@@ -15,6 +15,7 @@ export function MultiSelect({
   id,
   "aria-label": ariaLabel,
   className,
+  minCount = 0,
 }: {
   values: string[];
   onChange: (next: string[]) => void;
@@ -24,6 +25,8 @@ export function MultiSelect({
   id?: string;
   "aria-label"?: string;
   className?: string;
+  /** When set, deselecting is blocked once selection would fall below this count. */
+  minCount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -56,8 +59,12 @@ export function MultiSelect({
   }, [options, q]);
 
   function toggle(value: string) {
-    if (values.includes(value)) onChange(values.filter((v) => v !== value));
-    else onChange([...values, value]);
+    if (values.includes(value)) {
+      if (values.length <= minCount) return;
+      onChange(values.filter((v) => v !== value));
+    } else {
+      onChange([...values, value]);
+    }
   }
 
   return (

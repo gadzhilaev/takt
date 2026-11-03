@@ -78,6 +78,12 @@ async def admin_client(client: AsyncClient) -> AsyncClient:
     return client
 
 
+async def current_user_id(client: AsyncClient) -> str:
+    me = await client.get("/api/v1/auth/me")
+    assert me.status_code == 200, me.text
+    return me.json()["user"]["id"]
+
+
 async def register_verified(
     client: AsyncClient,
     *,

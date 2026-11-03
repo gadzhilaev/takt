@@ -157,9 +157,13 @@ export function TaskDrawer({
                     id="drawer-assignees"
                     aria-label="Исполнители"
                     values={assigneeIds}
-                    onChange={(ids) => patch.mutate({ assignee_ids: ids })}
+                    onChange={(ids) => {
+                      if (ids.length === 0) return;
+                      patch.mutate({ assignee_ids: ids });
+                    }}
                     options={members.map((m) => ({ value: m.user_id, label: m.name }))}
-                    placeholder="Не назначены"
+                    placeholder="Выберите исполнителей"
+                    minCount={1}
                   />
                 </div>
                 <div>

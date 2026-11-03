@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import current_user_id
+
 
 async def _login_admin(client: AsyncClient):
     await client.post(
@@ -14,13 +16,19 @@ async def _login_admin(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_new_task_appears_at_top_of_nonempty_column(client: AsyncClient):
     headers = await _login_admin(client)
+    uid = await current_user_id(client)
     statuses = (await client.get("/api/v1/settings/statuses")).json()["items"]
     col = next(s for s in statuses if not s["is_done"])
 
     first = await client.post(
         "/api/v1/tasks",
         headers=headers,
-        json={"title": "Older card", "status_id": col["id"], "priority": "medium"},
+        json={
+            "title": "Older card",
+            "status_id": col["id"],
+            "priority": "medium",
+            "assignee_ids": [uid],
+        },
     )
     assert first.status_code == 200, first.text
     older = first.json()["task"]
@@ -28,7 +36,12 @@ async def test_new_task_appears_at_top_of_nonempty_column(client: AsyncClient):
     second = await client.post(
         "/api/v1/tasks",
         headers=headers,
-        json={"title": "Newest card", "status_id": col["id"], "priority": "high"},
+        json={
+            "title": "Newest card",
+            "status_id": col["id"],
+            "priority": "high",
+            "assignee_ids": [uid],
+        },
     )
     assert second.status_code == 200, second.text
     newest = second.json()["task"]
