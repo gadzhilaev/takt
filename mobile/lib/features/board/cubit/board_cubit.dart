@@ -106,7 +106,11 @@ class BoardCubit extends Cubit<BoardState> {
   /// Set from AuthCubit so widgets only show tasks assigned to this user.
   String? currentUserId;
 
+  /// Last successful /projects network sync (splash / pull-to-refresh).
+  DateTime? _projectsSyncedAt;
+
   static const _lastProjectKey = 'takt_last_project_id';
+  static const _projectsFreshFor = Duration(seconds: 90);
 
   void setCurrentUserId(String? id) {
     currentUserId = id;
@@ -235,6 +239,7 @@ class BoardCubit extends Cubit<BoardState> {
     try {
       final projects = await this.projects.listProjects();
       await cache.saveProjects(projects);
+      _projectsSyncedAt = DateTime.now();
       final visible = projects.where((p) => !taktIsTestProject(p)).toList();
       // Сервер — источник истины: пустой список затирает локальный кэш на экране.
       if (visible.isEmpty) {
@@ -282,12 +287,20 @@ class BoardCubit extends Cubit<BoardState> {
 
   /// Silent by default — keeps hub content on screen (no spinner except pull-to-refresh UI).
   Future<void> refreshProjects({bool forceLoading = false}) async {
+    final synced = _projectsSyncedAt;
+    if (!forceLoading &&
+        state.projects.isNotEmpty &&
+        synced != null &&
+        DateTime.now().difference(synced) < _projectsFreshFor) {
+      return;
+    }
     if (forceLoading && state.projects.isEmpty) {
       emit(state.copyWith(loading: true, clearError: true));
     }
     try {
       final projects = await this.projects.listProjects();
       await cache.saveProjects(projects);
+      _projectsSyncedAt = DateTime.now();
       final visible = projects.where((p) => !taktIsTestProject(p)).toList();
       final currentId = state.project?.id;
       Project? project = state.project;

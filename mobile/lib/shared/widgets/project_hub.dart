@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -36,48 +38,46 @@ class ProjectHub extends StatefulWidget {
 class _ProjectHubState extends State<ProjectHub> {
   final Set<String> _expanded = {};
   final Map<String, List<LeaveRequest>> _leaveByProject = {};
+  final Set<String> _leaveLoaded = {};
   bool _loadingLeaves = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLeaveRequests();
-  }
-
-  @override
-  void didUpdateWidget(covariant ProjectHub oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.projects != widget.projects) {
-      _loadLeaveRequests();
-    }
-  }
 
   List<Project> get _visible => taktVisibleProjects(widget.projects);
 
-  Future<void> _loadLeaveRequests() async {
+  /// Заявки на выход грузим только при раскрытии проекта (не на каждый заход в хаб).
+  Future<void> _ensureLeaveRequests(String projectId) async {
     final uid = widget.currentUserId;
     if (uid == null || uid.isEmpty) return;
-    final adminProjects = _visible.where((p) {
-      return p.members.any((m) => m.userId == uid && m.role == 'admin');
-    }).toList();
-    if (adminProjects.isEmpty) return;
-    setState(() => _loadingLeaves = true);
-    final repo = context.read<ProjectsRepository>();
-    final next = <String, List<LeaveRequest>>{};
-    for (final p in adminProjects) {
-      try {
-        next[p.id] = await repo.listLeaveRequests(p.id);
-      } catch (_) {
-        next[p.id] = const [];
-      }
+    if (_leaveLoaded.contains(projectId)) return;
+    final project = _visible.where((p) => p.id == projectId);
+    if (project.isEmpty) return;
+    final p = project.first;
+    final isAdmin = p.members.any((m) => m.userId == uid && m.role == 'admin');
+    if (!isAdmin) {
+      _leaveLoaded.add(projectId);
+      return;
     }
-    if (!mounted) return;
-    setState(() {
-      _leaveByProject
-        ..clear()
-        ..addAll(next);
-      _loadingLeaves = false;
-    });
+    setState(() => _loadingLeaves = true);
+    try {
+      final items = await context.read<ProjectsRepository>().listLeaveRequests(projectId);
+      if (!mounted) return;
+      setState(() {
+        _leaveByProject[projectId] = items;
+        _leaveLoaded.add(projectId);
+        _loadingLeaves = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _leaveByProject[projectId] = const [];
+        _leaveLoaded.add(projectId);
+        _loadingLeaves = false;
+      });
+    }
+  }
+
+  Future<void> _reloadLeaveRequests(String projectId) async {
+    _leaveLoaded.remove(projectId);
+    await _ensureLeaveRequests(projectId);
   }
 
   Future<void> _removeMember(Project project, ProjectMember member) async {
@@ -94,7 +94,7 @@ class _ProjectHubState extends State<ProjectHub> {
             userId: member.userId,
           );
       widget.onProjectsChanged?.call();
-      await _loadLeaveRequests();
+      await _reloadLeaveRequests(project.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${member.name} удалён из проекта')),
@@ -143,7 +143,7 @@ class _ProjectHubState extends State<ProjectHub> {
         await repo.rejectLeaveRequest(projectId: project.id, requestId: req.id);
       }
       widget.onProjectsChanged?.call();
-      await _loadLeaveRequests();
+      await _reloadLeaveRequests(project.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -262,6 +262,7 @@ class _ProjectHubState extends State<ProjectHub> {
                                 GestureDetector(
                                   behavior: HitTestBehavior.opaque,
                                   onTap: () {
+                                    final willOpen = !open;
                                     setState(() {
                                       if (open) {
                                         _expanded.remove(p.id);
@@ -269,6 +270,9 @@ class _ProjectHubState extends State<ProjectHub> {
                                         _expanded.add(p.id);
                                       }
                                     });
+                                    if (willOpen) {
+                                      unawaited(_ensureLeaveRequests(p.id));
+                                    }
                                   },
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

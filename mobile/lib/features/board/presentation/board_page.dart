@@ -26,6 +26,7 @@ class _BoardPageState extends State<BoardPage> {
   int _pageIndex = 0;
   int _unread = 0;
   bool _bootstrapped = false;
+  bool _dragging = false;
 
   @override
   void initState() {
@@ -46,7 +47,11 @@ class _BoardPageState extends State<BoardPage> {
     _bootstrapped = true;
     final state = cubit.state;
     if (state.project == null) {
-      context.go('/projects');
+      // IndexedStack also mounts Board under /my-tasks|/profile — don't steal navigation.
+      final loc = GoRouterState.of(context).matchedLocation;
+      if (loc.startsWith('/board')) {
+        context.go('/projects');
+      }
       return;
     }
     _syncPageController(state.columnIndex, state.columns.length);
@@ -111,7 +116,10 @@ class _BoardPageState extends State<BoardPage> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!)));
         }
         if (state.project == null && _bootstrapped) {
-          context.go('/projects');
+          final loc = GoRouterState.of(context).matchedLocation;
+          if (loc.startsWith('/board')) {
+            context.go('/projects');
+          }
           return;
         }
         if (state.project != null) {
@@ -187,7 +195,9 @@ class _BoardPageState extends State<BoardPage> {
                           controller: _pageController,
                           itemCount: state.columns.length,
                           padEnds: false,
-                          physics: const KanbanPagePhysics(parent: ClampingScrollPhysics()),
+                          physics: _dragging
+                              ? const NeverScrollableScrollPhysics()
+                              : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
                           onPageChanged: (i) {
                             setState(() => _pageIndex = i);
                             context.read<BoardCubit>().selectColumn(i);
@@ -210,6 +220,9 @@ class _BoardPageState extends State<BoardPage> {
                                       dark: dark,
                                       onAdd: () => context.push('/task-create?status=${col.id}'),
                                       onOpenTask: (task) => context.push('/task/${task.id}'),
+                                      onDraggingChanged: (v) => setState(() => _dragging = v),
+                                      onTaskDropped: (task) =>
+                                          context.read<BoardCubit>().moveToColumn(task, col.id),
                                     ),
                                   ),
                                 );

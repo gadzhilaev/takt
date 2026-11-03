@@ -16,7 +16,7 @@ import '../../board/cubit/board_cubit.dart';
 import '../../notifications/data/notifications_repository.dart';
 import '../../shell/takt_bottom_nav.dart';
 
-/// Welcome / project picker. Full shell nav (with «Мои задачи») only after a project is open.
+/// Welcome / project picker. Bottom nav: Главная / Мои задачи / Профиль.
 class ProjectsWelcomePage extends StatefulWidget {
   const ProjectsWelcomePage({super.key});
 
@@ -41,10 +41,8 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
     if (cubit.state.projects.isEmpty) {
       // Cold path: may show spinner only until disk/network fills projects.
       await cubit.bootstrap();
-    } else {
-      // Local list already on screen — sync in background without blanking.
-      unawaited(cubit.refreshProjects());
     }
+    // Если список уже с splash — не дёргаем /projects снова (только pull-to-refresh).
   }
 
   Future<void> _loadUnread() async {
@@ -168,7 +166,6 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                       context.read<BoardCubit>().refreshProjects(),
                   onRefresh: _onUserRefresh,
                 ),
-          // Без «Мои задачи», пока проект не выбран — только Главная / Профиль.
           bottomNavigationBar: TaktBottomNav(
             items: [
               TaktBottomNavItem(
@@ -176,6 +173,12 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                 icon: AppIcons.home,
                 selected: true,
                 onTap: () {},
+              ),
+              TaktBottomNavItem(
+                label: 'Мои задачи',
+                icon: AppIcons.myTasks,
+                selected: false,
+                onTap: () => context.go('/my-tasks'),
               ),
               TaktBottomNavItem(
                 label: 'Профиль',
