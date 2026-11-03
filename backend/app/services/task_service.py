@@ -48,6 +48,8 @@ async def log_activity(
 async def apply_status_change(db: AsyncSession, task: Task, new_status: TaskStatus) -> bool:
     """Apply status. Returns True if task newly entered an is_done column."""
     was_done = bool(task.status.is_done) if task.status is not None else False
+    if task.status_id != new_status.id:
+        task.status_entered_at = datetime.now(UTC)
     task.status_id = new_status.id
     # Keep loaded relationship in sync — otherwise serializers return a stale nested status
     # until the identity map is expired/refetched.

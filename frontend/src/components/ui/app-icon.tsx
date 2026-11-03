@@ -35,6 +35,7 @@ import {
   Settings,
   House,
   Sun,
+  Timer,
   Trash2,
   User,
   UserPlus,
@@ -81,6 +82,7 @@ export const APP_ICON_NAMES = [
   "circle-check",
   "assignment",
   "forum",
+  "timer",
 ] as const;
 
 export type AppIconName = (typeof APP_ICON_NAMES)[number];
@@ -123,6 +125,7 @@ const ICONS: Record<AppIconName, LucideIcon> = {
   "circle-check": CircleCheck,
   assignment: ClipboardList,
   forum: MessagesSquare,
+  timer: Timer,
 };
 
 export const APP_ICON_STROKE = 1.75;

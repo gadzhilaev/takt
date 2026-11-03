@@ -24,6 +24,7 @@ export function ColumnStartDroppable({
   );
 }
 
+/** Column wrapper: height follows content; capped by parent so tall columns scroll inside. */
 export function KanbanColumn({
   id,
   children,
@@ -37,7 +38,7 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="kanban-col-width relative flex h-full min-h-0 shrink-0 flex-col self-stretch"
+      className="kanban-col-width relative flex max-h-full min-h-0 shrink-0 flex-col self-start"
     >
       {showEmptyIndicator && (
         <div
@@ -45,7 +46,7 @@ export function KanbanColumn({
           aria-hidden
         />
       )}
-      <div className={cn("flex h-full min-h-0 min-w-0 flex-col")}>{children}</div>
+      <div className={cn("flex max-h-full min-h-0 min-w-0 flex-col")}>{children}</div>
     </div>
   );
 }

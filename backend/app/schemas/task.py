@@ -75,6 +75,7 @@ class TaskOut(BaseModel):
     author: UserBrief | None = None
     due_date: datetime | None
     closed_at: datetime | None
+    status_entered_at: datetime
     archived_at: datetime | None = None
     position: float
     created_at: datetime

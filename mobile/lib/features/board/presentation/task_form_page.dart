@@ -109,8 +109,13 @@ class _TaskFormPageState extends State<TaskFormPage> {
                 .map((m) => TaskAssignee(id: m.userId, name: m.name, avatarUrl: m.avatarUrl))
                 .toList(),
             closedAt: _existing!.closedAt,
+            statusEnteredAt: _existing!.statusEnteredAt,
+            updatedAt: _existing!.updatedAt,
+            createdAt: _existing!.createdAt,
             authorId: _existing!.authorId,
             authorName: _existing!.authorName,
+            commentCount: _existing!.commentCount,
+            statusName: _existing!.statusName,
           ),
         );
       }

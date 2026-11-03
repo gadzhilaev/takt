@@ -175,6 +175,9 @@ class TaskItem extends Equatable {
     this.description,
     this.assignees = const [],
     this.closedAt,
+    this.statusEnteredAt,
+    this.updatedAt,
+    this.createdAt,
     this.statusName,
     this.authorId,
     this.authorName,
@@ -190,12 +193,18 @@ class TaskItem extends Equatable {
   final String? description;
   final List<TaskAssignee> assignees;
   final String? closedAt;
+  final String? statusEnteredAt;
+  final String? updatedAt;
+  final String? createdAt;
   final String? statusName;
   final String? authorId;
   final String? authorName;
   final int commentCount;
 
   bool get isDone => closedAt != null;
+
+  /// ISO for time-in-column badge (status enter → updated → created).
+  String? get timeInStatusIso => statusEnteredAt ?? updatedAt ?? createdAt;
 
   factory TaskItem.fromJson(Map<String, dynamic> json) {
     final status = json['status'] as Map<String, dynamic>?;
@@ -212,6 +221,9 @@ class TaskItem extends Equatable {
           .map((e) => TaskAssignee.fromJson(e as Map<String, dynamic>))
           .toList(),
       closedAt: json['closed_at'] as String?,
+      statusEnteredAt: json['status_entered_at'] as String?,
+      updatedAt: json['updated_at'] as String?,
+      createdAt: json['created_at'] as String?,
       statusName: status?['name'] as String?,
       authorId: json['author_id'] as String? ?? author?['id'] as String?,
       authorName: author?['name'] as String?,
@@ -227,6 +239,9 @@ class TaskItem extends Equatable {
     String? projectId,
     List<TaskAssignee>? assignees,
     String? closedAt,
+    String? statusEnteredAt,
+    String? updatedAt,
+    String? createdAt,
     String? statusName,
     double? position,
   }) =>
@@ -240,6 +255,9 @@ class TaskItem extends Equatable {
         description: description ?? this.description,
         assignees: assignees ?? this.assignees,
         closedAt: closedAt ?? this.closedAt,
+        statusEnteredAt: statusEnteredAt ?? this.statusEnteredAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        createdAt: createdAt ?? this.createdAt,
         statusName: statusName ?? this.statusName,
         authorId: authorId,
         authorName: authorName,
@@ -256,6 +274,9 @@ class TaskItem extends Equatable {
         'description': description,
         'assignees': assignees.map((a) => a.toJson()).toList(),
         'closed_at': closedAt,
+        'status_entered_at': statusEnteredAt,
+        'updated_at': updatedAt,
+        'created_at': createdAt,
         'status': statusName == null ? null : {'name': statusName},
         'author_id': authorId,
         'author': authorName == null && authorId == null
@@ -274,8 +295,18 @@ class TaskItem extends Equatable {
       };
 
   @override
-  List<Object?> get props =>
-      [id, title, statusId, priority, position, description, assignees, closedAt, commentCount];
+  List<Object?> get props => [
+        id,
+        title,
+        statusId,
+        priority,
+        position,
+        description,
+        assignees,
+        closedAt,
+        statusEnteredAt,
+        commentCount,
+      ];
 }
 
 class AppNotification extends Equatable {

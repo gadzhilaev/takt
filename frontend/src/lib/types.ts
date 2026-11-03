@@ -91,6 +91,7 @@ export type Task = {
   author?: { id: string; name: string; avatar_url: string | null };
   due_date: string | null;
   closed_at: string | null;
+  status_entered_at?: string;
   archived_at?: string | null;
   position: number;
   created_at: string;

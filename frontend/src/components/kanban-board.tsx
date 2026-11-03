@@ -700,12 +700,12 @@ export function KanbanBoard({
   }
 
   function renderColumnShell(status: Status, body: ReactNode, opts?: { fillHeight?: boolean }) {
-    const fill = opts?.fillHeight !== false;
+    const fill = opts?.fillHeight === true;
     return (
       <div
         className={cn(
           "kanban-column-shell flex w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2",
-          fill ? "h-full min-h-0" : "max-h-[min(36rem,calc(100dvh-13rem))]"
+          fill ? "h-full min-h-0" : "max-h-full min-h-0"
         )}
         style={columnShellStyle(status.color || "#607FA4")}
       >
@@ -940,7 +940,7 @@ export function KanbanBoard({
           setDropIndicator(null);
         }}
       >
-        <div className="kanban-board-track flex h-full min-h-0 min-w-0 flex-1 items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-1">
+        <div className="kanban-board-track flex h-full min-h-0 min-w-0 flex-1 items-start gap-3 overflow-x-auto overflow-y-hidden pb-1">
           {statuses.map((status) => {
             const colTasks = byStatus[status.id] ?? [];
             const emptyDrop =
@@ -953,8 +953,8 @@ export function KanbanBoard({
                   status,
                   <div
                     className={cn(
-                      "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain",
-                      colTasks.length === 0 ? "min-h-[2.5rem]" : null
+                      "flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
+                      colTasks.length === 0 ? "min-h-[2.5rem]" : "min-h-0 flex-1"
                     )}
                   >
                     <ColumnStartDroppable

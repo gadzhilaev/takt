@@ -379,8 +379,8 @@ export function MemberTasksSection({
   const desktopBoard = (
     <div
       className={cn(
-        "kanban-board-track flex gap-3 overflow-x-auto overflow-y-hidden pb-1",
-        fillParent ? "min-h-0 flex-1 items-stretch" : "items-start"
+        "kanban-board-track flex items-start gap-3 overflow-x-auto overflow-y-hidden pb-1",
+        fillParent && "min-h-0 flex-1"
       )}
     >
       {statuses.map((status) => {
@@ -392,10 +392,7 @@ export function MemberTasksSection({
 
         const shell = (
           <div
-            className={cn(
-              "kanban-column-shell flex w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2",
-              fillParent ? "h-full min-h-0" : "max-h-[min(28rem,calc(100dvh-16rem))]"
-            )}
+            className="kanban-column-shell flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
             style={columnShellStyle(status.color || "#607FA4")}
           >
             <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
@@ -406,8 +403,7 @@ export function MemberTasksSection({
             <div
               className={cn(
                 "flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
-                fillParent && "flex-1",
-                colTasks.length === 0 ? "min-h-[2rem]" : null
+                colTasks.length === 0 ? "min-h-[2rem]" : "flex-1"
               )}
             >
               {canDrag && (
@@ -435,13 +431,7 @@ export function MemberTasksSection({
 
         if (!canDrag) {
           return (
-            <div
-              key={status.id}
-              className={cn(
-                "kanban-col-width flex shrink-0 flex-col",
-                fillParent ? "min-h-0 self-stretch" : "self-start"
-              )}
-            >
+            <div key={status.id} className="kanban-col-width flex max-h-full shrink-0 flex-col self-start">
               {shell}
             </div>
           );

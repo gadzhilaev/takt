@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/kanban_colors.dart';
-import '../../shared/widgets/app_icon.dart';
 import '../../core/theme.dart';
+import '../../core/time_in_status.dart';
+import '../../shared/widgets/app_icon.dart';
 import '../models/models.dart';
 import 'urgency_badge.dart';
 import 'user_avatar.dart';
@@ -77,7 +78,16 @@ class TaktTaskCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      UrgencyBadge(priority: task.priority),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          UrgencyBadge(priority: task.priority),
+                          if (formatTimeInStatus(task.timeInStatusIso) case final t?)
+                            _TimeInStatusChip(label: t, dark: dark),
+                        ],
+                      ),
                       if (hasDesc) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -118,6 +128,43 @@ class TaktTaskCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TimeInStatusChip extends StatelessWidget {
+  const _TimeInStatusChip({required this.label, required this.dark});
+
+  final String label;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final soft = dark ? TaktColors.surface2Dark : TaktColors.surface2;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: soft,
+        borderRadius: BorderRadius.circular(TaktRadii.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, size: 12, color: muted.withValues(alpha: 0.85)),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: muted,
+            ),
+          ),
+        ],
       ),
     );
   }

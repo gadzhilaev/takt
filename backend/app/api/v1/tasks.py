@@ -196,6 +196,7 @@ async def create_task(
     if status.project_id and status.project_id != project_id:
         raise HTTPException(status_code=400, detail={"error": {"code": "status_mismatch", "message": "Статус из другого проекта"}})
     pos = await task_service.next_position(db, body.status_id)
+    now = datetime.now(UTC)
     task = Task(
         title=body.title,
         description=body.description,
@@ -206,9 +207,10 @@ async def create_task(
         author_id=user.id,
         due_date=body.due_date,
         position=pos,
+        status_entered_at=now,
     )
     if status.is_done:
-        task.closed_at = datetime.now(UTC)
+        task.closed_at = now
     db.add(task)
     await db.flush()
     if body.assignee_ids:
@@ -413,6 +415,7 @@ async def duplicate_task(
         author_id=user.id,
         due_date=source.due_date,
         position=pos,
+        status_entered_at=datetime.now(UTC),
     )
     db.add(clone)
     await db.flush()
