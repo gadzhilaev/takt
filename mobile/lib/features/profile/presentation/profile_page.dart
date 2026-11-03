@@ -85,35 +85,39 @@ class _ProfilePageState extends State<ProfilePage> {
         return Scaffold(
           appBar: TaktAppBar(title: 'Профиль'),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(0, 4, 0, 28),
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 28),
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
                   children: [
                     TaktUserAvatar(
                       name: _name.isEmpty ? '?' : _name,
                       avatarUrl: _avatarUrl,
-                      size: 48,
+                      size: 64,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _name.isEmpty ? 'Пользователь' : _name,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.2,
-                              color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(_email, style: TextStyle(fontSize: 13, color: muted)),
-                        ],
+                    const SizedBox(height: 12),
+                    Text(
+                      _name.isEmpty ? 'Пользователь' : _name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
+                        color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _email,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: muted),
+                    ),
+                    const SizedBox(height: 12),
+                    TaktButton(
+                      label: 'Изменить профиль',
+                      variant: TaktButtonVariant.secondary,
+                      onPressed: () => _editProfile(context),
                     ),
                   ],
                 ),
@@ -129,32 +133,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                 ),
-              TaktSection(
-                title: 'Аккаунт',
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: _SettingsGroup(
-                  surface: surface,
-                  border: border,
-                  children: [
-                    TaktListTile(
-                      leading: AppIcon(AppIcons.edit, size: 20, color: muted),
-                      title: 'Личные данные',
-                      subtitle: _email,
-                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
-                      onTap: () => _editProfile(context),
-                    ),
-                  ],
-                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Divider(height: 1, color: border),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: SignInMethodsSection(
                   onMessage: (m) => setState(() => _message = m),
                 ),
               ),
               TaktSection(
                 title: 'Тема',
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: _SettingsGroup(
                   surface: surface,
                   border: border,
@@ -185,7 +176,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               TaktSection(
                 title: 'Уведомления',
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: _SettingsGroup(
                   surface: surface,
                   border: border,
@@ -218,7 +209,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (project == null) return const SizedBox.shrink();
                   return TaktSection(
                     title: 'Проекты',
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     child: _SettingsGroup(
                       surface: surface,
                       border: border,
@@ -237,7 +228,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               TaktSection(
                 title: 'О приложении',
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: _SettingsGroup(
                   surface: surface,
                   border: border,
@@ -259,30 +250,39 @@ class _ProfilePageState extends State<ProfilePage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextButton.icon(
-                  onPressed: () async {
-                    final ok = await showTaktSheet(
-                      context: context,
-                      title: 'Выйти из аккаунта?',
-                      confirmLabel: 'Выйти',
-                      body: Text(
-                        'Виджеты очистят данные текущего пользователя.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.4,
-                          color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                child: Divider(height: 1, color: border),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TaktButton(
+                    label: 'Выйти',
+                    variant: TaktButtonVariant.ghost,
+                    danger: true,
+                    icon: AppIcons.logout,
+                    onPressed: () async {
+                      final ok = await showTaktSheet(
+                        context: context,
+                        title: 'Выйти из аккаунта?',
+                        confirmLabel: 'Выйти',
+                        body: Text(
+                          'Виджеты очистят данные текущего пользователя.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.4,
+                            color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                          ),
                         ),
-                      ),
-                    );
-                    if (ok != true || !context.mounted) return;
-                    await context.read<AuthCubit>().logout();
-                    if (context.mounted) context.go('/login');
-                  },
-                  icon: const AppIcon(AppIcons.logout, size: 18, color: TaktColors.danger),
-                  label: const Text('Выйти', style: TextStyle(color: TaktColors.danger)),
+                      );
+                      if (ok != true || !context.mounted) return;
+                      await context.read<AuthCubit>().logout();
+                      if (context.mounted) context.go('/login');
+                    },
+                  ),
                 ),
               ),
             ],

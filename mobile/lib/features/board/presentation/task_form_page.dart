@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/widgets/app_icon.dart';
 import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/assignee_picker_dialog.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_select.dart';
-import '../../../shared/widgets/user_avatar.dart';
+import '../../../shared/widgets/takt_ui.dart';
 import '../cubit/board_cubit.dart';
 
 class TaskFormPage extends StatefulWidget {
@@ -68,9 +67,16 @@ class _TaskFormPageState extends State<TaskFormPage> {
     super.dispose();
   }
 
+  bool get _canSave {
+    if (_saving) return false;
+    if (_title.text.trim().isEmpty || _statusId.isEmpty) return false;
+    if (_assigneeIds.isEmpty) return false;
+    return true;
+  }
+
   Future<void> _save() async {
     final title = _title.text.trim();
-    if (title.isEmpty || _statusId.isEmpty) return;
+    if (!_canSave) return;
     setState(() => _saving = true);
     final cubit = context.read<BoardCubit>();
     final board = cubit.state;
@@ -138,7 +144,11 @@ class _TaskFormPageState extends State<TaskFormPage> {
     final members = board.project?.members ?? const <ProjectMember>[];
     final dark = Theme.of(context).brightness == Brightness.dark;
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
     final selectedMembers = members.where((m) => _assigneeIds.contains(m.userId)).toList();
+    final assigneeLabel = selectedMembers.isEmpty
+        ? null
+        : selectedMembers.map((m) => m.name).join(', ');
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -149,7 +159,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
           onClose: () => _leave(false),
           actions: [
             TextButton(
-              onPressed: _saving ? null : _save,
+              onPressed: _canSave ? _save : null,
               child: _saving
                   ? SizedBox(
                       width: 18,
@@ -167,114 +177,86 @@ class _TaskFormPageState extends State<TaskFormPage> {
         body: ListView(
           padding: EdgeInsets.fromLTRB(
             16,
-            8,
+            12,
             16,
             24 + MediaQuery.viewInsetsOf(context).bottom,
           ),
           children: [
-            Text('Название', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _title,
-              autofocus: widget.isCreate,
-              maxLines: null,
-              minLines: 1,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                height: 1.35,
-                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-              ),
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                isDense: true,
-                hintText: 'Что нужно сделать',
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text('Описание', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _description,
-              minLines: 3,
-              maxLines: 6,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.4,
-                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-              ),
-              decoration: const InputDecoration(
-                isDense: true,
-                hintText: 'Подробности (необязательно)',
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            TaktFormField(
+              label: 'Название',
+              child: TextField(
+                controller: _title,
+                autofocus: widget.isCreate,
+                maxLines: null,
+                minLines: 1,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  height: 1.35,
+                  color: fg,
+                ),
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  hintText: 'Что нужно сделать',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
               ),
             ),
-            const SizedBox(height: 14),
-            TaktSelectField<String>(
-              label: 'Столбец',
-              value: board.columns.any((c) => c.id == _statusId) ? _statusId : null,
-              options: [
-                for (final c in board.columns) TaktSelectOption(value: c.id, label: c.name),
-              ],
-              onChanged: (v) => setState(() => _statusId = v),
+            TaktFormField(
+              label: 'Описание',
+              child: TextField(
+                controller: _description,
+                minLines: 3,
+                maxLines: 6,
+                style: TextStyle(fontSize: 14, height: 1.4, color: fg),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  hintText: 'Необязательно',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
             ),
-            const SizedBox(height: 14),
-            TaktSelectField<String>(
+            TaktFormField(
+              label: 'Исполнители',
+              child: members.isEmpty
+                  ? Text(
+                      'В проекте пока нет участников',
+                      style: TextStyle(fontSize: 13, color: muted),
+                    )
+                  : TaktFieldTrigger(
+                      valueText: assigneeLabel,
+                      placeholder: 'Выберите исполнителей',
+                      onTap: () => _pickAssignees(members),
+                    ),
+            ),
+            if (!widget.isCreate || board.columns.length > 1)
+              TaktFormField(
+                label: 'Столбец',
+                child: TaktSelectField<String>(
+                  label: '',
+                  value: board.columns.any((c) => c.id == _statusId) ? _statusId : null,
+                  options: [
+                    for (final c in board.columns) TaktSelectOption(value: c.id, label: c.name),
+                  ],
+                  onChanged: (v) => setState(() => _statusId = v),
+                ),
+              ),
+            TaktFormField(
               label: 'Срочность',
-              value: _priority,
-              options: const [
-                TaktSelectOption(value: 'urgent', label: 'Срочно'),
-                TaktSelectOption(value: 'high', label: 'Важно'),
-                TaktSelectOption(value: 'medium', label: 'Обычная'),
-              ],
-              onChanged: (v) => setState(() => _priority = v),
-            ),
-            const SizedBox(height: 16),
-            Text('Исполнители', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted)),
-            const SizedBox(height: 8),
-            if (members.isEmpty)
-              Text('В проекте пока нет участников', style: TextStyle(fontSize: 13, color: muted))
-            else ...[
-              if (selectedMembers.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final m in selectedMembers)
-                        InputChip(
-                          avatar: TaktUserAvatar(name: m.name, avatarUrl: m.avatarUrl, size: 20),
-                          label: Text(
-                            m.name,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-                            ),
-                          ),
-                          onDeleted: () => setState(() => _assigneeIds.remove(m.userId)),
-                          deleteIconColor: muted,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          side: BorderSide(color: dark ? TaktColors.borderDark : TaktColors.border),
-                          backgroundColor: dark ? TaktColors.surface2Dark : TaktColors.surface2,
-                          labelStyle: TextStyle(
-                            color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              OutlinedButton.icon(
-                onPressed: () => _pickAssignees(members),
-                icon: const AppIcon(AppIcons.invite, size: 18),
-                label: Text(
-                  selectedMembers.isEmpty ? 'Выбрать исполнителей' : 'Изменить список',
-                ),
+              bottomGap: 0,
+              child: TaktSelectField<String>(
+                label: '',
+                value: _priority,
+                options: const [
+                  TaktSelectOption(value: 'urgent', label: 'Срочно'),
+                  TaktSelectOption(value: 'high', label: 'Важно'),
+                  TaktSelectOption(value: 'medium', label: 'Обычная'),
+                ],
+                onChanged: (v) => setState(() => _priority = v),
               ),
-            ],
+            ),
           ],
         ),
       ),

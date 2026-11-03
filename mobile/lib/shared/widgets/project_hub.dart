@@ -383,11 +383,12 @@ class _MemberRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final soft = dark ? TaktColors.surface2Dark : TaktColors.surface2;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          TaktUserAvatar(name: member.name, avatarUrl: member.avatarUrl, size: 22),
+          TaktUserAvatar(name: member.name, avatarUrl: member.avatarUrl, size: 24),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -396,25 +397,30 @@ class _MemberRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
-                height: 1.2,
+                height: 1.25,
+                fontWeight: FontWeight.w500,
                 color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
               ),
             ),
           ),
           if (member.role == 'admin')
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
+            Container(
+              margin: const EdgeInsets.only(right: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: soft,
+                borderRadius: BorderRadius.circular(TaktRadii.sm),
+              ),
               child: Text(
-                'владелец',
+                'админ',
                 style: TextStyle(
                   fontSize: 10,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                   color: muted,
                 ),
               ),
             ),
           if (canRemove)
-            // InkWell — без Material tooltip «Удалить», который всплывал поверх списка.
             InkWell(
               onTap: onRemove,
               borderRadius: BorderRadius.circular(14),

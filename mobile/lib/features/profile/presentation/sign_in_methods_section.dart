@@ -240,27 +240,29 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
       children: [
         Text(
           'Вход и безопасность',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.2,
-              ),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.15,
+            color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+          ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           'Пароль и сервисы можно использовать вместе.',
-          style: TextStyle(fontSize: 12.5, height: 1.35, color: muted),
+          style: TextStyle(fontSize: 12, height: 1.35, color: muted),
         ),
         const SizedBox(height: 10),
         DecoratedBox(
           decoration: BoxDecoration(
             color: surface,
-            borderRadius: BorderRadius.circular(TaktRadii.lg),
+            borderRadius: BorderRadius.circular(TaktRadii.md),
             border: Border.all(color: border),
           ),
           child: Column(
             children: [
               _MethodRow(
-                leading: Icon(Icons.lock_outline_rounded, size: 20, color: muted),
+                leading: Icon(Icons.lock_outline_rounded, size: 18, color: muted),
                 title: 'Email и пароль',
                 subtitle: _hasPassword ? 'Задан' : 'Не задан',
                 actionLabel: _hasPassword ? 'Сменить' : 'Задать',
@@ -268,24 +270,21 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
                 busy: false,
               ),
               for (final id in _enabledProviders) ...[
-                Divider(height: 1, color: border),
+                Divider(height: 1, thickness: 1, color: border),
                 _MethodRow(
                   leading: _icons.containsKey(id)
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: SvgPicture.asset(
-                            _icons[id]!,
-                            width: 22,
-                            height: 22,
-                            colorFilter: id == 'apple'
-                                ? ColorFilter.mode(
-                                    dark ? TaktColors.foregroundDark : TaktColors.graphite,
-                                    BlendMode.srcIn,
-                                  )
-                                : null,
-                          ),
+                      ? SvgPicture.asset(
+                          _icons[id]!,
+                          width: 20,
+                          height: 20,
+                          colorFilter: id == 'apple'
+                              ? ColorFilter.mode(
+                                  dark ? TaktColors.foregroundDark : TaktColors.graphite,
+                                  BlendMode.srcIn,
+                                )
+                              : null,
                         )
-                      : Icon(Icons.link_rounded, size: 20, color: muted),
+                      : Icon(Icons.link_rounded, size: 18, color: muted),
                   title: OAuthProviderId.accountLabel(id),
                   subtitle: linked.containsKey(id)
                       ? (() {
@@ -346,12 +345,22 @@ class _MethodRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final well = dark ? TaktColors.surface2Dark : TaktColors.surface2;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       child: Row(
         children: [
-          SizedBox(width: 28, height: 28, child: Center(child: leading)),
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: well,
+              shape: BoxShape.circle,
+            ),
+            child: leading,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -360,14 +369,14 @@ class _MethodRow extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: -0.15,
+                    letterSpacing: -0.1,
                     color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(fontSize: 12, color: muted)),
+                Text(subtitle, style: TextStyle(fontSize: 11, height: 1.3, color: muted)),
               ],
             ),
           ),
@@ -375,18 +384,31 @@ class _MethodRow extends StatelessWidget {
             TextButton(
               onPressed: busy ? null : onAction,
               style: TextButton.styleFrom(
-                foregroundColor: danger ? TaktColors.danger : (dark ? TaktColors.accentDark : TaktColors.accent),
+                foregroundColor: danger
+                    ? TaktColors.danger
+                    : (dark ? TaktColors.accentDark : TaktColors.accent),
+                backgroundColor: danger
+                    ? null
+                    : (dark ? TaktColors.surface2Dark : TaktColors.surface2),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: StadiumBorder(
+                  side: danger
+                      ? BorderSide.none
+                      : BorderSide(color: dark ? TaktColors.borderDark : TaktColors.border),
+                ),
               ),
               child: busy
                   ? const SizedBox(
-                      width: 16,
-                      height: 16,
+                      width: 14,
+                      height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(actionLabel!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  : Text(
+                      actionLabel!,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
             ),
         ],
       ),

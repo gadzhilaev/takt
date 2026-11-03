@@ -90,11 +90,31 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     if (updated == true && mounted) await _refreshFromBoard();
   }
 
+  Future<void> _moveTo(TaskItem task, String statusId) async {
+    await context.read<BoardCubit>().moveToColumn(task, statusId);
+    if (mounted) await _refreshFromBoard();
+  }
+
+  Future<void> _delete(TaskItem task) async {
+    final ok = await showTaktSheet(
+      context: context,
+      title: 'Удалить задачу?',
+      confirmLabel: 'Удалить',
+      body: const Text('Действие нельзя отменить.'),
+    );
+    if (ok == true && mounted) {
+      await context.read<BoardCubit>().deleteTask(task.id);
+      if (!mounted) return;
+      _leave();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
     final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
+    final border = dark ? TaktColors.borderDark : TaktColors.border;
     final cubit = context.watch<BoardCubit>();
     final board = cubit.state;
     final task = _task;
@@ -116,61 +136,31 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         onBack: _leave,
         actions: [
           if (task != null)
-            IconButton(
-              tooltip: 'Редактировать',
-              visualDensity: VisualDensity.compact,
+            TextButton(
               onPressed: () => _openEdit(task),
-              icon: AppIcon(AppIcons.edit, size: 20, color: fg),
+              child: const Text('Редактировать'),
             ),
-          if (task != null)
+          if (task != null && board.columns.where((c) => c.id != task.statusId).isNotEmpty)
             PopupMenuButton<String>(
               useRootNavigator: true,
+              tooltip: 'Переместить',
               icon: AppIcon(AppIcons.more, size: 22, color: fg),
               onSelected: (v) async {
-                if (v == 'edit') {
-                  await _openEdit(task);
-                } else if (v == 'done') {
+                if (v == 'done') {
                   final done = board.columns.where((c) => c.isDone).toList();
                   if (done.isEmpty) return;
-                  final boardCubit = context.read<BoardCubit>();
-                  await boardCubit.moveToColumn(task, done.first.id);
-                  if (!mounted) return;
-                  _leave();
-                } else if (v == 'delete' && canDelete) {
-                  final boardCubit = context.read<BoardCubit>();
-                  final ok = await showTaktSheet(
-                    context: context,
-                    title: 'Удалить задачу?',
-                    confirmLabel: 'Удалить',
-                    body: const Text('Действие нельзя отменить.'),
-                  );
-                  if (ok == true && mounted) {
-                    await boardCubit.deleteTask(task.id);
-                    if (!mounted) return;
-                    _leave();
-                  }
+                  await _moveTo(task, done.first.id);
+                  if (mounted) _leave();
                 } else if (v.startsWith('move:')) {
-                  final boardCubit = context.read<BoardCubit>();
-                  await boardCubit.moveToColumn(task, v.substring(5));
-                  if (mounted) await _refreshFromBoard();
+                  await _moveTo(task, v.substring(5));
                 }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(value: 'edit', child: Text('Редактировать')),
                 const PopupMenuItem(value: 'done', child: Text('Завершить')),
-                if (board.columns.isNotEmpty) ...[
-                  const PopupMenuDivider(),
-                  ...board.columns
-                      .where((c) => c.id != task.statusId)
-                      .map((c) => PopupMenuItem(value: 'move:${c.id}', child: Text('В «${c.name}»'))),
-                ],
-                if (canDelete) ...[
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Удалить', style: TextStyle(color: TaktColors.danger)),
-                  ),
-                ],
+                const PopupMenuDivider(),
+                ...board.columns
+                    .where((c) => c.id != task.statusId)
+                    .map((c) => PopupMenuItem(value: 'move:${c.id}', child: Text('В «${c.name}»'))),
               ],
             ),
         ],
@@ -179,108 +169,141 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         top: false,
         minimum: const EdgeInsets.only(bottom: 8),
         child: _loading && task == null
-          ? const SizedBox.shrink()
-          : _error != null
-              ? TaktEmptyState(
-                  title: _error!,
-                  icon: AppIcons.alert,
-                  action: TaktButton(
-                    label: 'Назад',
-                    variant: TaktButtonVariant.secondary,
-                    onPressed: _leave,
-                  ),
-                )
-              : task == null
-                  ? TaktEmptyState(
-                      title: 'Задача не найдена',
-                      subtitle: 'Возможно, она удалена или у вас нет доступа',
-                      action: TaktButton(
-                        label: 'На главную',
-                        variant: TaktButtonVariant.secondary,
-                        onPressed: () => context.go(
-                              context.read<BoardCubit>().state.project != null ? '/board' : '/projects',
-                            ),
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      children: [
-                        Text(
-                          task.title,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.25,
-                            height: 1.3,
-                            color: fg,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            UrgencyBadge(priority: task.priority),
-                            if (statusName != null)
-                              Text(
-                                statusName,
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: muted),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Text('Описание', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted)),
-                        const SizedBox(height: 6),
-                        Text(
-                          (task.description?.trim().isNotEmpty ?? false) ? task.description! : 'Без описания',
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.45,
-                            color: (task.description?.trim().isNotEmpty ?? false) ? fg : muted,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text('Исполнители', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted)),
-                        const SizedBox(height: 8),
-                        if (task.assignees.isEmpty)
-                          Text('Не назначены', style: TextStyle(fontSize: 14, color: muted))
-                        else
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 8,
-                            children: [
-                              for (final a in task.assignees)
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    TaktUserAvatar(name: a.name, avatarUrl: a.avatarUrl, size: 26),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      a.name,
-                                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: fg),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        if (task.authorName != null && task.authorName!.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          Text('Автор', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted)),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              TaktUserAvatar(name: task.authorName!, size: 26),
-                              const SizedBox(width: 6),
-                              Text(
-                                task.authorName!,
-                                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: fg),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
+            ? const SizedBox.shrink()
+            : _error != null
+                ? TaktEmptyState(
+                    title: _error!,
+                    icon: AppIcons.alert,
+                    action: TaktButton(
+                      label: 'Назад',
+                      variant: TaktButtonVariant.secondary,
+                      onPressed: _leave,
                     ),
+                  )
+                : task == null
+                    ? TaktEmptyState(
+                        title: 'Задача не найдена',
+                        subtitle: 'Возможно, она удалена или у вас нет доступа',
+                        action: TaktButton(
+                          label: 'На главную',
+                          variant: TaktButtonVariant.secondary,
+                          onPressed: () => context.go(
+                                context.read<BoardCubit>().state.project != null ? '/board' : '/projects',
+                              ),
+                        ),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                        children: [
+                          TaktFieldLabel('Название'),
+                          const SizedBox(height: 6),
+                          Text(
+                            task.title,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
+                              letterSpacing: -0.15,
+                              color: fg,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TaktFieldLabel('Описание'),
+                          const SizedBox(height: 6),
+                          Text(
+                            (task.description?.trim().isNotEmpty ?? false)
+                                ? task.description!
+                                : 'Без описания',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              color: (task.description?.trim().isNotEmpty ?? false) ? fg : muted,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TaktFieldLabel('Исполнители'),
+                          const SizedBox(height: 8),
+                          if (task.assignees.isEmpty)
+                            Text('Не назначены', style: TextStyle(fontSize: 14, color: muted))
+                          else
+                            Column(
+                              children: [
+                                for (final a in task.assignees)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      children: [
+                                        TaktUserAvatar(
+                                          name: a.name,
+                                          avatarUrl: a.avatarUrl,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            a.name,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: fg,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          const SizedBox(height: 8),
+                          TaktFieldLabel('Столбец'),
+                          const SizedBox(height: 6),
+                          Text(
+                            statusName ?? '—',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: fg),
+                          ),
+                          const SizedBox(height: 16),
+                          TaktFieldLabel('Срочность'),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: UrgencyBadge(priority: task.priority),
+                          ),
+                          if (task.authorName != null && task.authorName!.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            TaktFieldLabel('Автор'),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                TaktUserAvatar(name: task.authorName!, size: 24),
+                                const SizedBox(width: 8),
+                                Text(
+                                  task.authorName!,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: fg,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (canDelete) ...[
+                            const SizedBox(height: 24),
+                            Divider(height: 1, color: border),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TaktButton(
+                                label: 'Удалить задачу',
+                                variant: TaktButtonVariant.ghost,
+                                danger: true,
+                                icon: AppIcons.delete,
+                                onPressed: () => _delete(task),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
       ),
     );
   }

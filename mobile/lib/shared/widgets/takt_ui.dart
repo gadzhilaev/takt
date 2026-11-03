@@ -311,6 +311,124 @@ class TaktTextField extends StatelessWidget {
   }
 }
 
+/// Web `.label-text` — 12px semibold muted above a field.
+class TaktFieldLabel extends StatelessWidget {
+  const TaktFieldLabel(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        height: 1.25,
+        color: dark ? TaktColors.mutedDark : TaktColors.muted,
+      ),
+    );
+  }
+}
+
+/// Web `.field` trigger (select / multi-select style): bordered row + chevron.
+class TaktFieldTrigger extends StatelessWidget {
+  const TaktFieldTrigger({
+    super.key,
+    required this.valueText,
+    required this.onTap,
+    this.placeholder = 'Выбрать',
+    this.enabled = true,
+    this.leading,
+  });
+
+  final String? valueText;
+  final String placeholder;
+  final VoidCallback? onTap;
+  final bool enabled;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final border = dark ? TaktColors.borderDark : TaktColors.border;
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
+    final surface = dark ? TaktColors.surfaceDark : TaktColors.surface;
+    final empty = valueText == null || valueText!.trim().isEmpty;
+
+    return Material(
+      color: surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TaktRadii.md),
+        side: BorderSide(color: border),
+      ),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(TaktRadii.md),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              children: [
+                if (leading != null) ...[
+                  leading!,
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(
+                    empty ? placeholder : valueText!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                      color: empty ? muted : fg,
+                    ),
+                  ),
+                ),
+                AppIcon(AppIcons.chevronDown, size: 16, color: muted.withValues(alpha: 0.7)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Label + child stack with web drawer spacing (`space-y` field block).
+class TaktFormField extends StatelessWidget {
+  const TaktFormField({
+    super.key,
+    required this.label,
+    required this.child,
+    this.bottomGap = 16,
+  });
+
+  final String label;
+  final Widget child;
+  final double bottomGap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomGap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TaktFieldLabel(label),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
 /// Strip internal demo markers from notification copy.
 String taktSanitizeNotificationText(String? raw) {
   if (raw == null) return '';

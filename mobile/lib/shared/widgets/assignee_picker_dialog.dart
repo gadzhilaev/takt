@@ -171,7 +171,9 @@ Future<Set<String>?> showAssigneePickerDialog({
                             child: TaktButton(
                               label: count > 0 ? 'Готово · $count' : 'Готово',
                               expand: true,
-                              onPressed: () => Navigator.pop(ctx, selected),
+                              onPressed: count == 0
+                                  ? null
+                                  : () => Navigator.pop(ctx, selected),
                             ),
                           ),
                         ],

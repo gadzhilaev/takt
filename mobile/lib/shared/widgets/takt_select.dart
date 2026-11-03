@@ -55,6 +55,40 @@ class TaktSelectField<T> extends StatelessWidget {
     final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
     final surface = dark ? TaktColors.surfaceDark : TaktColors.surface;
 
+    final field = Material(
+      color: surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TaktRadii.md),
+        side: BorderSide(color: border),
+      ),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: enabled ? () => _open(context) : null,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 11, 8, 11),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _display,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: enabled ? fg : muted,
+                  ),
+                ),
+              ),
+              AppIcon(AppIcons.chevronDown, size: 16, color: muted.withValues(alpha: 0.7)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (label.trim().isEmpty) return field;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -63,37 +97,7 @@ class TaktSelectField<T> extends StatelessWidget {
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted),
         ),
         const SizedBox(height: 6),
-        Material(
-          color: surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(TaktRadii.md),
-            side: BorderSide(color: border),
-          ),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: enabled ? () => _open(context) : null,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 11, 8, 11),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _display,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: enabled ? fg : muted,
-                      ),
-                    ),
-                  ),
-                  AppIcon(AppIcons.chevronDown, size: 22, color: muted),
-                ],
-              ),
-            ),
-          ),
-        ),
+        field,
       ],
     );
   }
