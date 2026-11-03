@@ -143,7 +143,7 @@ export function SignInMethodsSection({
             </Button>
           ) : (
             <Button type="button" size="sm" variant="secondary" className="shrink-0 rounded-full px-3" asChild>
-              <Link href="/forgot-password">Задать</Link>
+              <Link href="/forgot-password?mode=set">Задать</Link>
             </Button>
           )}
         </div>

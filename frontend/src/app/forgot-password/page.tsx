@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,10 @@ import { paths } from "@/lib/paths";
 
 type SendCodeResponse = { ok?: boolean; message?: string; email?: string };
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordInner() {
   const router = useRouter();
+  const search = useSearchParams();
+  const setMode = search.get("mode") === "set";
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [step, setStep] = useState<"email" | "reset">("email");
@@ -22,6 +24,26 @@ export default function ForgotPasswordPage() {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [sending, setSending] = useState(false);
+  const [emailLocked, setEmailLocked] = useState(false);
+
+  useEffect(() => {
+    const q = search.get("email");
+    if (q) {
+      setEmail(q);
+      if (setMode) setEmailLocked(true);
+    } else if (setMode) {
+      void api<{ user: { email: string } }>("/api/v1/auth/me")
+        .then((res) => {
+          if (res.user?.email) {
+            setEmail(res.user.email);
+            setEmailLocked(true);
+          }
+        })
+        .catch(() => {
+          /* ignore — guest forgot flow */
+        });
+    }
+  }, [search, setMode]);
 
   async function onSend(e: React.FormEvent) {
     e.preventDefault();
@@ -59,7 +81,11 @@ export default function ForgotPasswordPage() {
         },
       });
       const msg = res.message || "";
-      router.push(msg ? `${paths.login}?message=${encodeURIComponent(msg)}` : paths.login);
+      if (setMode) {
+        router.push(msg ? `${paths.profile}?message=${encodeURIComponent(msg)}` : paths.profile);
+      } else {
+        router.push(msg ? `${paths.login}?message=${encodeURIComponent(msg)}` : paths.login);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "");
     } finally {
@@ -85,6 +111,15 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  const titleEmail = setMode ? "Задать пароль" : "Сброс пароля";
+  const titleReset = setMode ? "Задать пароль" : "Новый пароль";
+  const hintEmail = setMode
+    ? "Пришлём код на email — после подтверждения зададите пароль для входа"
+    : "Укажите email, пришлём код для сброса пароля";
+  const hintReset = setMode
+    ? `Введите код из письма на ${email} и придумайте пароль`
+    : `Введите код из письма на ${email} и задайте новый пароль`;
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
       <div
@@ -100,12 +135,10 @@ export default function ForgotPasswordPage() {
         <div className="surface-panel p-6 sm:p-7">
           <div className="mb-6">
             <h1 className="text-xl font-semibold tracking-tight">
-              {step === "email" ? "Сброс пароля" : "Новый пароль"}
+              {step === "email" ? titleEmail : titleReset}
             </h1>
             <p className="mt-1.5 text-[13px] leading-snug text-muted">
-              {step === "email"
-                ? "Укажите email, пришлём код для сброса пароля"
-                : `Введите код из письма на ${email} и задайте новый пароль`}
+              {step === "email" ? hintEmail : hintReset}
             </p>
           </div>
 
@@ -121,6 +154,7 @@ export default function ForgotPasswordPage() {
                   autoComplete="email"
                   value={email}
                   onChange={(ev) => setEmail(ev.target.value)}
+                  readOnly={emailLocked}
                   required
                 />
               </div>
@@ -155,7 +189,7 @@ export default function ForgotPasswordPage() {
               </div>
               <div>
                 <label className="label-text" htmlFor="forgot-pass">
-                  Новый пароль
+                  {setMode ? "Пароль" : "Новый пароль"}
                 </label>
                 <PasswordInput
                   id="forgot-pass"
@@ -185,7 +219,7 @@ export default function ForgotPasswordPage() {
                 </p>
               ) : null}
               <Button type="submit" className="w-full" size="lg" disabled={sending}>
-                {sending ? "…" : "Сбросить пароль"}
+                {sending ? "…" : setMode ? "Сохранить пароль" : "Сбросить пароль"}
               </Button>
               <button
                 type="button"
@@ -199,13 +233,29 @@ export default function ForgotPasswordPage() {
           )}
 
           <p className="mt-5 text-center text-sm text-muted">
-            Вспомнили пароль?{" "}
-            <Link href={paths.login} className="font-medium text-[var(--accent)]">
-              Войти
-            </Link>
+            {setMode ? (
+              <Link href={paths.profile} className="font-medium text-[var(--accent)]">
+                Назад в профиль
+              </Link>
+            ) : (
+              <>
+                Вспомнили пароль?{" "}
+                <Link href={paths.login} className="font-medium text-[var(--accent)]">
+                  Войти
+                </Link>
+              </>
+            )}
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted">…</div>}>
+      <ForgotPasswordInner />
+    </Suspense>
   );
 }

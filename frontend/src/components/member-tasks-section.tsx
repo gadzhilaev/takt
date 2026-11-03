@@ -149,10 +149,10 @@ export function MemberTasksSection({
 
   return (
     <section
-      className="shrink-0 overflow-y-auto border-b border-hairline pb-3"
+      className="mt-3 shrink-0 border-b border-hairline pb-4 pt-1"
       aria-label={title}
     >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <MemberSelect
           members={members}
@@ -173,7 +173,7 @@ export function MemberTasksSection({
             return (
               <div key={status.id} className="flex w-[17.5rem] shrink-0 flex-col self-start">
                 <div
-                  className="kanban-column-shell flex w-full max-h-[min(20rem,40vh)] flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+                  className="kanban-column-shell flex w-full flex-col rounded-[var(--radius-lg)] border p-2"
                   style={columnShellStyle(status.color || "#607FA4")}
                 >
                   <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
@@ -183,8 +183,8 @@ export function MemberTasksSection({
                   </div>
                   <div
                     className={cn(
-                      "flex flex-col gap-2 overflow-y-auto",
-                      colTasks.length === 0 ? "min-h-[2rem]" : "min-h-0"
+                      "flex flex-col gap-2",
+                      colTasks.length === 0 ? "min-h-[2rem]" : null
                     )}
                   >
                     {colTasks.map((task) => (
@@ -238,7 +238,7 @@ export function MemberTasksSection({
           </div>
           {mobileStatus && (
             <div
-              className="kanban-column-shell flex max-h-72 flex-col gap-2 overflow-y-auto rounded-[var(--radius-lg)] border p-2"
+              className="kanban-column-shell flex flex-col gap-2 rounded-[var(--radius-lg)] border p-2"
               style={columnShellStyle(mobileStatus.color || "#607FA4")}
             >
               {mobileTasks.map((task) => (

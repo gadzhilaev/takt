@@ -222,8 +222,9 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
   void _setPassword() {
     final auth = context.read<AuthCubit>().state;
     final email = auth is AuthAuthenticated ? auth.user.email : '';
-    final qs = email.isEmpty ? '' : '?email=${Uri.encodeQueryComponent(email)}';
-    context.push('/forgot-password$qs');
+    final params = <String, String>{'mode': 'set'};
+    if (email.isNotEmpty) params['email'] = email;
+    context.push(Uri(path: '/forgot-password', queryParameters: params).toString());
   }
 
   @override

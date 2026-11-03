@@ -27,15 +27,22 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool _busy = false;
   bool _obscure = true;
   bool _emailPrefillDone = false;
+  /// Из профиля «Задать» — не «забыл пароль», а первичная установка.
+  bool _setMode = false;
+  bool _emailLocked = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_emailPrefillDone) return;
     _emailPrefillDone = true;
-    final q = GoRouterState.of(context).uri.queryParameters['email'];
+    final uri = GoRouterState.of(context).uri;
+    final q = uri.queryParameters['email'];
+    final mode = uri.queryParameters['mode'];
+    _setMode = mode == 'set' || context.read<AuthCubit>().state is AuthAuthenticated;
     if (q != null && q.isNotEmpty) {
       _email.text = q;
+      _emailLocked = _setMode;
     }
   }
 
@@ -176,7 +183,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                           crossAxisAlignment: CrossAxisAlignment.stretch,
                                           children: [
                                             Text(
-                                              'Сброс пароля',
+                                              _setMode ? 'Задать пароль' : 'Сброс пароля',
                                               textAlign: TextAlign.center,
                                               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                                     fontWeight: FontWeight.w600,
@@ -185,7 +192,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                             ),
                                             const SizedBox(height: 6),
                                             Text(
-                                              'Укажите email, пришлём код для сброса пароля',
+                                              _setMode
+                                                  ? 'Пришлём код на email — после подтверждения зададите пароль для входа'
+                                                  : 'Укажите email, пришлём код для сброса пароля',
                                               textAlign: TextAlign.center,
                                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                                     color: hint,
@@ -195,13 +204,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                             const SizedBox(height: 24),
                                             TextFormField(
                                               controller: _email,
+                                              readOnly: _emailLocked,
                                               keyboardType: TextInputType.emailAddress,
                                               textInputAction: TextInputAction.done,
                                               onFieldSubmitted: (_) => _busy ? null : _sendCode(),
                                               autofillHints: const [AutofillHints.email],
-                                              decoration: const InputDecoration(
+                                              decoration: InputDecoration(
                                                 labelText: 'Email',
-                                                prefixIcon: Padding(
+                                                prefixIcon: const Padding(
                                                   padding: EdgeInsets.all(12),
                                                   child: AppIcon(AppIcons.mail, size: 20),
                                                 ),
@@ -241,7 +251,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                           crossAxisAlignment: CrossAxisAlignment.stretch,
                                           children: [
                                             Text(
-                                              'Новый пароль',
+                                              _setMode ? 'Задать пароль' : 'Новый пароль',
                                               textAlign: TextAlign.center,
                                               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                                     fontWeight: FontWeight.w600,
@@ -250,7 +260,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                             ),
                                             const SizedBox(height: 6),
                                             Text(
-                                              'Введите код из письма и задайте новый пароль',
+                                              _setMode
+                                                  ? 'Введите код из письма и придумайте пароль'
+                                                  : 'Введите код из письма и задайте новый пароль',
                                               textAlign: TextAlign.center,
                                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                                     color: hint,
@@ -343,7 +355,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                                         color: Colors.white,
                                                       ),
                                                     )
-                                                  : const Text('Сбросить пароль'),
+                                                  : Text(_setMode ? 'Сохранить пароль' : 'Сбросить пароль'),
                                             ),
                                             TextButton(
                                               onPressed: _busy ? null : _sendCode,
@@ -356,9 +368,21 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             ),
                             const SizedBox(height: 18),
                             TextButton(
-                              onPressed: () => context.go('/login'),
+                              onPressed: () {
+                                if (_setMode || context.read<AuthCubit>().state is AuthAuthenticated) {
+                                  if (context.canPop()) {
+                                    context.pop();
+                                  } else {
+                                    context.go('/profile');
+                                  }
+                                } else {
+                                  context.go('/login');
+                                }
+                              },
                               child: Text(
-                                'Назад ко входу',
+                                _setMode || context.read<AuthCubit>().state is AuthAuthenticated
+                                    ? 'Назад в профиль'
+                                    : 'Назад ко входу',
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.primary,
                                   fontWeight: FontWeight.w600,
