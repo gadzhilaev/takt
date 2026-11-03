@@ -377,12 +377,7 @@ export function MemberTasksSection({
   const activeTask = activeId ? filtered.find((t) => t.id === activeId) : null;
 
   const desktopBoard = (
-    <div
-      className={cn(
-        "kanban-board-track flex gap-3 overflow-x-auto pb-1",
-        fillParent ? "min-h-0 flex-1 items-stretch overflow-y-hidden" : "items-start"
-      )}
-    >
+    <div className="kanban-board-track flex items-start gap-3 overflow-x-auto pb-1">
       {statuses.map((status) => {
         const colTasks = byStatus[status.id] ?? [];
         const emptyDrop =
@@ -390,89 +385,56 @@ export function MemberTasksSection({
           dropIndicator.statusId === status.id &&
           colTasks.length === 0;
 
-        if (!canDrag) {
-          return (
+        const shell = (
+          <div
+            className="kanban-column-shell flex max-h-[min(28rem,calc(100dvh-16rem))] w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+            style={columnShellStyle(status.color || "#607FA4")}
+          >
+            <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
+            <div className="mb-2 flex shrink-0 items-center gap-1.5 px-1">
+              <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold">{status.name}</h3>
+              <span className="text-[11px] tabular-nums text-muted">{colTasks.length}</span>
+            </div>
             <div
-              key={status.id}
               className={cn(
-                "kanban-col-width flex shrink-0 flex-col",
-                fillParent ? "min-h-0 self-stretch" : "self-start"
+                "flex min-h-0 flex-col gap-2 overflow-y-auto",
+                colTasks.length === 0 ? "min-h-[2rem]" : null
               )}
             >
-              <div
-                className={cn(
-                  "kanban-column-shell flex w-full flex-col rounded-[var(--radius-lg)] border p-2",
-                  fillParent && "h-full min-h-0 overflow-hidden"
-                )}
-                style={columnShellStyle(status.color || "#607FA4")}
-              >
-                <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
-                <div className="mb-2 flex shrink-0 items-center gap-1.5 px-1">
-                  <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold">{status.name}</h3>
-                  <span className="text-[11px] tabular-nums text-muted">{colTasks.length}</span>
-                </div>
-                <div
-                  className={cn(
-                    "flex flex-col gap-2",
-                    fillParent && "min-h-0 flex-1 overflow-y-auto",
-                    colTasks.length === 0 ? "min-h-[2rem]" : null
-                  )}
-                >
-                  {colTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      draggable={false}
-                      isDone={!!status.is_done}
-                      onOpen={() => onOpenTask(task.id)}
-                    />
-                  ))}
-                  {!colTasks.length && (
-                    <p className="py-2 text-center text-[12px] text-muted">Пусто</p>
-                  )}
-                </div>
-              </div>
+              {canDrag && (
+                <ColumnStartDroppable
+                  statusId={status.id}
+                  active={dropIndicator?.kind === "start" && dropIndicator.statusId === status.id}
+                />
+              )}
+              {colTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  draggable={canDrag}
+                  isDone={!!status.is_done}
+                  dropEdge={canDrag ? taskDropEdge(task.id) : undefined}
+                  onOpen={() => onOpenTask(task.id)}
+                />
+              ))}
+              {!colTasks.length && (
+                <p className="py-2 text-center text-[12px] text-muted">Пусто</p>
+              )}
+            </div>
+          </div>
+        );
+
+        if (!canDrag) {
+          return (
+            <div key={status.id} className="kanban-col-width flex shrink-0 flex-col self-start">
+              {shell}
             </div>
           );
         }
 
         return (
           <KanbanColumn key={status.id} id={status.id} showEmptyIndicator={emptyDrop}>
-            <div
-              className={cn(
-                "kanban-column-shell flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
-              )}
-              style={columnShellStyle(status.color || "#607FA4")}
-            >
-              <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
-              <div className="mb-2 flex shrink-0 items-center gap-1.5 px-1">
-                <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold">{status.name}</h3>
-                <span className="text-[11px] tabular-nums text-muted">{colTasks.length}</span>
-              </div>
-              <div
-                className={cn(
-                  "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto",
-                  colTasks.length === 0 ? "min-h-[2rem]" : null
-                )}
-              >
-                <ColumnStartDroppable
-                  statusId={status.id}
-                  active={dropIndicator?.kind === "start" && dropIndicator.statusId === status.id}
-                />
-                {colTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    isDone={!!status.is_done}
-                    dropEdge={taskDropEdge(task.id)}
-                    onOpen={() => onOpenTask(task.id)}
-                  />
-                ))}
-                {!colTasks.length && (
-                  <p className="py-2 text-center text-[12px] text-muted">Пусто</p>
-                )}
-              </div>
-            </div>
+            {shell}
           </KanbanColumn>
         );
       })}
