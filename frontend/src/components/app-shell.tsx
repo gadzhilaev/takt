@@ -466,7 +466,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden bg-[var(--kanban-board-bg)] px-3 pb-3 pt-5 md:px-4 md:pb-4 md:pt-6">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">{children}</div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
         </main>
       </div>
 

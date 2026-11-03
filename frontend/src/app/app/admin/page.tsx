@@ -70,7 +70,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain pb-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="page-title">Пользователи</h1>
         <Link href="/app/admin/settings" className="text-sm font-medium text-[var(--accent)] hover:underline">

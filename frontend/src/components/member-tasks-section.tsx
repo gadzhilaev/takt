@@ -377,7 +377,12 @@ export function MemberTasksSection({
   const activeTask = activeId ? filtered.find((t) => t.id === activeId) : null;
 
   const desktopBoard = (
-    <div className="kanban-board-track flex items-start gap-3 overflow-x-auto pb-1">
+    <div
+      className={cn(
+        "kanban-board-track flex gap-3 overflow-x-auto overflow-y-hidden pb-1",
+        fillParent ? "min-h-0 flex-1 items-stretch" : "items-start"
+      )}
+    >
       {statuses.map((status) => {
         const colTasks = byStatus[status.id] ?? [];
         const emptyDrop =
@@ -387,7 +392,10 @@ export function MemberTasksSection({
 
         const shell = (
           <div
-            className="kanban-column-shell flex max-h-[min(28rem,calc(100dvh-16rem))] w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+            className={cn(
+              "kanban-column-shell flex w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2",
+              fillParent ? "h-full min-h-0" : "max-h-[min(28rem,calc(100dvh-16rem))]"
+            )}
             style={columnShellStyle(status.color || "#607FA4")}
           >
             <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
@@ -397,7 +405,8 @@ export function MemberTasksSection({
             </div>
             <div
               className={cn(
-                "flex min-h-0 flex-col gap-2 overflow-y-auto",
+                "flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
+                fillParent && "flex-1",
                 colTasks.length === 0 ? "min-h-[2rem]" : null
               )}
             >
@@ -426,7 +435,13 @@ export function MemberTasksSection({
 
         if (!canDrag) {
           return (
-            <div key={status.id} className="kanban-col-width flex shrink-0 flex-col self-start">
+            <div
+              key={status.id}
+              className={cn(
+                "kanban-col-width flex shrink-0 flex-col",
+                fillParent ? "min-h-0 self-stretch" : "self-start"
+              )}
+            >
               {shell}
             </div>
           );
@@ -465,33 +480,35 @@ export function MemberTasksSection({
         </p>
       ) : isDesktop ? (
         canDrag ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={(e) => setActiveId(String(e.active.id))}
-            onDragOver={onDragOver}
-            onDragEnd={onDragEnd}
-            onDragCancel={() => {
-              setActiveId(null);
-              setDropIndicator(null);
-            }}
-          >
-            {desktopBoard}
-            <DragOverlay dropAnimation={null}>
-              {activeTask ? (
-                <div className="w-[16.5rem]">
-                  <TaskCard
-                    task={activeTask}
-                    overlay
-                    isDone={!!statuses.find((s) => s.id === activeTask.status_id)?.is_done}
-                    onOpen={() => {}}
-                  />
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+          <div className={cn("flex min-h-0 flex-col", fillParent && "min-h-0 flex-1")}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={(e) => setActiveId(String(e.active.id))}
+              onDragOver={onDragOver}
+              onDragEnd={onDragEnd}
+              onDragCancel={() => {
+                setActiveId(null);
+                setDropIndicator(null);
+              }}
+            >
+              {desktopBoard}
+              <DragOverlay dropAnimation={null}>
+                {activeTask ? (
+                  <div className="w-[16.5rem]">
+                    <TaskCard
+                      task={activeTask}
+                      overlay
+                      isDone={!!statuses.find((s) => s.id === activeTask.status_id)?.is_done}
+                      onOpen={() => {}}
+                    />
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </div>
         ) : (
-          desktopBoard
+          <div className={cn(fillParent && "min-h-0 flex-1")}>{desktopBoard}</div>
         )
       ) : (
         <div className="space-y-3">

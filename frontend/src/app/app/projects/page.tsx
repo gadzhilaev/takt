@@ -115,7 +115,7 @@ function ProjectsInner() {
 
   if (browse) {
     return (
-      <div className="mx-auto max-w-lg space-y-4 pt-4">
+      <div className="mx-auto max-w-lg space-y-4 overflow-y-auto overscroll-contain pt-4 pb-6">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">Проекты</h1>
           <Button size="sm" onClick={() => router.push("/app/projects?new=1")}>

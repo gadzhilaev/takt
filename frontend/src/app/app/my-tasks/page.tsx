@@ -56,7 +56,7 @@ export default function MyTasksPage() {
   const tasks = board.data?.items ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 px-1 py-2">
+    <div className="mx-auto max-w-3xl space-y-5 overflow-y-auto overscroll-contain px-1 py-2 pb-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Мои задачи</h1>
         <p className="mt-1 text-sm text-muted">Назначенные вам задачи в текущем проекте.</p>

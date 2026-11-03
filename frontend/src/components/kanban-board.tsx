@@ -699,10 +699,14 @@ export function KanbanBoard({
     );
   }
 
-  function renderColumnShell(status: Status, body: ReactNode) {
+  function renderColumnShell(status: Status, body: ReactNode, opts?: { fillHeight?: boolean }) {
+    const fill = opts?.fillHeight !== false;
     return (
       <div
-        className="kanban-column-shell flex max-h-[min(36rem,calc(100dvh-13rem))] w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2"
+        className={cn(
+          "kanban-column-shell flex w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border p-2",
+          fill ? "h-full min-h-0" : "max-h-[min(36rem,calc(100dvh-13rem))]"
+        )}
         style={columnShellStyle(status.color || "#607FA4")}
       >
         <div className="kanban-column-accent mb-2 shrink-0" aria-hidden />
@@ -856,7 +860,8 @@ export function KanbanBoard({
               {!mobileTasks.length && (
                 <p className="py-3 text-center text-sm text-muted">Пока пусто</p>
               )}
-            </div>
+            </div>,
+            { fillHeight: false }
           )}
 
           {addingColumn ? (
@@ -935,7 +940,7 @@ export function KanbanBoard({
           setDropIndicator(null);
         }}
       >
-        <div className="kanban-board-track flex min-h-0 items-start gap-3 overflow-x-auto overflow-y-auto pb-1">
+        <div className="kanban-board-track flex h-full min-h-0 min-w-0 flex-1 items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-1">
           {statuses.map((status) => {
             const colTasks = byStatus[status.id] ?? [];
             const emptyDrop =
@@ -948,7 +953,7 @@ export function KanbanBoard({
                   status,
                   <div
                     className={cn(
-                      "flex min-h-0 flex-col gap-2 overflow-y-auto",
+                      "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain",
                       colTasks.length === 0 ? "min-h-[2.5rem]" : null
                     )}
                   >

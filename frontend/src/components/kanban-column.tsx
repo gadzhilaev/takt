@@ -37,7 +37,7 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="kanban-col-width relative flex shrink-0 flex-col self-start"
+      className="kanban-col-width relative flex h-full min-h-0 shrink-0 flex-col self-stretch"
     >
       {showEmptyIndicator && (
         <div
@@ -45,7 +45,7 @@ export function KanbanColumn({
           aria-hidden
         />
       )}
-      <div className={cn("flex min-h-0 min-w-0 w-full flex-col")}>{children}</div>
+      <div className={cn("flex h-full min-h-0 min-w-0 flex-col")}>{children}</div>
     </div>
   );
 }

@@ -35,7 +35,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-8">
+    <div className="mx-auto max-w-lg space-y-8 overflow-y-auto overscroll-contain pb-6">
       <h1 className="text-2xl font-semibold">Профиль</h1>
       <section className="space-y-3 rounded-xl border p-4 dark:border-slate-800">
         <label className="block text-sm font-medium">Имя</label>
