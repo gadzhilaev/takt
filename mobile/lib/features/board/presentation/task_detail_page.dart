@@ -151,20 +151,33 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     final task = _task;
     final authUserId = cubit.currentUserId;
 
-    String? statusName = task?.statusName;
-    if (task != null && (statusName == null || statusName.isEmpty)) {
-      statusName = board.columns.where((c) => c.id == task.statusId).map((c) => c.name).firstOrNull;
+    StatusColumn? statusCol;
+    if (task != null) {
+      for (final c in board.columns) {
+        if (c.id == task.statusId) {
+          statusCol = c;
+          break;
+        }
+      }
     }
+    final rawStatusName = task?.statusName;
+    final statusName =
+        (rawStatusName != null && rawStatusName.isNotEmpty) ? rawStatusName : statusCol?.name;
 
     final canDelete = task != null &&
         authUserId != null &&
         task.authorId != null &&
         task.authorId == authUserId;
 
-    final urgencyLabel = task == null
-        ? ''
-        : KanbanColors.urgency(task.priority, dark: dark).label;
+    final urgency = task == null ? null : KanbanColors.urgency(task.priority, dark: dark);
     final createdLabel = task == null ? null : formatCreatedAt(task.createdAt);
+    final colBg = statusCol != null
+        ? KanbanColors.columnBackground(statusCol.color, dark: dark)
+        : null;
+    final colBorder = statusCol != null
+        ? KanbanColors.columnBorder(statusCol.color, dark: dark)
+        : (dark ? TaktColors.borderDark : TaktColors.border);
+    final colAccent = statusCol != null ? KanbanColors.columnAccent(statusCol.color) : null;
 
     return Scaffold(
       appBar: TaktAppBar(
@@ -226,28 +239,118 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     : ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                         children: [
-                          Text.rich(
-                            TextSpan(
-                              style: TextStyle(fontSize: 14, height: 1.4, color: fg),
-                              children: [
-                                TextSpan(text: 'Срочность: ', style: TextStyle(color: muted)),
-                                TextSpan(
-                                  text: urgencyLabel,
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: urgency?.bg ??
+                                  colBg ??
+                                  (dark ? TaktColors.surface2Dark : TaktColors.surface2),
+                              borderRadius: BorderRadius.circular(TaktRadii.lg),
+                              border: Border.all(color: colBorder),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(TaktRadii.lg),
+                              child: IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    ColoredBox(
+                                      color: urgency?.fg ?? colAccent ?? TaktColors.accent,
+                                      child: const SizedBox(width: 3),
+                                    ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (colAccent != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(bottom: 8),
+                                                child: ColoredBox(
+                                                  color: colAccent,
+                                                  child: const SizedBox(height: 3, width: double.infinity),
+                                                ),
+                                              ),
+                                            Text.rich(
+                                              TextSpan(
+                                                style: TextStyle(fontSize: 14, height: 1.4, color: fg),
+                                                children: [
+                                                  TextSpan(
+                                                    text: 'Срочность: ',
+                                                    style: TextStyle(color: muted),
+                                                  ),
+                                                  TextSpan(
+                                                    text: urgency?.label ?? '',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w600,
+                                                      color: urgency?.fg ?? fg,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text: '  ·  ',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w800,
+                                                      color: fg,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text: 'Статус: ',
+                                                    style: TextStyle(color: muted),
+                                                  ),
+                                                  TextSpan(
+                                                    text: statusName ?? '—',
+                                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                if (task.authorName != null &&
+                                                    task.authorName!.isNotEmpty) ...[
+                                                  TaktUserAvatar(
+                                                    name: task.authorName!,
+                                                    avatarUrl: task.authorAvatarUrl,
+                                                    size: 24,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Flexible(
+                                                    child: Text(
+                                                      task.authorName!,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: fg,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ] else
+                                                  Text(
+                                                    'Без автора',
+                                                    style: TextStyle(fontSize: 13, color: muted),
+                                                  ),
+                                                if (createdLabel != null) ...[
+                                                  Padding(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                                                    child: Text('·', style: TextStyle(color: muted)),
+                                                  ),
+                                                  Text(
+                                                    createdLabel,
+                                                    style: TextStyle(fontSize: 13, color: muted),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                TextSpan(
-                                  text: '  ·  ',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: fg,
-                                  ),
-                                ),
-                                TextSpan(text: 'Статус: ', style: TextStyle(color: muted)),
-                                TextSpan(
-                                  text: statusName ?? '—',
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -310,40 +413,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                   ),
                               ],
                             ),
-                          if (task.authorName != null && task.authorName!.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            TaktFieldLabel('Автор'),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                TaktUserAvatar(
-                                  name: task.authorName!,
-                                  avatarUrl: task.authorAvatarUrl,
-                                  size: 28,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    task.authorName!,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: fg,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (createdLabel != null) ...[
-                            const SizedBox(height: 16),
-                            TaktFieldLabel('Создана'),
-                            const SizedBox(height: 6),
-                            Text(
-                              createdLabel,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: fg),
-                            ),
-                          ],
                         ],
                       ),
       ),

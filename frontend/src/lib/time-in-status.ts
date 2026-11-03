@@ -1,4 +1,4 @@
-/** Format a duration in ms as compact Russian label (мин. / ч. / д. / нед.). */
+/** Format a duration in ms as compact Russian label with remainder units. */
 export function formatDurationMs(ms: number): string | null {
   if (!Number.isFinite(ms)) return null;
   const safe = Math.max(0, ms);
@@ -14,10 +14,14 @@ export function formatDurationMs(ms: number): string | null {
   }
   if (safe < day) {
     const h = Math.floor(safe / hour);
+    const remM = Math.floor((safe % hour) / minute);
+    if (remM > 0) return `${h} ч., ${remM} мин.`;
     return `${h} ч.`;
   }
   if (safe < week) {
     const d = Math.floor(safe / day);
+    const remH = Math.floor((safe % day) / hour);
+    if (remH > 0) return `${d} д., ${remH} ч.`;
     return `${d} д.`;
   }
   const w = Math.floor(safe / week);

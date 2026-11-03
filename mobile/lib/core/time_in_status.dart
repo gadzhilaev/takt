@@ -1,4 +1,4 @@
-/// Format a duration as compact Russian label (мин. / ч. / д. / нед.).
+/// Format a duration as compact Russian label with remainder units.
 String? formatDuration(Duration duration) {
   var ms = duration.inMilliseconds;
   if (ms < 0) ms = 0;
@@ -15,10 +15,14 @@ String? formatDuration(Duration duration) {
   }
   if (ms < day) {
     final h = ms ~/ hour;
+    final remM = (ms % hour) ~/ minute;
+    if (remM > 0) return '$h ч., $remM мин.';
     return '$h ч.';
   }
   if (ms < week) {
     final d = ms ~/ day;
+    final remH = (ms % day) ~/ hour;
+    if (remH > 0) return '$d д., $remH ч.';
     return '$d д.';
   }
   final w = ms ~/ week;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTaskTimeLabel, formatTimeInStatus } from "./time-in-status";
+import { formatDurationMs, formatTaskTimeLabel, formatTimeInStatus } from "./time-in-status";
 
 describe("formatTimeInStatus", () => {
   const base = Date.parse("2026-11-03T12:00:00.000Z");
@@ -13,6 +13,12 @@ describe("formatTimeInStatus", () => {
     expect(
       formatTimeInStatus(new Date(base - (16 * 7 + 4) * 86400_000).toISOString(), base)
     ).toBe("16 нед., 4 д.");
+  });
+
+  it("formats compound remainders", () => {
+    expect(formatDurationMs(8 * 3600_000 + 40 * 60_000)).toBe("8 ч., 40 мин.");
+    expect(formatDurationMs(1 * 86400_000 + 20 * 3600_000)).toBe("1 д., 20 ч.");
+    expect(formatDurationMs(6 * 7 * 86400_000 + 1 * 86400_000)).toBe("6 нед., 1 д.");
   });
 
   it("returns null for bad input", () => {
@@ -48,6 +54,6 @@ describe("formatTaskTimeLabel", () => {
         },
         { isDone: true, now }
       )
-    ).toBe("2 д.");
+    ).toBe("2 д., 2 ч.");
   });
 });

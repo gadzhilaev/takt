@@ -9,8 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { resolveColumnColors } from "@/lib/column-colors";
 import { formatCreatedAt } from "@/lib/format-created-at";
-import { URGENCY_OPTIONS, urgencyFromPriority, urgencyLabel } from "@/lib/urgency";
+import {
+  URGENCY_OPTIONS,
+  urgencyCssVars,
+  urgencyFromPriority,
+  urgencyLabel,
+  urgencyOption,
+} from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
 
@@ -93,7 +100,11 @@ export function TaskDrawer({
   const task = data?.task;
   const assigneeIds = task?.assignees.map((a) => a.id) ?? [];
   const isAuthor = !!task && !!meData?.user && task.author_id === meData.user.id;
-  const statusName = task ? statuses.find((s) => s.id === task.status_id)?.name ?? "-" : "-";
+  const status = task ? statuses.find((s) => s.id === task.status_id) : undefined;
+  const statusName = status?.name ?? "-";
+  const createdLabel = task ? formatCreatedAt(task.created_at) : null;
+  const urgency = task ? urgencyOption(task.priority) : null;
+  const colColors = status ? resolveColumnColors(status.color) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Задача">
@@ -217,13 +228,59 @@ export function TaskDrawer({
               </>
             ) : (
               <>
-                <p className="text-sm leading-snug text-foreground">
-                  <span className="text-muted">Срочность:</span> {urgencyLabel(task.priority)}
-                  <span className="mx-1.5 font-bold text-foreground" aria-hidden>
-                    ·
-                  </span>
-                  <span className="text-muted">Статус:</span> {statusName}
-                </p>
+                <div
+                  className="overflow-hidden rounded-[var(--radius)] border bg-[var(--urgency-bg)] dark:bg-[var(--urgency-bg-dark)]"
+                  style={{
+                    ...urgencyCssVars(task.priority),
+                    borderColor: colColors?.border ?? "var(--border)",
+                    borderLeftWidth: 3,
+                    borderLeftColor: urgency?.color ?? colColors?.value,
+                  }}
+                >
+                  <div
+                    className="h-1 w-full"
+                    style={{ backgroundColor: colColors?.value ?? urgency?.color }}
+                    aria-hidden
+                  />
+                  <div className="space-y-2 px-3 py-2.5">
+                    <p className="text-sm leading-snug text-foreground">
+                      <span className="text-muted">Срочность:</span>{" "}
+                      <span
+                        className="font-semibold text-[var(--urgency-fg)] dark:text-[var(--urgency-fg-dark)]"
+                      >
+                        {urgencyLabel(task.priority)}
+                      </span>
+                      <span className="mx-1.5 font-bold text-foreground" aria-hidden>
+                        ·
+                      </span>
+                      <span className="text-muted">Статус:</span> {statusName}
+                    </p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      {task.author?.name ? (
+                        <>
+                          <UserAvatar
+                            name={task.author.name}
+                            avatarUrl={task.author.avatar_url}
+                            size={6}
+                          />
+                          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                            {task.author.name}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted">Без автора</span>
+                      )}
+                      {createdLabel && (
+                        <>
+                          <span className="text-muted" aria-hidden>
+                            ·
+                          </span>
+                          <span className="shrink-0 text-sm text-muted">{createdLabel}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div>
                   <p className="label-text">Название</p>
                   <p className="text-[15px] font-semibold leading-snug text-foreground">{task.title}</p>
@@ -251,27 +308,6 @@ export function TaskDrawer({
                     <p className="text-sm text-muted">Не назначены</p>
                   )}
                 </div>
-                <div>
-                  <p className="label-text">Автор</p>
-                  {task.author?.name ? (
-                    <div className="mt-1 flex items-center gap-2 text-sm">
-                      <UserAvatar
-                        name={task.author.name}
-                        avatarUrl={task.author.avatar_url}
-                        size={6}
-                      />
-                      <span>{task.author.name}</span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted">—</p>
-                  )}
-                </div>
-                {formatCreatedAt(task.created_at) && (
-                  <div>
-                    <p className="label-text">Создана</p>
-                    <p className="text-sm text-foreground">{formatCreatedAt(task.created_at)}</p>
-                  </div>
-                )}
               </>
             )
           ) : (

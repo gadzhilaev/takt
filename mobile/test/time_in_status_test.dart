@@ -16,6 +16,12 @@ void main() {
     );
   });
 
+  test('compound remainders', () {
+    expect(formatDuration(const Duration(hours: 8, minutes: 40)), '8 ч., 40 мин.');
+    expect(formatDuration(const Duration(days: 1, hours: 20)), '1 д., 20 ч.');
+    expect(formatDuration(const Duration(days: 6 * 7 + 1)), '6 нед., 1 д.');
+  });
+
   test('null and bad input', () {
     expect(formatTimeInStatus(null), isNull);
     expect(formatTimeInStatus('nope'), isNull);
@@ -32,7 +38,7 @@ void main() {
         statusEnteredAt: closed.toIso8601String(),
         now: closed,
       ),
-      '2 д.',
+      '2 д., 2 ч.',
     );
   });
 
