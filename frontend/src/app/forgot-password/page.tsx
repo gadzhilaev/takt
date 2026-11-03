@@ -104,7 +104,7 @@ export default function ForgotPasswordPage() {
             </h1>
             <p className="mt-1.5 text-[13px] leading-snug text-muted">
               {step === "email"
-                ? "Укажите email — пришлём код для сброса пароля"
+                ? "Укажите email, пришлём код для сброса пароля"
                 : `Введите код из письма на ${email} и задайте новый пароль`}
             </p>
           </div>

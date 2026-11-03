@@ -26,6 +26,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool _awaitingCode = false;
   bool _busy = false;
   bool _obscure = true;
+  bool _emailPrefillDone = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_emailPrefillDone) return;
+    _emailPrefillDone = true;
+    final q = GoRouterState.of(context).uri.queryParameters['email'];
+    if (q != null && q.isNotEmpty) {
+      _email.text = q;
+    }
+  }
 
   @override
   void dispose() {
@@ -80,11 +92,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       );
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
-      final go = Uri(
-        path: '/login',
-        queryParameters: message == null || message.isEmpty ? null : {'message': message},
-      ).toString();
-      context.go(go);
+      final loggedIn = context.read<AuthCubit>().state is AuthAuthenticated;
+      if (loggedIn) {
+        context.go('/profile');
+      } else {
+        final go = Uri(
+          path: '/login',
+          queryParameters: message == null || message.isEmpty ? null : {'message': message},
+        ).toString();
+        context.go(go);
+      }
       if (message != null && message.isNotEmpty) {
         messenger.showSnackBar(SnackBar(content: Text(message)));
       }
@@ -168,7 +185,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                             ),
                                             const SizedBox(height: 6),
                                             Text(
-                                              'Укажите email — пришлём код для сброса пароля',
+                                              'Укажите email, пришлём код для сброса пароля',
                                               textAlign: TextAlign.center,
                                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                                     color: hint,

@@ -71,6 +71,7 @@ class _TaktAppState extends State<TaktApp> {
       auth: _authRepo,
       api: widget.api,
       widgetSync: _widgetSync,
+      oauth: _oauth,
       fcm: widget.fcm,
     )..bootstrap();
     _boardCubit = BoardCubit(

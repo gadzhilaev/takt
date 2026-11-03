@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
@@ -110,7 +111,7 @@ export function SignInMethodsSection({
       <div>
         <p className="text-[13px] font-semibold tracking-tight">Вход и безопасность</p>
         <p className="mt-0.5 text-[12px] leading-snug text-muted">
-          Можно пользоваться паролем и несколькими сервисами сразу — привяжите все нужные.
+          Пароль и сервисы можно использовать вместе.
         </p>
       </div>
 
@@ -123,7 +124,7 @@ export function SignInMethodsSection({
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium leading-tight">Email и пароль</p>
             <p className="text-[11px] text-muted">
-              {isLoading ? "…" : hasPassword ? "Задан — можно входить по почте" : "Не задан"}
+              {isLoading ? "…" : hasPassword ? "Задан" : "Не задан"}
             </p>
           </div>
           {hasPassword ? (
@@ -142,7 +143,7 @@ export function SignInMethodsSection({
             </Button>
           ) : (
             <Button type="button" size="sm" variant="secondary" className="shrink-0 rounded-full px-3" asChild>
-              <a href="/forgot-password">Задать</a>
+              <Link href="/forgot-password">Задать</Link>
             </Button>
           )}
         </div>
@@ -281,11 +282,6 @@ export function SignInMethodsSection({
         })}
       </div>
 
-      {!hasPassword && (data?.items.length ?? 0) > 0 && (
-        <p className="text-[11px] leading-snug text-muted">
-          Чтобы отвязать последний сервис, сначала задайте пароль — иначе можно потерять доступ.
-        </p>
-      )}
     </div>
   );
 }

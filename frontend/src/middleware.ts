@@ -56,10 +56,8 @@ export function middleware(request: NextRequest) {
 
   // Only bounce away from login when access is still valid.
   // Refresh-only (or stale refresh) must not trap users in /app ↔ /login loops.
-  if (
-    (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") &&
-    accessTokenAlive(request)
-  ) {
+  // /forgot-password оставляем доступным залогиненным (задать пароль для OAuth-аккаунта).
+  if ((pathname === "/login" || pathname === "/register") && accessTokenAlive(request)) {
     const next = request.nextUrl.searchParams.get("next");
     const url = request.nextUrl.clone();
     if (

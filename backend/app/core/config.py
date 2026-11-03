@@ -20,9 +20,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://track:track_dev_pass@localhost:5433/track"
     SECRET_KEY: str = "change-me-in-production-min-32-chars-long"
     JWT_ALGORITHM: str = "HS256"
-    # Short access + long refresh; web/mobile renew via /auth/refresh without logout.
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    # Access short-ish, refresh long-lived; /auth/refresh renews access without logout.
+    # Defaults keep daytime use stable; refresh is reusable (no rotate-on-every-call races).
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24h
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 90
 
     COOKIE_SECURE: bool = False
     COOKIE_DOMAIN: str | None = None

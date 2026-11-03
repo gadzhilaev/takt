@@ -63,6 +63,8 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
         if (onSplash) return null;
         if (onPushIntro) return null;
         if (!fcm.promptSeen) return '/enable-notifications';
+        // Задание/сброс пароля доступен и из профиля (OAuth-only аккаунты).
+        if (loc == '/forgot-password') return null;
         if (loggingIn) {
           // Prefer pending widget/push deep link over project hub.
           final pending = PendingDeepLink.value;

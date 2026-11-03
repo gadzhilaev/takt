@@ -2,7 +2,7 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import (
@@ -42,7 +42,8 @@ def check_login_lockout(email: str, ip: str | None, max_attempts: int, lock_minu
 def record_failed_login(email: str, ip: str | None, max_attempts: int, lock_minutes: int) -> None:
     key = _client_key(email, ip)
     now = datetime.now(UTC)
-    attempts = [t for t in _login_attempts.get(key, []) if now - t < timedelta(minutes=lock_minutes)]
+    window = timedelta(minutes=lock_minutes)
+    attempts = [t for t in _login_attempts.get(key, []) if now - t < window]
     attempts.append(now)
     _login_attempts[key] = attempts
     if len(attempts) >= max_attempts:
@@ -115,7 +116,13 @@ async def revoke_all_user_tokens(db: AsyncSession, user_id: uuid.UUID) -> None:
 
 
 async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, str, User]:
-    from app.core.security import decode_token
+    """Renew access without invalidating the presented refresh token.
+
+    Rotate-on-every-refresh caused parallel tabs/mobile+web to revoke each other
+    and drop the session. We reuse the same refresh; near expiry we mint a new
+    one but keep the old jti valid until its natural exp (no revoke race).
+    """
+    from app.core.security import create_access_token, decode_token
 
     payload = decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":
@@ -126,16 +133,28 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, st
         raise AuthError("invalid_token", "Недействительный refresh-токен")
     result = await db.execute(select(RefreshToken).where(RefreshToken.jti == jti))
     stored = result.scalar_one_or_none()
-    if not stored or stored.revoked_at or stored.expires_at < datetime.now(UTC):
+    now = datetime.now(UTC)
+    if not stored or stored.revoked_at or stored.expires_at < now:
         raise AuthError("invalid_token", "Сессия истекла")
     user_id = uuid.UUID(sub)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise AuthError("inactive", "Учётная запись отключена")
-    await revoke_refresh_token(db, jti)
-    access, new_refresh, _ = await create_token_pair(db, user)
-    return access, new_refresh, user
+
+    exp_ts = payload.get("exp")
+    if isinstance(exp_ts, (int, float)):
+        jwt_exp = datetime.fromtimestamp(int(exp_ts), UTC)
+    else:
+        jwt_exp = stored.expires_at
+    # Sliding: if less than 30 days remain, issue a new refresh but do not revoke old.
+    if jwt_exp - now <= timedelta(days=30):
+        access, new_refresh, _ = await create_token_pair(db, user)
+        return access, new_refresh, user
+
+    access = create_access_token(str(user.id), {"role": user.role.value})
+    await db.flush()
+    return access, refresh_token, user
 
 
 async def change_password(

@@ -28,6 +28,9 @@ class OAuthRepository {
   Map<String, dynamic>? _providersCache;
   Future<Map<String, dynamic>>? _providersInflight;
 
+  ({List<Map<String, dynamic>> items, bool hasPassword})? _identitiesCache;
+  Future<({List<Map<String, dynamic>> items, bool hasPassword})>? _identitiesInflight;
+
   /// Уже загруженный ответ `/providers` (или null, если ещё не грели).
   Map<String, dynamic>? get cachedProviders => _providersCache;
 
@@ -37,12 +40,23 @@ class OAuthRepository {
     return raw is Map<String, dynamic> ? raw : null;
   }
 
+  ({List<Map<String, dynamic>> items, bool hasPassword})? get cachedIdentities => _identitiesCache;
+
   /// Прогрев на splash: один inflight на всех потребителей.
   Future<void> prefetchProviders() async {
     try {
       await providers();
     } catch (e) {
       debugPrint('── OAuth providers prefetch ✕ $e');
+    }
+  }
+
+  /// Прогрев привязок на splash (после auth), чтобы профиль открывался без «Загрузка…».
+  Future<void> prefetchIdentities() async {
+    try {
+      await identitiesDetailed();
+    } catch (e) {
+      debugPrint('── OAuth identities prefetch ✕ $e');
     }
   }
 
@@ -88,11 +102,13 @@ class OAuthRepository {
       );
       debugPrint('── OAuth Apple ← credential (hasToken=${credential.identityToken != null})');
     } on SignInWithAppleAuthorizationException catch (e) {
-      if (e.code == AuthorizationErrorCode.canceled) {
+      // canceled / unknown(1000) / failed: не показываем сырой AuthorizationError в UI.
+      if (e.code == AuthorizationErrorCode.canceled ||
+          e.code == AuthorizationErrorCode.unknown ||
+          e.code == AuthorizationErrorCode.failed) {
         throw const OAuthException('', cancelled: true);
       }
-      // Системный текст Apple / иначе через API-слой при complete.
-      throw OAuthException(_api.messageFromError(e));
+      throw const OAuthException('', cancelled: true);
     } on MissingPluginException catch (e) {
       throw OAuthException(_api.messageFromError(e));
     }
@@ -241,12 +257,22 @@ class OAuthRepository {
     await _tokens.saveTokens(access: access, refresh: refresh);
   }
 
-  Future<({List<Map<String, dynamic>> items, bool hasPassword})> identitiesDetailed() async {
-    final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/oauth/identities');
-    final items = res.data?['items'];
-    final list = items is List ? items.cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
-    final hasPassword = res.data?['has_password'] as bool? ?? false;
-    return (items: list, hasPassword: hasPassword);
+  Future<({List<Map<String, dynamic>> items, bool hasPassword})> identitiesDetailed({
+    bool force = false,
+  }) async {
+    if (!force && _identitiesCache != null) return _identitiesCache!;
+    return _identitiesInflight ??= () async {
+      try {
+        final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/oauth/identities');
+        final items = res.data?['items'];
+        final list = items is List ? items.cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
+        final hasPassword = res.data?['has_password'] as bool? ?? false;
+        _identitiesCache = (items: list, hasPassword: hasPassword);
+        return _identitiesCache!;
+      } finally {
+        _identitiesInflight = null;
+      }
+    }();
   }
 
   Future<List<Map<String, dynamic>>> identities() async {
@@ -256,11 +282,28 @@ class OAuthRepository {
 
   Future<void> unlink(String identityId) async {
     await _api.dio.delete('/api/v1/auth/oauth/identities/$identityId');
+    _identitiesCache = null;
+  }
+
+  void invalidateIdentitiesCache() {
+    _identitiesCache = null;
   }
 }
 
 bool isOAuthCancel(Object e) {
   if (e is OAuthException && e.cancelled) return true;
+  if (e is OAuthException && e.message.trim().isEmpty) return true;
+  if (e is SignInWithAppleAuthorizationException) {
+    return e.code == AuthorizationErrorCode.canceled ||
+        e.code == AuthorizationErrorCode.unknown ||
+        e.code == AuthorizationErrorCode.failed;
+  }
+  final text = e.toString().toLowerCase();
+  if (text.contains('authorizationerror') ||
+      text.contains('signinwithapple') ||
+      text.contains('com.apple.authenticationservices')) {
+    return true;
+  }
   if (e is DioException) {
     final data = e.response?.data;
     String? code;
@@ -275,6 +318,15 @@ bool isOAuthCancel(Object e) {
     }
     return code == 'access_denied' || e.type == DioExceptionType.cancel;
   }
-  if (kDebugMode && e.toString().toLowerCase().contains('cancel')) return true;
+  if (text.contains('cancel')) return true;
   return false;
+}
+
+bool isTechnicalOAuthMessage(String msg) {
+  final t = msg.toLowerCase();
+  return t.contains('authorizationerror') ||
+      t.contains('signinwithapple') ||
+      t.contains('exception(') ||
+      t.contains('com.apple') ||
+      t.contains('flutter_web_auth');
 }

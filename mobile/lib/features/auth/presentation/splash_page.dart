@@ -71,8 +71,11 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     final state = auth.state;
     if (state is AuthAuthenticated) {
       board.setCurrentUserId(state.user.id);
-      // Кэш проектов + файлы аватаров на диске до ухода со splash.
-      await board.hydrateFromCache();
+      // Кэш проектов + привязки входа + аватары до ухода со splash.
+      await Future.wait<void>([
+        board.hydrateFromCache(),
+        oauth.prefetchIdentities(),
+      ]);
       if (!mounted) return;
       try {
         await board.bootstrap().timeout(const Duration(seconds: 10));

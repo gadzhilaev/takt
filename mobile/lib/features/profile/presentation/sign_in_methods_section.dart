@@ -32,7 +32,7 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
   List<Map<String, dynamic>> _identities = const [];
   Map<String, dynamic>? _providers;
   bool _hasPassword = false;
-  bool _loading = true;
+  bool _ready = false;
   String? _busy;
   String? _error;
 
@@ -40,32 +40,40 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
   ApiClient get _api => context.read<ApiClient>();
 
   @override
-  void initState() {
-    super.initState();
-    _reload();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_ready) return;
+    _ready = true;
+    final cachedProviders = _oauth.cachedProviderMap;
+    final cachedIdentities = _oauth.cachedIdentities;
+    if (cachedProviders != null) {
+      _providers = cachedProviders;
+    }
+    if (cachedIdentities != null) {
+      _identities = cachedIdentities.items;
+      _hasPassword = cachedIdentities.hasPassword;
+    }
+    // Фон: обновить без спиннера, если кэш уже есть.
+    _reload(silent: cachedProviders != null && cachedIdentities != null);
   }
 
-  Future<void> _reload() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _reload({bool silent = false, bool force = false}) async {
+    if (!silent && mounted) {
+      setState(() => _error = null);
+    }
     try {
-      final providers = await _oauth.providers();
-      final detailed = await _oauth.identitiesDetailed();
+      final providers = await _oauth.providers(force: force);
+      final detailed = await _oauth.identitiesDetailed(force: force);
       if (!mounted) return;
       setState(() {
         _providers = providers['providers'] as Map<String, dynamic>?;
         _identities = detailed.items;
         _hasPassword = detailed.hasPassword;
-        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = _api.messageFromError(e);
-      });
+      if (silent) return;
+      setState(() => _error = _api.messageFromError(e));
     }
   }
 
@@ -97,18 +105,21 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
     try {
       await _oauth.signIn(id, link: true);
       if (!mounted) return;
+      _oauth.invalidateIdentitiesCache();
       widget.onMessage?.call('${OAuthProviderId.accountLabel(id)} привязан');
-      await _reload();
+      await _reload(force: true, silent: true);
     } catch (e) {
       if (!mounted) return;
-      if (isOAuthCancel(e) || (e is OAuthException && e.cancelled)) {
+      if (isOAuthCancel(e)) {
         setState(() => _busy = null);
         return;
       }
-      final msg = e is OAuthException && e.message.trim().isNotEmpty
-          ? e.message
-          : _api.messageFromError(e);
-      setState(() => _error = msg);
+      final raw = e is OAuthException ? e.message.trim() : _api.messageFromError(e);
+      if (raw.isEmpty || isTechnicalOAuthMessage(raw)) {
+        setState(() => _busy = null);
+        return;
+      }
+      setState(() => _error = raw);
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -141,7 +152,7 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
       await _oauth.unlink(id);
       if (!mounted) return;
       widget.onMessage?.call('$label отвязан');
-      await _reload();
+      await _reload(force: true, silent: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = _api.messageFromError(e));
@@ -198,7 +209,7 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
     try {
       await authRepo.confirmChangePassword(code: codeCtrl.text);
       if (!mounted) return;
-      widget.onMessage?.call('Пароль обновлён — войдите снова');
+      widget.onMessage?.call('Пароль обновлён. Войдите снова');
       await context.read<AuthCubit>().logout();
       if (!mounted) return;
       context.go('/login');
@@ -206,6 +217,13 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
       if (!mounted) return;
       setState(() => _error = _api.messageFromError(e));
     }
+  }
+
+  void _setPassword() {
+    final auth = context.read<AuthCubit>().state;
+    final email = auth is AuthAuthenticated ? auth.user.email : '';
+    final qs = email.isEmpty ? '' : '?email=${Uri.encodeQueryComponent(email)}';
+    context.push('/forgot-password$qs');
   }
 
   @override
@@ -228,7 +246,7 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Пароль и сервисы можно использовать вместе — привяжите несколько способов входа.',
+          'Пароль и сервисы можно использовать вместе.',
           style: TextStyle(fontSize: 12.5, height: 1.35, color: muted),
         ),
         const SizedBox(height: 10),
@@ -243,17 +261,9 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
               _MethodRow(
                 leading: Icon(Icons.lock_outline_rounded, size: 20, color: muted),
                 title: 'Email и пароль',
-                subtitle: _loading
-                    ? '…'
-                    : _hasPassword
-                        ? 'Задан — можно входить по почте'
-                        : 'Не задан',
-                actionLabel: _loading ? null : (_hasPassword ? 'Сменить' : 'Задать'),
-                onAction: _loading
-                    ? null
-                    : _hasPassword
-                        ? _changePassword
-                        : () => context.push('/forgot-password'),
+                subtitle: _hasPassword ? 'Задан' : 'Не задан',
+                actionLabel: _hasPassword ? 'Сменить' : 'Задать',
+                onAction: _hasPassword ? _changePassword : _setPassword,
                 busy: false,
               ),
               for (final id in _enabledProviders) ...[
@@ -300,21 +310,9 @@ class _SignInMethodsSectionState extends State<SignInMethodsSection> {
                         },
                 ),
               ],
-              if (_loading && _enabledProviders.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Text('Загрузка…', style: TextStyle(fontSize: 13, color: muted)),
-                ),
             ],
           ),
         ),
-        if (!_hasPassword && _identities.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Чтобы отвязать последний сервис, сначала задайте пароль (через «Забыли пароль» на входе).',
-            style: TextStyle(fontSize: 11.5, height: 1.35, color: muted),
-          ),
-        ],
         if (_error != null) ...[
           const SizedBox(height: 8),
           Text(_error!, style: TextStyle(fontSize: 13, color: TaktColors.danger)),

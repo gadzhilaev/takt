@@ -81,6 +81,10 @@ class _OAuthButtonsState extends State<OAuthButtons> {
       final msg = e is OAuthException && e.message.trim().isNotEmpty
           ? e.message
           : api.messageFromError(e);
+      if (msg.trim().isEmpty || isTechnicalOAuthMessage(msg)) {
+        setState(() => _busy = null);
+        return;
+      }
       setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _busy = null);

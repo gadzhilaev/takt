@@ -212,22 +212,28 @@ class _ProfilePageState extends State<ProfilePage> {
                   ],
                 ),
               ),
-              TaktSection(
-                title: 'Проекты',
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: _SettingsGroup(
-                  surface: surface,
-                  border: border,
-                  children: [
-                    TaktListTile(
-                      leading: AppIcon(AppIcons.invite, size: 20, color: muted),
-                      title: 'Пригласить участника',
-                      subtitle: 'В текущий проект',
-                      trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
-                      onTap: () => _inviteDialog(context),
+              Builder(
+                builder: (context) {
+                  final project = context.watch<BoardCubit>().state.project;
+                  if (project == null) return const SizedBox.shrink();
+                  return TaktSection(
+                    title: 'Проекты',
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    child: _SettingsGroup(
+                      surface: surface,
+                      border: border,
+                      children: [
+                        TaktListTile(
+                          leading: AppIcon(AppIcons.invite, size: 20, color: muted),
+                          title: 'Пригласить участника',
+                          subtitle: 'В проект «${project.name}»',
+                          trailing: AppIcon(AppIcons.chevronRight, size: 20, color: muted),
+                          onTap: () => _inviteDialog(context, projectId: project.id),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
               TaktSection(
                 title: 'О приложении',
@@ -346,35 +352,11 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _openPrivacy(BuildContext context) async {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
-    final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
-    await showTaktInfoSheet(
-      context: context,
-      title: 'Конфиденциальность',
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Takt обрабатывает данные аккаунта и задач только для работы сервиса.',
-            style: TextStyle(fontSize: 14, height: 1.45, color: fg),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Мы храним имя, email, аватар, состав проектов и задач, а также '
-            'токены push-уведомлений на устройстве. Данные не продаём и не '
-            'передаём третьим лицам, кроме инфраструктуры, необходимой для '
-            'работы приложения (хостинг, доставка уведомлений).',
-            style: TextStyle(fontSize: 13.5, height: 1.45, color: muted),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Вы можете запросить удаление аккаунта через поддержку: ${TaktLinks.supportEmail}.',
-            style: TextStyle(fontSize: 13.5, height: 1.45, color: muted),
-          ),
-        ],
-      ),
-    );
+    final uri = Uri.parse(TaktLinks.privacyUrl);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      setState(() => _message = 'Не удалось открыть ${TaktLinks.privacyUrl}');
+    }
   }
 
   Future<void> _handlePushTap(BuildContext context) async {
@@ -429,38 +411,67 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _inviteDialog(BuildContext context) async {
+  Future<void> _inviteDialog(BuildContext context, {required String projectId}) async {
     final email = TextEditingController();
-    final choice = await showModalBottomSheet<String>(
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final choice = await showTaktDialog<String>(
       context: context,
-      useRootNavigator: true,
-      showDragHandle: true,
       builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Приглашение', style: Theme.of(ctx).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                TaktTextField(
-                  controller: email,
-                  label: 'Email сотрудника',
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, 'email'),
-                  child: const Text('Пригласить по email'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: () => Navigator.pop(ctx, 'link'),
-                  child: const Text('Скопировать ссылку'),
-                ),
-              ],
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Material(
+            color: dark ? TaktColors.surfaceDark : TaktColors.surface,
+            elevation: 8,
+            shadowColor: Colors.black.withValues(alpha: dark ? 0.45 : 0.18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(TaktRadii.lg),
+              side: BorderSide(color: dark ? TaktColors.borderDark : TaktColors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Приглашение',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.25,
+                      color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TaktTextField(
+                    controller: email,
+                    label: 'Email сотрудника',
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 16),
+                  TaktButton(
+                    label: 'Пригласить по email',
+                    expand: true,
+                    onPressed: () => Navigator.pop(ctx, 'email'),
+                  ),
+                  const SizedBox(height: 8),
+                  TaktButton(
+                    label: 'Скопировать ссылку',
+                    variant: TaktButtonVariant.secondary,
+                    expand: true,
+                    onPressed: () => Navigator.pop(ctx, 'link'),
+                  ),
+                  const SizedBox(height: 8),
+                  TaktButton(
+                    label: 'Отмена',
+                    variant: TaktButtonVariant.ghost,
+                    expand: true,
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -469,15 +480,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (choice == null || !context.mounted) return;
     final projectsRepo = context.read<ProjectsRepository>();
     final api = context.read<ApiClient>();
-    final currentId = context.read<BoardCubit>().state.project?.id;
     try {
-      final projects = await projectsRepo.listProjects();
-      if (!mounted) return;
-      if (projects.isEmpty) {
-        setState(() => _message = 'Сначала создайте проект');
-        return;
-      }
-      final projectId = currentId ?? projects.first.id;
       if (choice == 'link') {
         final token = await projectsRepo.createOrGetInviteLink(projectId);
         if (!mounted) return;

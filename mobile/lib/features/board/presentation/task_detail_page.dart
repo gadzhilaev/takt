@@ -7,6 +7,7 @@ import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
+import '../../../shared/widgets/takt_sheet.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../../../shared/widgets/urgency_badge.dart';
 import '../../../shared/widgets/user_avatar.dart';
@@ -137,21 +138,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   _leave();
                 } else if (v == 'delete' && canDelete) {
                   final boardCubit = context.read<BoardCubit>();
-                  final ok = await showDialog<bool>(
+                  final ok = await showTaktSheet(
                     context: context,
-                    useRootNavigator: true,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Удалить задачу?'),
-                      content: const Text('Действие нельзя отменить.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          style: TextButton.styleFrom(foregroundColor: TaktColors.danger),
-                          child: const Text('Удалить'),
-                        ),
-                      ],
-                    ),
+                    title: 'Удалить задачу?',
+                    confirmLabel: 'Удалить',
+                    body: const Text('Действие нельзя отменить.'),
                   );
                   if (ok == true && mounted) {
                     await boardCubit.deleteTask(task.id);

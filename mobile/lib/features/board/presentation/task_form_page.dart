@@ -7,6 +7,8 @@ import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_select.dart';
+import '../../../shared/widgets/takt_sheet.dart';
+import '../../../shared/widgets/takt_ui.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../cubit/board_cubit.dart';
 
@@ -124,16 +126,10 @@ class _TaskFormPageState extends State<TaskFormPage> {
 
   Future<void> _pickAssignees(List<ProjectMember> members) async {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final result = await showModalBottomSheet<Set<String>>(
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
+    final result = await showTaktDialog<Set<String>>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      backgroundColor: dark ? TaktColors.surfaceDark : TaktColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-      ),
       builder: (ctx) {
         var selected = Set<String>.from(_assigneeIds);
         var query = '';
@@ -143,89 +139,131 @@ class _TaskFormPageState extends State<TaskFormPage> {
               if (query.trim().isEmpty) return true;
               return m.name.toLowerCase().contains(query.trim().toLowerCase());
             }).toList();
-            return SafeArea(
-              top: false,
-              child: SizedBox(
-                height: MediaQuery.sizeOf(ctx).height * 0.62,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Исполнители',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 400,
+                  maxHeight: MediaQuery.sizeOf(ctx).height * 0.72,
+                ),
+                child: Material(
+                  color: dark ? TaktColors.surfaceDark : TaktColors.surface,
+                  elevation: 8,
+                  shadowColor: Colors.black.withValues(alpha: dark ? 0.45 : 0.18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(TaktRadii.lg),
+                    side: BorderSide(color: dark ? TaktColors.borderDark : TaktColors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 12, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Исполнители',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.25,
+                                  color: fg,
+                                ),
                               ),
                             ),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, selected),
-                            child: const Text('Готово'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (members.length > 6)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: TextField(
-                          onChanged: (v) => setLocal(() => query = v),
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            hintText: 'Поиск',
-                            prefixIcon: AppIcon(AppIcons.search, size: 20),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
+                            IconButton(
+                              tooltip: 'Закрыть',
+                              onPressed: () => Navigator.pop(ctx),
+                              icon: AppIcon(AppIcons.close, size: 20, color: muted),
+                            ),
+                          ],
                         ),
                       ),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-                        itemCount: filtered.length,
-                        itemBuilder: (_, i) {
-                          final m = filtered[i];
-                          final on = selected.contains(m.userId);
-                          return ListTile(
-                            dense: true,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.md)),
-                            selected: on,
-                            selectedTileColor: dark ? TaktColors.accentSoftDark : TaktColors.accentSoft,
-                            leading: TaktUserAvatar(name: m.name, avatarUrl: m.avatarUrl, size: 32),
-                            title: Text(
-                              m.name,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: on ? FontWeight.w600 : FontWeight.w500,
-                                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+                      if (members.length > 6)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                          child: TextField(
+                            onChanged: (v) => setLocal(() => query = v),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              hintText: 'Поиск',
+                              prefixIcon: AppIcon(AppIcons.search, size: 20),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) {
+                            final m = filtered[i];
+                            final on = selected.contains(m.userId);
+                            return ListTile(
+                              dense: true,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TaktRadii.md)),
+                              selected: on,
+                              selectedTileColor: dark ? TaktColors.accentSoftDark : TaktColors.accentSoft,
+                              leading: TaktUserAvatar(name: m.name, avatarUrl: m.avatarUrl, size: 32),
+                              title: Text(
+                                m.name,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+                                  color: fg,
+                                ),
+                              ),
+                              trailing: AppIcon(
+                                on ? AppIcons.circleCheck : AppIcons.circle,
+                                size: 22,
+                                color: on
+                                    ? (dark ? TaktColors.accentDark : TaktColors.accent)
+                                    : (dark ? TaktColors.mutedDark : TaktColors.borderStrong),
+                              ),
+                              onTap: () {
+                                setLocal(() {
+                                  if (on) {
+                                    selected.remove(m.userId);
+                                  } else {
+                                    selected.add(m.userId);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TaktButton(
+                                label: 'Отмена',
+                                variant: TaktButtonVariant.secondary,
+                                expand: true,
+                                onPressed: () => Navigator.pop(ctx),
                               ),
                             ),
-                            trailing: AppIcon(
-                              on ? AppIcons.circleCheck : AppIcons.circle,
-                              size: 22,
-                              color: on
-                                  ? (dark ? TaktColors.accentDark : TaktColors.accent)
-                                  : (dark ? TaktColors.mutedDark : TaktColors.borderStrong),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TaktButton(
+                                label: 'Готово',
+                                expand: true,
+                                onPressed: () => Navigator.pop(ctx, selected),
+                              ),
                             ),
-                            onTap: () {
-                              setLocal(() {
-                                if (on) {
-                                  selected.remove(m.userId);
-                                } else {
-                                  selected.add(m.userId);
-                                }
-                              });
-                            },
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );

@@ -99,22 +99,6 @@ async function tryRefreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
-async function clearAuthCookiesBestEffort() {
-  try {
-    const headers = new Headers({ "Content-Type": "application/json" });
-    const csrf = csrfToken();
-    if (csrf) headers.set("X-CSRF-Token", csrf);
-    await fetch(`${API_BASE}/api/v1/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-      headers,
-      body: "{}",
-    });
-  } catch {
-    /* ignore — navigation still proceeds */
-  }
-}
-
 function redirectToLogin() {
   if (typeof window === "undefined") return;
   const path = window.location.pathname + window.location.search;
@@ -122,9 +106,9 @@ function redirectToLogin() {
     return;
   }
   const next = encodeURIComponent(path || "/app/projects");
-  void clearAuthCookiesBestEffort().finally(() => {
-    window.location.assign(`/login?next=${next}`);
-  });
+  // Do NOT call /logout here: a failed refresh in one tab used to revoke cookies
+  // for the whole browser and wipe a successful refresh in another tab.
+  window.location.assign(`/login?next=${next}`);
 }
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {

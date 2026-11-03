@@ -6,6 +6,7 @@ import '../../../core/push/fcm_bootstrap.dart';
 import '../../../shared/models/models.dart';
 import '../../widget_sync/widget_sync.dart';
 import '../data/auth_repository.dart';
+import '../data/oauth_repository.dart';
 
 sealed class AuthState extends Equatable {
   const AuthState();
@@ -44,10 +45,12 @@ class AuthCubit extends Cubit<AuthState> {
     required this.auth,
     required this.api,
     required this.widgetSync,
+    this.oauth,
     this.fcm,
   }) : super(const AuthUnknown());
 
   final AuthRepository auth;
+  final OAuthRepository? oauth;
   final ApiClient api;
   final WidgetSync widgetSync;
   final FcmBootstrap? fcm;
@@ -129,6 +132,7 @@ class AuthCubit extends Cubit<AuthState> {
     await fcm?.unregister();
     await auth.logout();
     await widgetSync.clearOnLogout();
+    oauth?.invalidateIdentitiesCache();
     emit(const AuthGuest());
   }
 
