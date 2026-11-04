@@ -87,6 +87,8 @@ export function KanbanBoard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  /** Достаточно высоты для split «мои 2/5 + проект 3/5»; иначе мои — capped, проект занимает остаток. */
+  const tallBoard = useMediaQuery("(min-height: 900px)");
   const [quickCol, setQuickCol] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -915,13 +917,16 @@ export function KanbanBoard({
     );
   }
 
-  /* Desktop: при задачах — 2/5 мои / 3/5 проект; если пусто — блок сжимается */
+  /* Desktop: на высоких экранах — 2/5 мои / 3/5 проект; на низких — мои capped, проект flex-1 */
+  const splitTall = mineHasTasks && tallBoard;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <div
         className={cn(
           "flex min-h-0 flex-col overflow-hidden",
-          mineHasTasks ? "flex-[2]" : "shrink-0"
+          splitTall && "flex-[2]",
+          mineHasTasks && !tallBoard && "max-h-[min(34vh,20rem)] shrink-0",
+          !mineHasTasks && "shrink-0"
         )}
       >
         <MemberTasksSection
@@ -938,7 +943,7 @@ export function KanbanBoard({
       <div
         className={cn(
           "flex min-h-0 flex-col overflow-hidden",
-          mineHasTasks ? "flex-[3]" : "flex-1"
+          splitTall ? "flex-[3]" : "flex-1"
         )}
       >
       <DndContext

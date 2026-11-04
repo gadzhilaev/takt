@@ -17,7 +17,7 @@ class TaktBottomNavItem {
   final VoidCallback onTap;
 }
 
-/// Compact bottom navigation — active = accent color + weight, no strip/pill.
+/// Bottom nav: active = accent + soft chip; inactive = muted (чётко различаются).
 class TaktBottomNav extends StatelessWidget {
   const TaktBottomNav({super.key, required this.items});
 
@@ -30,6 +30,7 @@ class TaktBottomNav extends StatelessWidget {
     final border = dark ? TaktColors.borderDark : TaktColors.border;
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
     final active = dark ? TaktColors.accentDark : TaktColors.accent;
+    final soft = dark ? TaktColors.accentSoftDark : TaktColors.accentSoft;
 
     return Material(
       color: bg,
@@ -41,7 +42,7 @@ class TaktBottomNav extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 52,
+            height: 56,
             child: Row(
               children: [
                 for (final item in items)
@@ -52,12 +53,23 @@ class TaktBottomNav extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          AppIcon(
-                            item.icon,
-                            size: 22,
-                            color: item.selected ? active : muted,
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOut,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: item.selected ? soft : Colors.transparent,
+                              borderRadius: BorderRadius.circular(TaktRadii.md),
+                            ),
+                            child: AppIcon(
+                              item.icon,
+                              size: 22,
+                              color: item.selected
+                                  ? active
+                                  : muted.withValues(alpha: dark ? 0.75 : 0.65),
+                            ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             item.label,
                             maxLines: 1,
@@ -65,8 +77,10 @@ class TaktBottomNav extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 10.5,
                               height: 1.1,
-                              fontWeight: item.selected ? FontWeight.w600 : FontWeight.w500,
-                              color: item.selected ? active : muted,
+                              fontWeight: item.selected ? FontWeight.w700 : FontWeight.w500,
+                              color: item.selected
+                                  ? active
+                                  : muted.withValues(alpha: dark ? 0.8 : 0.7),
                             ),
                           ),
                         ],
