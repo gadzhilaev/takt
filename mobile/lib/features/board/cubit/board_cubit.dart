@@ -460,14 +460,15 @@ class BoardCubit extends Cubit<BoardState> {
     }
   }
 
-  /// Pull-to-refresh: визуальный индикатор у RefreshIndicator, контент не бланкуем.
+  /// Pull-to-refresh / realtime: [forceLoading] true — как жесткий refresh;
+  /// false — тихий sync (кэш на экране, сеть в фоне).
   Future<void> refreshBoard({bool forceLoading = false}) async {
     final project = state.project;
     if (project == null) {
       await refreshProjects(forceLoading: forceLoading);
       return;
     }
-    await openProject(project.id, forceLoading: true);
+    await openProject(project.id, forceLoading: forceLoading);
   }
 
   void selectColumn(int index) {

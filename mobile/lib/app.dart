@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/api_client.dart';
+import 'core/board_realtime.dart';
 import 'core/pending_deep_link.dart';
 import 'core/push/fcm_bootstrap.dart';
 import 'core/router.dart';
@@ -56,6 +57,7 @@ class _TaktAppState extends State<TaktApp> {
   late final NotificationsRepository _notifications;
   late final ThemeController _themeController;
   late final GoRouter _router;
+  late final BoardRealtime _boardRealtime;
 
   @override
   void initState() {
@@ -80,6 +82,7 @@ class _TaktAppState extends State<TaktApp> {
       api: widget.api,
       widgetSync: _widgetSync,
     );
+    _boardRealtime = BoardRealtime(tokens: widget.tokens, boardCubit: _boardCubit);
     _router = createRouter(_authCubit, widget.fcm);
     TaktApp.onWidgetDeepLink = _consumeDeepLink;
     WidgetsBinding.instance.addPostFrameCallback((_) => _consumeDeepLink());
@@ -111,6 +114,7 @@ class _TaktAppState extends State<TaktApp> {
     if (TaktApp.onWidgetDeepLink == _consumeDeepLink) {
       TaktApp.onWidgetDeepLink = null;
     }
+    _boardRealtime.dispose();
     _authCubit.close();
     _boardCubit.close();
     _themeController.dispose();
@@ -143,6 +147,7 @@ class _TaktAppState extends State<TaktApp> {
               if (state is AuthAuthenticated) {
                 final board = context.read<BoardCubit>();
                 board.setCurrentUserId(state.user.id);
+                unawaited(_boardRealtime.start());
                 // Проекты уже греются на splash; здесь только виджет / повторный вход.
                 if (board.state.projects.isEmpty) {
                   unawaited(board.bootstrap());
@@ -155,6 +160,7 @@ class _TaktAppState extends State<TaktApp> {
                   _consumeDeepLink();
                 });
               } else if (state is AuthGuest) {
+                unawaited(_boardRealtime.stop());
                 final board = context.read<BoardCubit>();
                 board.setCurrentUserId(null);
                 unawaited(board.clearLocal());

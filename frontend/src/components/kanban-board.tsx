@@ -14,7 +14,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { api, wsUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { ProjectMember, Status, Task } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
+import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { COLUMN_COLOR_PALETTE, columnShellStyle } from "@/lib/column-colors";
 import { URGENCY_OPTIONS, urgencyFromPriority } from "@/lib/urgency";
@@ -98,6 +99,8 @@ export function KanbanBoard({
   const [deleteColumn, setDeleteColumn] = useState<Status | null>(null);
   const [moveToStatusId, setMoveToStatusId] = useState("");
   const [mineHasTasks, setMineHasTasks] = useState(false);
+
+  useBoardRealtime(projectId);
 
   const selectedTaskId = searchParams.get("task");
 
@@ -443,14 +446,6 @@ export function KanbanBoard({
     },
     [moveMutation, resolveDrop, tasks]
   );
-
-  useEffect(() => {
-    const url = wsUrl();
-    if (!url) return;
-    const ws = new WebSocket(url);
-    ws.onmessage = () => qc.invalidateQueries({ queryKey: ["tasks", projectId] });
-    return () => ws.close();
-  }, [qc, projectId]);
 
   if (statusesQuery.isLoading || tasksQuery.isLoading) {
     return (

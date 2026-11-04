@@ -365,9 +365,13 @@ async def delete_task(
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     if not task_service.can_delete_task(user, task):
         raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Можно удалять только свои задачи"}})
+    project_id = str(task.project_id) if task.project_id else None
     await task_service.soft_delete_task(db, task)
     await db.commit()
-    await ws_manager.broadcast("task.deleted", {"task_id": str(task_id)})
+    await ws_manager.broadcast(
+        "task.deleted",
+        {"task_id": str(task_id), "project_id": project_id},
+    )
     return {"ok": True}
 
 
@@ -512,7 +516,14 @@ async def add_comment(
         created_at=comment.created_at,
         mentions=[str(x) for x in body.mention_user_ids],
     )
-    await ws_manager.broadcast("comment.added", {"task_id": str(task_id), "comment": out.model_dump(mode="json")})
+    await ws_manager.broadcast(
+        "comment.added",
+        {
+            "task_id": str(task_id),
+            "project_id": str(task.project_id) if task.project_id else None,
+            "comment": out.model_dump(mode="json"),
+        },
+    )
     return {"comment": out}
 
 
