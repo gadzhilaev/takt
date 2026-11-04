@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../data/notifications_repository.dart';
-import '../../../shared/widgets/app_icon.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});

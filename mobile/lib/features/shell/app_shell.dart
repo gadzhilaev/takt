@@ -8,6 +8,7 @@ import '../../shared/widgets/swipe_back_edge.dart';
 import '../../shared/widgets/takt_app_bar.dart';
 import '../board/cubit/board_cubit.dart';
 import '../notifications/data/notifications_repository.dart';
+import '../projects/presentation/projects_welcome_page.dart';
 import 'takt_bottom_nav.dart';
 
 /// Фиксированные AppBar + bottom nav; листается только body ([SlidingBranchStack]).
@@ -149,6 +150,7 @@ class _AppShellState extends State<AppShell> {
     return SwipeBackEdge(
       enabled: canSwipeBack,
       onBack: _backToProjects,
+      underlay: const ProjectsWelcomePage(previewOnly: true),
       child: Scaffold(
         appBar: _buildAppBar(idx: idx, dark: dark, projectName: projectName),
         body: navigationShell,

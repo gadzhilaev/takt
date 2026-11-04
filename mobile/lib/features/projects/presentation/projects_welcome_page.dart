@@ -18,7 +18,10 @@ import '../../shell/takt_bottom_nav.dart';
 
 /// Welcome / project picker. Bottom nav: Главная / Профиль («Мои задачи» — только в проекте).
 class ProjectsWelcomePage extends StatefulWidget {
-  const ProjectsWelcomePage({super.key});
+  const ProjectsWelcomePage({super.key, this.previewOnly = false});
+
+  /// Превью под свайпом «назад»: без clearProject и без живых жестов.
+  final bool previewOnly;
 
   @override
   State<ProjectsWelcomePage> createState() => _ProjectsWelcomePageState();
@@ -30,8 +33,10 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
   @override
   void initState() {
     super.initState();
-    _bootstrap();
-    _loadUnread();
+    if (!widget.previewOnly) {
+      _bootstrap();
+      _loadUnread();
+    }
   }
 
   Future<void> _bootstrap() async {
