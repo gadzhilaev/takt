@@ -3,13 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/kanban_colors.dart';
-import '../../../core/theme.dart';
-import '../../../features/notifications/data/notifications_repository.dart';
-import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/kanban_column.dart';
 import '../../../shared/widgets/kanban_drag_edge_scroll.dart';
 import '../../../shared/widgets/kanban_page_physics.dart';
-import '../../../shared/widgets/takt_app_bar.dart';
 import '../cubit/board_cubit.dart';
 
 class BoardPage extends StatefulWidget {
@@ -27,7 +23,6 @@ class _BoardPageState extends State<BoardPage> {
   final GlobalKey _pagerKey = GlobalKey();
   KanbanDragEdgeScroll? _edgeScroll;
   int _pageIndex = 0;
-  int _unread = 0;
   bool _bootstrapped = false;
   bool _dragging = false;
 
@@ -35,7 +30,6 @@ class _BoardPageState extends State<BoardPage> {
   void initState() {
     super.initState();
     _bootstrap();
-    _loadUnread();
   }
 
   Future<void> _bootstrap() async {
@@ -64,15 +58,6 @@ class _BoardPageState extends State<BoardPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.push('/task/$deepId');
       });
-    }
-  }
-
-  Future<void> _loadUnread() async {
-    try {
-      final list = await context.read<NotificationsRepository>().list(unreadOnly: true);
-      if (mounted) setState(() => _unread = list.length);
-    } catch (_) {
-      /* ignore */
     }
   }
 
@@ -124,14 +109,6 @@ class _BoardPageState extends State<BoardPage> {
     }
   }
 
-  void _backToProjects() {
-    context.read<BoardCubit>().clearProject();
-    _pageController?.dispose();
-    _pageController = null;
-    _pageIndex = 0;
-    context.go('/projects');
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<BoardCubit, BoardState>(
@@ -157,46 +134,17 @@ class _BoardPageState extends State<BoardPage> {
 
         if (project == null) {
           // Редирект на хаб в listener / bootstrap — без спиннера после splash.
-          return Scaffold(
-            backgroundColor: boardBg,
-            appBar: const TaktAppBar(title: 'Доска'),
-            body: const SizedBox.shrink(),
-          );
+          // AppBar — в AppShell; здесь только контент.
+          return ColoredBox(color: boardBg, child: const SizedBox.expand());
         }
 
         if (state.columns.isNotEmpty && _pageController == null) {
           _syncPageController(state.columnIndex, state.columns.length);
         }
 
-        return Scaffold(
-          backgroundColor: boardBg,
-          appBar: TaktAppBar(
-            title: project.name,
-            subtitle: 'Доска проекта',
-            onBack: _backToProjects,
-            actions: [
-              IconButton(
-                tooltip: 'Уведомления',
-                visualDensity: VisualDensity.compact,
-                onPressed: () async {
-                  await context.push('/notifications');
-                  _loadUnread();
-                },
-                icon: Badge(
-                  isLabelVisible: _unread > 0,
-                  smallSize: 8,
-                  backgroundColor: TaktColors.urgent,
-                  child: AppIcon(
-                    AppIcons.notifications,
-                    size: 22,
-                    color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-            ],
-          ),
-          body: Column(
+        return ColoredBox(
+          color: boardBg,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (state.offline)

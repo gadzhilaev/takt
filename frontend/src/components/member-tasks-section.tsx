@@ -402,8 +402,8 @@ export function MemberTasksSection({
             </div>
             <div
               className={cn(
-                "flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
-                colTasks.length === 0 ? "min-h-[2rem]" : "flex-1"
+                "flex max-h-full min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
+                colTasks.length === 0 && "min-h-[2rem]"
               )}
             >
               {canDrag && (

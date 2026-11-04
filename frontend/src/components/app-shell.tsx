@@ -293,10 +293,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const Sidebar = (
-    <aside className="flex h-full w-[19.5rem] shrink-0 flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))]">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-4">
+    <aside className="flex h-full w-[13.75rem] shrink-0 flex-col border-r border-hairline bg-[var(--sidebar,var(--surface))] xl:w-[19.5rem]">
+      <div className="flex shrink-0 items-center justify-between gap-1 px-2.5 py-3 xl:gap-2 xl:px-4 xl:py-4">
         <Link href="/app/projects" className="inline-flex min-w-0" aria-label="Takt">
-          <BrandLogo className="h-7" />
+          <BrandLogo className="h-6 xl:h-7" />
         </Link>
         <div className="flex items-center gap-0.5">
           <NotificationsMenu onOpen={() => setNotificationsOpen(true)} />
@@ -354,15 +354,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-1.5 pt-0.5">
-        <p className="section-label px-1.5">Мои проекты</p>
+      <div className="flex shrink-0 items-center justify-between gap-1 px-2 pb-1.5 pt-0.5 xl:gap-2 xl:px-3">
+        <p className="section-label truncate px-1 xl:px-1.5">Мои проекты</p>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius)] px-2 text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] xl:px-2"
           onClick={() => setCreateOpen(true)}
         >
           <AppIcon name="add" size={16} />
-          Создать
+          <span className="hidden xl:inline">Создать</span>
         </button>
       </div>
 
@@ -439,10 +439,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {user && hasPlatformAccess(user.platform_role) && (
           <Link
             href="/admin"
-            className="flex w-full items-center gap-2 rounded-[var(--radius)] px-2 py-2 text-[14px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            className="flex w-full items-center gap-2 rounded-[var(--radius)] px-2 py-2 text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] xl:text-[14px]"
+            title="Админка платформы"
           >
             <AppIcon name="settings" size={18} />
-            Админка платформы
+            <span className="truncate">Админка платформы</span>
           </Link>
         )}
         {user && (
@@ -453,10 +454,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={9} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-medium leading-tight">{user.name}</span>
-              <span className="block text-[12px] text-muted">Профиль и настройки</span>
+              <span className="block truncate text-[13px] font-medium leading-tight xl:text-[14px]">{user.name}</span>
+              <span className="hidden text-[12px] text-muted xl:block">Профиль и настройки</span>
             </span>
-            <AppIcon name="settings" size={16} className="shrink-0 text-muted" />
+            <AppIcon name="settings" size={16} className="hidden shrink-0 text-muted xl:block" />
           </button>
         )}
       </div>

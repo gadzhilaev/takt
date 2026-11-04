@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -92,8 +93,20 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
     routes: [
       GoRoute(path: '/splash', builder: (_, _) => const SplashPage()),
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
-      GoRoute(path: '/register', builder: (_, _) => const RegisterPage()),
-      GoRoute(path: '/forgot-password', builder: (_, _) => const ForgotPasswordPage()),
+      GoRoute(
+        path: '/register',
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: const RegisterPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: const ForgotPasswordPage(),
+        ),
+      ),
       GoRoute(path: '/enable-notifications', builder: (_, _) => const NotificationsIntroPage()),
       GoRoute(
         path: '/projects',
@@ -144,23 +157,35 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/notifications',
-        builder: (_, _) => const NotificationsPage(),
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: const NotificationsPage(),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/task/:taskId',
-        builder: (_, state) => TaskDetailPage(taskId: state.pathParameters['taskId']!),
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: TaskDetailPage(taskId: state.pathParameters['taskId']!),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/task-edit/:taskId',
-        builder: (_, state) => TaskFormPage(taskId: state.pathParameters['taskId']),
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: TaskFormPage(taskId: state.pathParameters['taskId']),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/task-create',
-        builder: (_, state) => TaskFormPage(
-          initialStatusId: state.uri.queryParameters['status'],
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: TaskFormPage(
+            initialStatusId: state.uri.queryParameters['status'],
+          ),
         ),
       ),
     ],

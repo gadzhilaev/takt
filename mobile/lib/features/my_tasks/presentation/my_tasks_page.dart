@@ -9,7 +9,6 @@ import '../../../shared/models/models.dart';
 import '../../../shared/widgets/kanban_column.dart';
 import '../../../shared/widgets/kanban_drag_edge_scroll.dart';
 import '../../../shared/widgets/kanban_page_physics.dart';
-import '../../../shared/widgets/takt_app_bar.dart';
 
 /// «Мои задачи» только для открытого проекта (Kanban с назначенными на меня).
 class MyTasksPage extends StatefulWidget {
@@ -96,16 +95,6 @@ class _MyTasksPageState extends State<MyTasksPage> {
     }
   }
 
-  void _backToProjects() {
-    context.read<BoardCubit>().clearProject();
-    _edgeScroll?.dispose();
-    _edgeScroll = null;
-    _pageController?.dispose();
-    _pageController = null;
-    _pageIndex = 0;
-    context.go('/projects');
-  }
-
   List<TaskItem> _mineInBoardColumn(BoardState state, String statusId) {
     final userId = context.read<BoardCubit>().currentUserId;
     if (userId == null || userId.isEmpty) return const [];
@@ -140,10 +129,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
         final project = state.project;
 
         if (project == null) {
-          return Scaffold(
-            backgroundColor: boardBg,
-            body: const SizedBox.shrink(),
-          );
+          return ColoredBox(color: boardBg, child: const SizedBox.expand());
         }
 
         if (state.columns.isNotEmpty && _pageController == null) {
@@ -153,14 +139,10 @@ class _MyTasksPageState extends State<MyTasksPage> {
         final userId = context.read<BoardCubit>().currentUserId;
         final cubit = context.read<BoardCubit>();
 
-        return Scaffold(
-          backgroundColor: boardBg,
-          appBar: TaktAppBar(
-            title: 'Мои задачи',
-            subtitle: project.name,
-            onBack: _backToProjects,
-          ),
-          body: Column(
+        // AppBar — в AppShell; листается только контент.
+        return ColoredBox(
+          color: boardBg,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (userId == null || userId.isEmpty)

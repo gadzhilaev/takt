@@ -930,19 +930,19 @@ export function KanbanBoard({
           )}
         </div>
 
-        <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-h-0 flex-1 snap-x snap-mandatory items-start gap-3 overflow-x-auto overflow-y-auto overscroll-contain px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {statuses.map((status) => {
             const colTasks = compactByStatus[status.id] ?? [];
             return (
               <div
                 key={status.id}
-                className="flex h-full w-[min(20rem,85%)] shrink-0 snap-center flex-col"
+                className="flex max-h-full w-[min(20rem,85%)] shrink-0 snap-center flex-col self-start"
               >
                 {renderColumnShell(
                   status,
                   <div
                     className={cn(
-                      "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain",
+                      "flex max-h-[min(70vh,36rem)] flex-col gap-2 overflow-y-auto overscroll-contain",
                       !colTasks.length && "min-h-[2.5rem]"
                     )}
                   >
@@ -961,13 +961,13 @@ export function KanbanBoard({
                       <p className="py-3 text-center text-sm text-muted">Пока пусто</p>
                     )}
                   </div>,
-                  { fillHeight: true }
+                  { fillHeight: false }
                 )}
               </div>
             );
           })}
           {compactMode === "board" && (
-            <div className="flex h-full w-[min(16rem,70%)] shrink-0 snap-center flex-col pt-0.5">
+            <div className="flex w-[min(16rem,70%)] shrink-0 snap-center flex-col self-start pt-0.5">
               {addColumnBlock}
             </div>
           )}
@@ -1031,8 +1031,8 @@ export function KanbanBoard({
                   status,
                   <div
                     className={cn(
-                      "flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
-                      colTasks.length === 0 ? "min-h-[2.5rem]" : "min-h-0 flex-1"
+                      "flex max-h-full min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
+                      colTasks.length === 0 && "min-h-[2.5rem]"
                     )}
                   >
                     <ColumnStartDroppable
@@ -1048,7 +1048,8 @@ export function KanbanBoard({
                         onOpen={() => openTask(task.id)}
                       />
                     ))}
-                  </div>
+                  </div>,
+                  { fillHeight: false }
                 )}
               </KanbanColumn>
             );

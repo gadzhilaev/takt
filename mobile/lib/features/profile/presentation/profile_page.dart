@@ -83,7 +83,7 @@ class _ProfilePageState extends State<ProfilePage> {
       listenable: themeCtrl,
       builder: (context, _) {
         return Scaffold(
-          appBar: TaktAppBar(title: 'Профиль'),
+          appBar: widget.embeddedInShell ? null : const TaktAppBar(title: 'Профиль'),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(0, 8, 0, 28),
             children: [

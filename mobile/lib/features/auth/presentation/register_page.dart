@@ -108,7 +108,18 @@ class _RegisterPageState extends State<RegisterPage> {
             },
             builder: (context, state) {
               final loading = _localBusy;
-              return LayoutBuilder(
+              return PopScope(
+                canPop: !_awaitingCode,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) return;
+                  if (_awaitingCode) {
+                    setState(() {
+                      _awaitingCode = false;
+                      _error = null;
+                    });
+                  }
+                },
+                child: LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
@@ -371,6 +382,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   );
                 },
+              ),
               );
             },
           ),
