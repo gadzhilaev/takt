@@ -6,7 +6,7 @@ import '../../shared/widgets/app_icon.dart';
 import '../board/cubit/board_cubit.dart';
 import 'takt_bottom_nav.dart';
 
-/// Compact bottom navigation — active = accent color + weight, no strip/pill.
+/// Bottom nav + slide between shell branches (см. [SlidingBranchStack] в router).
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 

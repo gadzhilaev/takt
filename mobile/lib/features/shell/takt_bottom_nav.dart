@@ -17,7 +17,7 @@ class TaktBottomNavItem {
   final VoidCallback onTap;
 }
 
-/// Bottom nav: active = accent + soft chip; inactive = muted (чётко различаются).
+/// Bottom nav: active = accent + weight; inactive = muted (без подложки-чипа).
 class TaktBottomNav extends StatelessWidget {
   const TaktBottomNav({super.key, required this.items});
 
@@ -30,7 +30,6 @@ class TaktBottomNav extends StatelessWidget {
     final border = dark ? TaktColors.borderDark : TaktColors.border;
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
     final active = dark ? TaktColors.accentDark : TaktColors.accent;
-    final soft = dark ? TaktColors.accentSoftDark : TaktColors.accentSoft;
 
     return Material(
       color: bg,
@@ -53,23 +52,14 @@ class TaktBottomNav extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            curve: Curves.easeOut,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: item.selected ? soft : Colors.transparent,
-                              borderRadius: BorderRadius.circular(TaktRadii.md),
-                            ),
-                            child: AppIcon(
-                              item.icon,
-                              size: 22,
-                              color: item.selected
-                                  ? active
-                                  : muted.withValues(alpha: dark ? 0.75 : 0.65),
-                            ),
+                          AppIcon(
+                            item.icon,
+                            size: 22,
+                            color: item.selected
+                                ? active
+                                : muted.withValues(alpha: dark ? 0.75 : 0.65),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Text(
                             item.label,
                             maxLines: 1,

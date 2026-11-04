@@ -172,6 +172,7 @@ class _BoardPageState extends State<BoardPage> {
           backgroundColor: boardBg,
           appBar: TaktAppBar(
             title: project.name,
+            subtitle: 'Доска проекта',
             onBack: _backToProjects,
             actions: [
               IconButton(

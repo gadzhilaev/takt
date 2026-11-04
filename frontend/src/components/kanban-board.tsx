@@ -15,7 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import type { ProjectMember, Status, Task } from "@/lib/types";
+import type { ProjectMember, Status, Task, User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -23,7 +23,7 @@ import { Select } from "@/components/ui/select";
 import { ColumnStartDroppable, KanbanColumn } from "@/components/kanban-column";
 import { TaskCard } from "@/components/task-card";
 import { TaskDrawer } from "@/components/task-drawer";
-import { MemberTasksSection } from "@/components/member-tasks-section";
+import { MemberSelect, MemberTasksSection } from "@/components/member-tasks-section";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +31,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { COLUMN_COLOR_PALETTE, columnShellStyle } from "@/lib/column-colors";
+import { memberTasksTitle, tasksForMember } from "@/lib/member-tasks";
 import { URGENCY_OPTIONS, urgencyFromPriority } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 
@@ -86,14 +87,16 @@ export function KanbanBoard({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isDesktop = useMediaQuery("(min-width: 768px)");
+  /** Совпадает с sidebar `lg` в app-shell: ниже — компакт как в мобильном приложении. */
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   /** Достаточно высоты для split «мои 2/5 + проект 3/5»; иначе мои — capped, проект занимает остаток. */
   const tallBoard = useMediaQuery("(min-height: 900px)");
   const [quickCol, setQuickCol] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
-  const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
+  const [compactMode, setCompactMode] = useState<"mine" | "board">("mine");
+  const [compactMemberId, setCompactMemberId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [addingColumn, setAddingColumn] = useState(false);
@@ -133,6 +136,11 @@ export function KanbanBoard({
     queryFn: () =>
       api<{ items: Task[] }>(`/api/v1/tasks?project_id=${projectId}&page_size=1000`),
   });
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: () => api<{ user: User }>("/api/v1/auth/me"),
+  });
+  const meId = meQuery.data?.user.id ?? "";
 
   const statuses = useMemo(() => statusesQuery.data?.items ?? [], [statusesQuery.data?.items]);
   const tasks = useMemo(() => tasksQuery.data?.items ?? [], [tasksQuery.data?.items]);
@@ -153,12 +161,29 @@ export function KanbanBoard({
     return map;
   }, [statuses, tasks]);
 
-  useEffect(() => {
-    if (!statuses.length) return;
-    if (!mobileStatusId || !statuses.some((s) => s.id === mobileStatusId)) {
-      setMobileStatusId(statuses[0].id);
+  const compactMember = compactMemberId ?? meId;
+  const compactTasks = useMemo(() => {
+    if (compactMode === "board" || !compactMember) return tasks;
+    return tasksForMember(tasks, compactMember);
+  }, [compactMode, compactMember, tasks]);
+  const compactByStatus = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    for (const s of statuses) map[s.id] = [];
+    for (const t of compactTasks) {
+      if (!map[t.status_id]) map[t.status_id] = [];
+      map[t.status_id].push(t);
     }
-  }, [statuses, mobileStatusId]);
+    for (const id of Object.keys(map)) map[id].sort((a, b) => a.position - b.position);
+    return map;
+  }, [statuses, compactTasks]);
+  const compactMineLabel =
+    meId && compactMember ? memberTasksTitle(members, compactMember, meId) : "Мои задачи";
+
+  useEffect(() => {
+    if (meId && (!compactMemberId || !members.some((m) => m.user_id === compactMemberId))) {
+      setCompactMemberId(meId);
+    }
+  }, [meId, compactMemberId, members]);
 
   useEffect(() => {
     if (startCreate && statuses[0] && quickCol == null) setQuickCol(statuses[0].id);
@@ -504,8 +529,6 @@ export function KanbanBoard({
   }
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : undefined;
-  const mobileStatus = statuses.find((s) => s.id === mobileStatusId) ?? statuses[0];
-  const mobileTasks = byStatus[mobileStatus.id] ?? [];
 
   function taskDropEdge(taskId: string): "before" | "after" | null {
     if (dropIndicator?.kind === "task" && dropIndicator.taskId === taskId) {
@@ -821,94 +844,132 @@ export function KanbanBoard({
     </Dialog>
   );
 
-  /* Mobile: one column, vertical scroll */
+  /* Phone / tablet: один режим + горизонтальные столбцы со snap (как в приложении). */
   if (!isDesktop) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
-        <MemberTasksSection
-          projectId={projectId}
-          members={members}
-          statuses={statuses}
-          tasks={tasks}
-          onOpenTask={openTask}
-          onMoveTask={(args) => moveMutation.mutate(args)}
+    const addColumnBlock = addingColumn ? (
+      <form
+        className="flex shrink-0 flex-col gap-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/70 p-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (newColumnName.trim()) {
+            columnMutation.mutate({ type: "create", name: newColumnName.trim() });
+          }
+        }}
+      >
+        <Input
+          value={newColumnName}
+          onChange={(e) => setNewColumnName(e.target.value)}
+          placeholder="Новый столбец"
+          autoFocus
         />
-        <div className="flex flex-col space-y-3">
-          <div className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Столбцы">
-            {statuses.map((status) => {
-              const active = status.id === mobileStatus.id;
-              return (
-                <button
-                  key={status.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={cn(
-                    "min-h-[36px] shrink-0 rounded-full px-3 text-[13px] font-medium",
-                    active
-                      ? "bg-[var(--accent)] text-[var(--accent-fg)]"
-                      : "bg-[var(--surface-2)] text-foreground"
-                  )}
-                  onClick={() => setMobileStatusId(status.id)}
-                >
-                  {status.name}
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex gap-2">
+          <Button type="submit" size="sm">
+            Добавить
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setAddingColumn(false)}>
+            Отмена
+          </Button>
+        </div>
+      </form>
+    ) : (
+      <button
+        type="button"
+        className="min-h-11 shrink-0 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-3 text-sm text-muted hover:text-foreground"
+        onClick={() => setAddingColumn(true)}
+      >
+        + Столбец
+      </button>
+    );
 
-          {renderColumnShell(
-            mobileStatus,
-            <div className={cn("flex flex-col gap-2", !mobileTasks.length && "min-h-[2.5rem]")}>
-              {mobileTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  draggable={false}
-                  isDone={!!statusById[task.status_id]?.is_done}
-                  statuses={statuses}
-                  onChangeStatus={(statusId) => moveToStatus(task, statusId)}
-                  onOpen={() => openTask(task.id)}
-                />
-              ))}
-              {!mobileTasks.length && (
-                <p className="py-3 text-center text-sm text-muted">Пока пусто</p>
-              )}
-            </div>,
-            { fillHeight: false }
-          )}
-
-          {addingColumn ? (
-            <form
-              className="flex shrink-0 gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (newColumnName.trim()) {
-                  columnMutation.mutate({ type: "create", name: newColumnName.trim() });
-                }
-              }}
-            >
-              <Input
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-                placeholder="Новый столбец"
-                autoFocus
-              />
-              <Button type="submit" size="sm">
-                Добавить
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setAddingColumn(false)}>
-                Отмена
-              </Button>
-            </form>
-          ) : (
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+        <div className="flex shrink-0 items-center gap-2">
+          <div
+            className="flex min-w-0 flex-1 rounded-[var(--radius)] bg-[var(--surface-2)] p-0.5"
+            role="tablist"
+            aria-label="Режим доски"
+          >
             <button
               type="button"
-              className="shrink-0 text-sm text-muted hover:text-foreground"
-              onClick={() => setAddingColumn(true)}
+              role="tab"
+              aria-selected={compactMode === "mine"}
+              className={cn(
+                "min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium transition-colors",
+                compactMode === "mine"
+                  ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
+                  : "text-muted hover:text-foreground"
+              )}
+              onClick={() => setCompactMode("mine")}
             >
-              + Столбец
+              {compactMineLabel}
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={compactMode === "board"}
+              className={cn(
+                "min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium transition-colors",
+                compactMode === "board"
+                  ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
+                  : "text-muted hover:text-foreground"
+              )}
+              onClick={() => setCompactMode("board")}
+            >
+              Доска
+            </button>
+          </div>
+          {compactMode === "mine" && meId && members.length > 0 && (
+            <div className="max-w-[42%] shrink-0 [&_.field]:max-w-full">
+              <MemberSelect
+                members={members}
+                currentUserId={meId}
+                value={compactMember || meId}
+                onChange={setCompactMemberId}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {statuses.map((status) => {
+            const colTasks = compactByStatus[status.id] ?? [];
+            return (
+              <div
+                key={status.id}
+                className="flex h-full w-[min(20rem,85%)] shrink-0 snap-center flex-col"
+              >
+                {renderColumnShell(
+                  status,
+                  <div
+                    className={cn(
+                      "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain",
+                      !colTasks.length && "min-h-[2.5rem]"
+                    )}
+                  >
+                    {colTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        draggable={false}
+                        isDone={!!status.is_done}
+                        statuses={statuses}
+                        onChangeStatus={(statusId) => moveToStatus(task, statusId)}
+                        onOpen={() => openTask(task.id)}
+                      />
+                    ))}
+                    {!colTasks.length && (
+                      <p className="py-3 text-center text-sm text-muted">Пока пусто</p>
+                    )}
+                  </div>,
+                  { fillHeight: true }
+                )}
+              </div>
+            );
+          })}
+          {compactMode === "board" && (
+            <div className="flex h-full w-[min(16rem,70%)] shrink-0 snap-center flex-col pt-0.5">
+              {addColumnBlock}
+            </div>
           )}
         </div>
         {drawer}

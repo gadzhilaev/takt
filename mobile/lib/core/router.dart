@@ -15,6 +15,7 @@ import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/projects/presentation/projects_welcome_page.dart';
 import '../features/shell/app_shell.dart';
+import '../features/shell/sliding_branch_stack.dart';
 import '../features/widget_sync/widget_sync.dart';
 import '../shared/widgets/takt_app_bar.dart';
 import '../shared/widgets/takt_mark.dart';
@@ -98,8 +99,14 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
         path: '/projects',
         builder: (_, _) => const ProjectsWelcomePage(),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
         builder: (context, state, navigationShell) => AppShell(navigationShell: navigationShell),
+        navigatorContainerBuilder: (context, navigationShell, children) {
+          return SlidingBranchStack(
+            currentIndex: navigationShell.currentIndex,
+            children: children,
+          );
+        },
         branches: [
           StatefulShellBranch(
             routes: [

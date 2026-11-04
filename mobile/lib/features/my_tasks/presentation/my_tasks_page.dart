@@ -156,7 +156,8 @@ class _MyTasksPageState extends State<MyTasksPage> {
         return Scaffold(
           backgroundColor: boardBg,
           appBar: TaktAppBar(
-            title: project.name,
+            title: 'Мои задачи',
+            subtitle: project.name,
             onBack: _backToProjects,
           ),
           body: Column(

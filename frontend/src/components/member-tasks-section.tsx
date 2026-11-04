@@ -48,7 +48,7 @@ type DropIndicator =
   | { kind: "start"; statusId: string }
   | { kind: "task"; statusId: string; taskId: string; edge: "before" | "after" };
 
-function MemberSelect({
+export function MemberSelect({
   members,
   currentUserId,
   value,
@@ -142,7 +142,7 @@ export function MemberTasksSection({
   /** Сообщает родителю, есть ли задачи у выбранного сотрудника (для split 2/5). */
   onHasTasksChange?: (hasTasks: boolean) => void;
 }) {
-  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const { data: meData } = useQuery({
     queryKey: ["me"],
     queryFn: () => api<{ user: User }>("/api/v1/auth/me"),

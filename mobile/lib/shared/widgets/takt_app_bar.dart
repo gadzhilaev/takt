@@ -12,6 +12,7 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
   const TaktAppBar({
     super.key,
     required this.title,
+    this.subtitle,
     this.titleWidget,
     this.leading,
     this.actions,
@@ -22,6 +23,8 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   final String title;
+  /// Second line under [title] (e.g. project name on «Мои задачи»).
+  final String? subtitle;
   /// When set, replaces mark + [title] (e.g. [TaktLogo] on home).
   final Widget? titleWidget;
   final Widget? leading;
@@ -33,15 +36,19 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showMark;
 
   static const double height = 48;
+  static const double heightWithSubtitle = 56;
   static const double markHeight = 20;
 
   @override
-  Size get preferredSize => const Size.fromHeight(height);
+  Size get preferredSize =>
+      Size.fromHeight(subtitle != null && subtitle!.isNotEmpty ? heightWithSubtitle : height);
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final fg = dark ? TaktColors.foregroundDark : TaktColors.graphite;
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final barHeight = preferredSize.height;
     Widget? lead = leading;
     if (lead == null && onClose != null) {
       lead = IconButton(
@@ -63,14 +70,41 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
       fontSize: 16,
       fontWeight: FontWeight.w600,
       letterSpacing: -0.2,
+      height: 1.15,
       color: fg,
     );
-    final titleText = Text(
-      title,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: titleStyle,
-    );
+    final hasSubtitle = subtitle != null && subtitle!.isNotEmpty;
+    final Widget titleBlock = hasSubtitle
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: titleStyle,
+              ),
+              Text(
+                subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.2,
+                  fontWeight: FontWeight.w500,
+                  color: muted,
+                ),
+              ),
+            ],
+          )
+        : Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: titleStyle,
+          );
     final Widget resolvedTitle;
     if (titleWidget != null) {
       resolvedTitle = titleWidget!;
@@ -79,15 +113,15 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           const TaktMark(height: markHeight, semanticLabel: null),
           const SizedBox(width: 8),
-          Expanded(child: titleText),
+          Expanded(child: titleBlock),
         ],
       );
     } else {
-      resolvedTitle = titleText;
+      resolvedTitle = titleBlock;
     }
 
     return AppBar(
-      toolbarHeight: height,
+      toolbarHeight: barHeight,
       titleSpacing: lead == null ? 16 : 0,
       centerTitle: centerTitle,
       leading: lead,
