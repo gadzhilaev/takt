@@ -22,43 +22,46 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasProject = context.watch<BoardCubit>().state.project != null;
+    final idx = navigationShell.currentIndex;
+
+    // Без проекта вкладка «Мои задачи» скрыта; если уже на ней — на главную.
+    if (!hasProject && idx == 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/projects');
+      });
+    }
+
+    final items = <TaktBottomNavItem>[
+      TaktBottomNavItem(
+        label: 'Главная',
+        icon: AppIcons.home,
+        selected: idx == 0,
+        onTap: () {
+          if (hasProject) {
+            _goBranch(0);
+          } else {
+            context.go('/projects');
+          }
+        },
+      ),
+      if (hasProject)
+        TaktBottomNavItem(
+          label: 'Мои задачи',
+          icon: AppIcons.myTasks,
+          selected: idx == 1,
+          onTap: () => _goBranch(1),
+        ),
+      TaktBottomNavItem(
+        label: 'Профиль',
+        icon: AppIcons.profile,
+        selected: idx == 2,
+        onTap: () => _goBranch(2),
+      ),
+    ];
 
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: TaktBottomNav(
-        items: [
-          TaktBottomNavItem(
-            label: 'Главная',
-            icon: AppIcons.home,
-            selected: navigationShell.currentIndex == 0,
-            onTap: () {
-              if (hasProject) {
-                _goBranch(0);
-              } else {
-                context.go('/projects');
-              }
-            },
-          ),
-          TaktBottomNavItem(
-            label: 'Мои задачи',
-            icon: AppIcons.myTasks,
-            selected: navigationShell.currentIndex == 1,
-            onTap: () {
-              if (hasProject) {
-                _goBranch(1);
-              } else {
-                context.go('/projects');
-              }
-            },
-          ),
-          TaktBottomNavItem(
-            label: 'Профиль',
-            icon: AppIcons.profile,
-            selected: navigationShell.currentIndex == 2,
-            onTap: () => _goBranch(2),
-          ),
-        ],
-      ),
+      bottomNavigationBar: TaktBottomNav(items: items),
     );
   }
 }

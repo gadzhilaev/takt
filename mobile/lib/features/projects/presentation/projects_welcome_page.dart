@@ -16,7 +16,7 @@ import '../../board/cubit/board_cubit.dart';
 import '../../notifications/data/notifications_repository.dart';
 import '../../shell/takt_bottom_nav.dart';
 
-/// Welcome / project picker. Bottom nav: Главная / Мои задачи / Профиль.
+/// Welcome / project picker. Bottom nav: Главная / Профиль («Мои задачи» — только в проекте).
 class ProjectsWelcomePage extends StatefulWidget {
   const ProjectsWelcomePage({super.key});
 
@@ -167,16 +167,6 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                 icon: AppIcons.home,
                 selected: true,
                 onTap: () {},
-              ),
-              TaktBottomNavItem(
-                label: 'Мои задачи',
-                icon: AppIcons.myTasks,
-                selected: false,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Сначала откройте проект')),
-                  );
-                },
               ),
               TaktBottomNavItem(
                 label: 'Профиль',
