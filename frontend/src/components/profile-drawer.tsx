@@ -34,6 +34,9 @@ export function ProfileDrawer({
   const [pushMsg, setPushMsg] = useState("");
   const [pushBusy, setPushBusy] = useState(false);
   const [pushState, setPushState] = useState<Awaited<ReturnType<typeof getPushStatus>> | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
@@ -98,6 +101,26 @@ export function ProfileDrawer({
     }
     qc.invalidateQueries({ queryKey: ["me"] });
     setMsg("Аватар обновлён");
+  }
+
+  async function deleteAccount() {
+    setErr("");
+    setMsg("");
+    if (deleteConfirm.trim().toUpperCase() !== "УДАЛИТЬ") {
+      setErr("Введите УДАЛИТЬ для подтверждения");
+      return;
+    }
+    setDeleteBusy(true);
+    try {
+      await api("/api/v1/users/me", { method: "DELETE" });
+      qc.clear();
+      router.replace("/login");
+      onClose();
+    } catch (e) {
+      setErr((e as Error).message || "Не удалось удалить аккаунт");
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   async function logout() {
@@ -271,10 +294,56 @@ export function ProfileDrawer({
           {err && <p className="text-sm text-[var(--danger)]">{err}</p>}
         </div>
 
-        <div className="border-t border-hairline p-3">
+        <div className="space-y-2 border-t border-hairline p-3">
           <Button variant="ghost" className="w-full justify-start" onClick={logout}>
             <AppIcon name="logout" size={16} /> Выйти
           </Button>
+          {!showDelete ? (
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-[var(--danger)]"
+              onClick={() => setShowDelete(true)}
+            >
+              Удалить аккаунт
+            </Button>
+          ) : (
+            <div className="space-y-2 rounded-md border border-hairline p-3">
+              <p className="text-xs text-muted">
+                Необратимо. Общие проекты команды сохранятся. Введите УДАЛИТЬ.
+              </p>
+              <Input
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="УДАЛИТЬ"
+                autoComplete="off"
+                disabled={deleteBusy}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  disabled={deleteBusy}
+                  onClick={deleteAccount}
+                >
+                  {deleteBusy ? "…" : "Удалить"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="flex-1"
+                  disabled={deleteBusy}
+                  onClick={() => {
+                    setShowDelete(false);
+                    setDeleteConfirm("");
+                  }}
+                >
+                  Отмена
+                </Button>
+              </div>
+              <Link href="/account-delete" className="text-xs text-muted underline-offset-2 hover:underline">
+                Страница удаления для магазинов
+              </Link>
+            </div>
+          )}
         </div>
       </aside>
     </div>

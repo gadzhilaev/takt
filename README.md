@@ -33,7 +33,8 @@ Takt помогает небольшим командам вести проек�
 - OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только в мобильном приложении (см. [`docs/oauth.md`](docs/oauth.md))
 - Проекты с ролями `admin` / `member` / `viewer` и приглашениями in-app
 - Kanban: 4 стартовых столбца, drag-and-drop; новая задача всегда в начало столбца
-- Задача: название, описание, исполнители (0..n), приоритет, комментарии, чеклист
+- Задача: название, описание, исполнители (≥1), приоритет, комментарии, чеклист
+- Удаление аккаунта: в профиле (web/mobile) и страница `/account-delete`
 - Уведомления: in-app, Web Push (VAPID), FCM на mobile
 - Платформенная админка `/admin` (пользователи, модерация, настройки OAuth)
 - Home screen widgets (iOS / Android) без JWT в виджете
@@ -172,7 +173,9 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 Mobile: [`mobile/docs/MOBILE_SETUP.md`](mobile/docs/MOBILE_SETUP.md).  
 Prod: [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
 
-Миграции Alembic **001–013** (head `013_email_code_reset_password`). При старте backend выполняет `alembic upgrade head`.
+Миграции Alembic **001–016** (head `016_task_status_entered_at`). При старте backend выполняет `alembic upgrade head`.
+
+Демо-воркспейс изолирован (`projects.is_demo` / `users.is_demo`). Учётка `DEMO_USER_EMAIL` + `DEMO_USER_PASSWORD` только в локальном `.env` / private-файле — **не** в git и не на лендинге. Скрипты: `backend/scripts/setup_demo_workspace.py`, `backend/scripts/seed_college_demo.py`.
 
 ## Тестирование
 
@@ -198,6 +201,7 @@ CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: 
 | [`docs/development.md`](docs/development.md) | Локальная разработка и тесты |
 | [`docs/deployment.md`](docs/deployment.md) | Docker и production |
 | [`docs/oauth.md`](docs/oauth.md) | Настройка OAuth |
+| [`docs/release.md`](docs/release.md) | Mobile / магазины (кратко) |
 | [`AGENTS.md`](AGENTS.md) | Правила для AI-агентов |
 
 ## Статус и лицензия
@@ -209,4 +213,6 @@ CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: 
 - OAuth на prod: VK ID и Яндекс ID (web + mobile), Sign in with Apple — только mobile  
   Политика оператора и 149-ФЗ: [`docs/oauth.md`](docs/oauth.md)
 
-Исходный код принадлежит [@gadzhilaev](https://github.com/gadzhilaev). Явная open-source лицензия пока не опубликована.
+Исходный код принадлежит [@gadzhilaev](https://github.com/gadzhilaev).
+
+**Лицензия:** proprietary / source-available — см. [`LICENSE`](LICENSE). Код можно **просматривать** в репозитории; это **не** open-source (нет права копировать, менять или использовать коммерчески без письменного разрешения). MIT/Apache **не** применяются.

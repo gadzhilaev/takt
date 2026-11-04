@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:app_settings/app_settings.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -174,11 +174,7 @@ class FcmBootstrap {
 
   /// Opens the OS settings screen for this app (notifications, etc.).
   Future<void> openSystemSettings() async {
-    try {
-      await AppSettings.openAppSettings(type: AppSettingsType.notification);
-    } catch (_) {
-      await AppSettings.openAppSettings();
-    }
+    await openAppSettings();
   }
 
   void dispose() {

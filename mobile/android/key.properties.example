@@ -1,0 +1,6 @@
+# Copy to mobile/android/key.properties (gitignored) for Play / RuStore release signing.
+# Do NOT commit real passwords or the keystore file.
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=takt
+storeFile=/absolute/path/to/takt-upload.jks

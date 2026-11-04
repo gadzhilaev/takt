@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     # Encrypt MFA secrets at rest (Fernet key or derived from SECRET_KEY)
     MFA_FERNET_KEY: str = ""
 
+    # WebSocket: ?access_token= fallback for older mobile builds.
+    # Prefer Authorization: Bearer (mobile) or access_token cookie (web).
+    # Set false after all clients ship header-based WS auth.
+    ALLOW_WS_QUERY_TOKEN: bool = True
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

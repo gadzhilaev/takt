@@ -15,6 +15,7 @@
 | [development.md](development.md) | Локальная разработка, тесты, contributing |
 | [deployment.md](deployment.md) | Docker, production, backup |
 | [oauth.md](oauth.md) | Apple / VK ID / Яндекс ID |
+| [release.md](release.md) | Mobile / store release (кратко) |
 | [decisions/](decisions/) | ADR |
 | [archive/](archive/) | Краткая история |
 

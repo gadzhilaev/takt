@@ -25,7 +25,7 @@ export default function PrivacyPage() {
         <h1 className="text-[28px] font-semibold tracking-tight sm:text-[32px]">
           Политика конфиденциальности
         </h1>
-        <p className="mt-2 text-[14px] text-muted">Актуально на 2 ноября 2026 г.</p>
+        <p className="mt-2 text-[14px] text-muted">Актуально на 4 ноября 2026 г.</p>
 
         <div className="prose-takt mt-8 space-y-7 text-[15px] leading-relaxed text-foreground/90">
           <section className="space-y-2">
@@ -105,8 +105,19 @@ export default function PrivacyPage() {
               <li>запросить доступ к своим данным и их уточнение через профиль или поддержку;</li>
               <li>отвязать способы входа и сменить пароль в разделе «Вход и безопасность»;</li>
               <li>отозвать согласие на push в настройках устройства;</li>
-              <li>запросить удаление аккаунта, написав на support@taktapp.ru.</li>
+              <li>
+                удалить аккаунт в профиле (web и мобильное приложение) или на странице{" "}
+                <Link href="/account-delete" className="text-[var(--accent)] underline-offset-2 hover:underline">
+                  /account-delete
+                </Link>
+                ; также можно написать на support@taktapp.ru.
+              </li>
             </ul>
+            <p>
+              При удалении аккаунт обезличивается, сессии и push-токены отзываются. Проекты, где
+              вы были единственным участником, удаляются. Данные общих проектов команды сохраняются
+              для остальных участников.
+            </p>
           </section>
 
           <section className="space-y-2">

@@ -8,7 +8,7 @@ import 'config.dart';
 import 'token_storage.dart';
 import '../features/board/cubit/board_cubit.dart';
 
-/// Live board sync via `WS /ws?access_token=…` (same hub as web).
+/// Live board sync via `WS /ws` with `Authorization: Bearer` (cookie on web).
 class BoardRealtime {
   BoardRealtime({
     required this.tokens,
@@ -56,7 +56,7 @@ class BoardRealtime {
     _socket = null;
   }
 
-  Uri? _wsUri(String access) {
+  Uri? _wsUri() {
     final base = AppConfig.apiBase.replaceFirst(RegExp(r'/+$'), '');
     final http = Uri.parse(base);
     final scheme = http.scheme == 'https' ? 'wss' : 'ws';
@@ -65,7 +65,6 @@ class BoardRealtime {
       host: http.host,
       port: http.hasPort ? http.port : null,
       path: '/ws',
-      queryParameters: {'access_token': access},
     );
   }
 
@@ -74,11 +73,14 @@ class BoardRealtime {
     await _tearDownSocket();
     final access = await tokens.readAccess();
     if (access == null || access.isEmpty) return;
-    final uri = _wsUri(access);
+    final uri = _wsUri();
     if (uri == null) return;
 
     try {
-      final socket = await WebSocket.connect(uri.toString());
+      final socket = await WebSocket.connect(
+        uri.toString(),
+        headers: {'Authorization': 'Bearer $access'},
+      );
       if (!_wantConnected) {
         await socket.close();
         return;

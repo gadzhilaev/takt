@@ -1,6 +1,4 @@
 PODS:
-  - app_settings (5.1.1):
-    - Flutter
   - Firebase/CoreOnly (12.19.3):
     - FirebaseCore (~> 12.19.3)
   - Firebase/Messaging (12.19.3):
@@ -73,6 +71,8 @@ PODS:
     - nanopb/encode (= 3.30910.0)
   - nanopb/decode (3.30910.0)
   - nanopb/encode (3.30910.0)
+  - permission_handler_apple (9.4.8):
+    - Flutter
   - PromisesObjC (2.4.1)
   - shared_preferences_foundation (0.0.1):
     - Flutter
@@ -84,13 +84,13 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
-  - app_settings (from `.symlinks/plugins/app_settings/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - flutter_web_auth_2 (from `.symlinks/plugins/flutter_web_auth_2/ios`)
   - home_widget (from `.symlinks/plugins/home_widget/ios`)
+  - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
@@ -108,8 +108,6 @@ SPEC REPOS:
     - PromisesObjC
 
 EXTERNAL SOURCES:
-  app_settings:
-    :path: ".symlinks/plugins/app_settings/ios"
   firebase_core:
     :path: ".symlinks/plugins/firebase_core/ios"
   firebase_messaging:
@@ -122,6 +120,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_web_auth_2/ios"
   home_widget:
     :path: ".symlinks/plugins/home_widget/ios"
+  permission_handler_apple:
+    :path: ".symlinks/plugins/permission_handler_apple/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   sign_in_with_apple:
@@ -130,7 +130,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
-  app_settings: 3507c575c2b18a462c99948f61d5de21d4420999
   Firebase: e3c5ab38229ae085490d02398d97b9f5374bbe6e
   firebase_core: 80d50cac10fc9dff2597c55ed43e296d9a0bc90a
   firebase_messaging: 378a914df459aea513c6642ebb531fe7d7200c94
@@ -145,6 +144,7 @@ SPEC CHECKSUMS:
   GoogleUtilities: 7dc09b3fa9ecb5c2298b952313d14628b61b9da3
   home_widget: 54b4f6b36ed8d64cfee594a476225c35c3e45091
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
+  permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sign_in_with_apple: 5e34677a4e74c5f42760f41b3bbe05343e84d171

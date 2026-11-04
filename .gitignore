@@ -38,8 +38,15 @@ uploads/
 # Mobile secrets / build
 mobile/android/app/google-services.json
 mobile/ios/Runner/GoogleService-Info.plist
+mobile/android/key.properties
+mobile/android/*.jks
+mobile/android/*.keystore
+*.jks
+*.keystore
 mobile/.dart_tool/
 mobile/build/
+mobile/android/build/
+mobile/android/.gradle/
 mobile/.flutter-plugins-dependencies
 mobile/**/Pods/
 mobile/ios/Flutter/Flutter.podspec

@@ -11,4 +11,6 @@ abstract final class TaktLinks {
   }
 
   static String get privacyUrl => '$webOrigin/privacy';
+
+  static String get accountDeleteUrl => '$webOrigin/account-delete';
 }

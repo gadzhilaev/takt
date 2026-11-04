@@ -2,17 +2,19 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, verify_csrf
+from app.api.deps import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user, verify_csrf
 from app.api.serializers import avatar_url
 from app.core.config import get_settings
+from app.core.csrf import CSRF_COOKIE
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import UserPublic
 from app.schemas.user import ProfileUpdate
+from app.services.account_service import AccountError, delete_own_account
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -135,3 +137,30 @@ async def delete_avatar(
     user.avatar_path = None
     await db.commit()
     return {"avatar_url": None}
+
+
+@router.delete("/me", dependencies=[Depends(verify_csrf)])
+async def delete_me(
+    response: Response,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Self-service account deletion / de-identification for store compliance."""
+    try:
+        await delete_own_account(db, user)
+        await db.commit()
+    except AccountError as e:
+        await db.rollback()
+        detail: dict = {"error": {"code": e.code, "message": e.message}}
+        if e.projects:
+            detail["error"]["projects"] = e.projects
+        raise HTTPException(status_code=e.status_code, detail=detail) from e
+
+    settings = get_settings()
+    cookie_opts: dict = {"path": "/"}
+    if settings.COOKIE_DOMAIN:
+        cookie_opts["domain"] = settings.COOKIE_DOMAIN
+    response.delete_cookie(ACCESS_COOKIE, **cookie_opts)
+    response.delete_cookie(REFRESH_COOKIE, **cookie_opts)
+    response.delete_cookie(CSRF_COOKIE, **cookie_opts)
+    return {"ok": True, "message": "Аккаунт удалён"}

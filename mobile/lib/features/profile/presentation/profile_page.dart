@@ -287,6 +287,16 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                child: TaktButton(
+                  label: 'Удалить аккаунт',
+                  variant: TaktButtonVariant.ghost,
+                  danger: true,
+                  expand: true,
+                  onPressed: () => _deleteAccount(context),
+                ),
+              ),
             ],
           ),
         );
@@ -358,6 +368,43 @@ class _ProfilePageState extends State<ProfilePage> {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
       setState(() => _message = 'Не удалось открыть ${TaktLinks.privacyUrl}');
+    }
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final ok = await showTaktSheet(
+      context: context,
+      title: 'Удалить аккаунт навсегда?',
+      confirmLabel: 'Удалить',
+      body: Text(
+        'Профиль будет обезличен, сессии и уведомления отключены. '
+        'Проекты, где вы единственный участник, удалятся. '
+        'Общие проекты команды сохранятся — если вы единственный администратор, '
+        'сначала назначьте другого.\n\n'
+        'Веб-форма: ${TaktLinks.accountDeleteUrl}',
+        style: TextStyle(fontSize: 14, height: 1.4, color: muted),
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final sure = await showTaktSheet(
+      context: context,
+      title: 'Подтвердите удаление',
+      confirmLabel: 'Удалить навсегда',
+      body: Text(
+        'Это действие нельзя отменить.',
+        style: TextStyle(fontSize: 14, height: 1.4, color: muted),
+      ),
+    );
+    if (sure != true || !context.mounted) return;
+    try {
+      await context.read<AuthCubit>().deleteAccount();
+      if (context.mounted) context.go('/login');
+    } catch (e) {
+      if (!context.mounted) return;
+      final msg = context.read<ApiClient>().messageFromError(e);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 

@@ -31,6 +31,7 @@
                 <data android:scheme="takt" android:host="task" />
                 <data android:scheme="takt" android:host="my-tasks" />
                 <data android:scheme="takt" android:host="profile" />
+                <data android:scheme="takt" android:host="oauth" />
             </intent-filter>
         </activity>
 

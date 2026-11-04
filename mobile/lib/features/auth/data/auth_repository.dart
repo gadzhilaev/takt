@@ -85,6 +85,11 @@ class AuthRepository {
     return UserProfile.fromJson(res.data!['user'] as Map<String, dynamic>);
   }
 
+  Future<void> deleteAccount() async {
+    await api.dio.delete('/api/v1/users/me');
+    await tokens.clear();
+  }
+
   Future<void> logout() async {
     try {
       await api.dio.post('/api/v1/auth/logout');

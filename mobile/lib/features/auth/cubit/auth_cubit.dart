@@ -136,6 +136,18 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthGuest());
   }
 
+  Future<void> deleteAccount() async {
+    try {
+      await fcm?.unregister();
+    } catch (_) {
+      /* server may already revoke tokens */
+    }
+    await auth.deleteAccount();
+    await widgetSync.clearOnLogout();
+    oauth?.invalidateIdentitiesCache();
+    emit(const AuthGuest());
+  }
+
   void setUser(UserProfile user) => emit(AuthAuthenticated(user));
 
   /// Успешный OAuth (токены уже сохранены в [OAuthRepository]).
