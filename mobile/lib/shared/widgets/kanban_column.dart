@@ -18,6 +18,7 @@ class KanbanColumnPane extends StatelessWidget {
     this.onAdd,
     this.onTaskDropped,
     this.onDraggingChanged,
+    this.onDragPointer,
     this.draggable = true,
   });
 
@@ -29,6 +30,8 @@ class KanbanColumnPane extends StatelessWidget {
   /// Drop onto this column (status change). Same-column drops ignored.
   final ValueChanged<TaskItem>? onTaskDropped;
   final ValueChanged<bool>? onDraggingChanged;
+  /// Global pointer while dragging — used for edge page scroll.
+  final ValueChanged<Offset>? onDragPointer;
   final bool draggable;
 
   @override
@@ -141,6 +144,7 @@ class KanbanColumnPane extends StatelessWidget {
                             enabled: canDrop,
                             onOpen: () => onOpenTask(tasks[i]),
                             onDraggingChanged: onDraggingChanged,
+                            onDragPointer: onDragPointer,
                           ),
                         ],
                       ],
@@ -175,6 +179,7 @@ class _DraggableTaskCard extends StatelessWidget {
     required this.enabled,
     required this.onOpen,
     this.onDraggingChanged,
+    this.onDragPointer,
   });
 
   final TaskItem task;
@@ -183,6 +188,7 @@ class _DraggableTaskCard extends StatelessWidget {
   final bool enabled;
   final VoidCallback onOpen;
   final ValueChanged<bool>? onDraggingChanged;
+  final ValueChanged<Offset>? onDragPointer;
 
   @override
   Widget build(BuildContext context) {
@@ -200,6 +206,7 @@ class _DraggableTaskCard extends StatelessWidget {
       delay: const Duration(milliseconds: 200),
       hapticFeedbackOnStart: true,
       onDragStarted: () => onDraggingChanged?.call(true),
+      onDragUpdate: (details) => onDragPointer?.call(details.globalPosition),
       onDragEnd: (_) => onDraggingChanged?.call(false),
       onDraggableCanceled: (_, _) => onDraggingChanged?.call(false),
       feedback: Material(

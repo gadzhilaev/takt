@@ -43,7 +43,13 @@ class AppShell extends StatelessWidget {
             label: 'Мои задачи',
             icon: AppIcons.myTasks,
             selected: navigationShell.currentIndex == 1,
-            onTap: () => _goBranch(1),
+            onTap: () {
+              if (hasProject) {
+                _goBranch(1);
+              } else {
+                context.go('/projects');
+              }
+            },
           ),
           TaktBottomNavItem(
             label: 'Профиль',

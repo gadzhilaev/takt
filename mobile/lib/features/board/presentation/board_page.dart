@@ -7,6 +7,7 @@ import '../../../core/theme.dart';
 import '../../../features/notifications/data/notifications_repository.dart';
 import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/kanban_column.dart';
+import '../../../shared/widgets/kanban_drag_edge_scroll.dart';
 import '../../../shared/widgets/kanban_page_physics.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../cubit/board_cubit.dart';
@@ -23,6 +24,8 @@ class BoardPage extends StatefulWidget {
 
 class _BoardPageState extends State<BoardPage> {
   PageController? _pageController;
+  final GlobalKey _pagerKey = GlobalKey();
+  KanbanDragEdgeScroll? _edgeScroll;
   int _pageIndex = 0;
   int _unread = 0;
   bool _bootstrapped = false;
@@ -75,8 +78,29 @@ class _BoardPageState extends State<BoardPage> {
 
   @override
   void dispose() {
+    _edgeScroll?.dispose();
     _pageController?.dispose();
     super.dispose();
+  }
+
+  void _setDragging(bool value) {
+    setState(() => _dragging = value);
+    if (!value) _edgeScroll?.stop();
+  }
+
+  void _ensureEdgeScroll(int pageCount) {
+    final ctrl = _pageController;
+    if (ctrl == null || pageCount <= 0) return;
+    if (_edgeScroll == null || _edgeScroll!.pageCount != pageCount) {
+      _edgeScroll?.dispose();
+      _edgeScroll = KanbanDragEdgeScroll(controller: ctrl, pageCount: pageCount);
+    }
+  }
+
+  void _onDragPointer(Offset global) {
+    final ctx = _pagerKey.currentContext;
+    if (ctx == null) return;
+    _edgeScroll?.onPointer(global, ctx);
   }
 
   void _syncPageController(int index, int count) {
@@ -191,40 +215,53 @@ class _BoardPageState extends State<BoardPage> {
                     : RefreshIndicator(
                         notificationPredicate: (n) => n.depth == 0 || n.depth == 1,
                         onRefresh: () => context.read<BoardCubit>().refreshBoard(),
-                        child: PageView.builder(
-                          controller: _pageController,
-                          itemCount: state.columns.length,
-                          padEnds: false,
-                          physics: _dragging
-                              ? const NeverScrollableScrollPhysics()
-                              : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
-                          onPageChanged: (i) {
-                            setState(() => _pageIndex = i);
-                            context.read<BoardCubit>().selectColumn(i);
-                          },
-                          itemBuilder: (context, i) {
-                            final col = state.columns[i];
-                            final tasks = state.tasks.where((t) => t.statusId == col.id).toList()
-                              ..sort((a, b) => a.position.compareTo(b.position));
-                            return LayoutBuilder(
-                              builder: (context, constraints) {
-                                return SingleChildScrollView(
-                                  physics: const AlwaysScrollableScrollPhysics(
-                                    parent: ClampingScrollPhysics(),
-                                  ),
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                                    child: KanbanColumnPane(
-                                      column: col,
-                                      tasks: tasks,
-                                      dark: dark,
-                                      onAdd: () => context.push('/task-create?status=${col.id}'),
-                                      onOpenTask: (task) => context.push('/task/${task.id}'),
-                                      onDraggingChanged: (v) => setState(() => _dragging = v),
-                                      onTaskDropped: (task) =>
-                                          context.read<BoardCubit>().moveToColumn(task, col.id),
-                                    ),
-                                  ),
+                        child: Builder(
+                          builder: (context) {
+                            _ensureEdgeScroll(state.columns.length);
+                            return PageView.builder(
+                              key: _pagerKey,
+                              controller: _pageController,
+                              itemCount: state.columns.length,
+                              padEnds: false,
+                              physics: _dragging
+                                  ? const NeverScrollableScrollPhysics()
+                                  : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
+                              onPageChanged: (i) {
+                                setState(() => _pageIndex = i);
+                                context.read<BoardCubit>().selectColumn(i);
+                              },
+                              itemBuilder: (context, i) {
+                                final col = state.columns[i];
+                                final tasks = state.tasks
+                                    .where((t) => t.statusId == col.id)
+                                    .toList()
+                                  ..sort((a, b) => a.position.compareTo(b.position));
+                                return LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    return SingleChildScrollView(
+                                      physics: const AlwaysScrollableScrollPhysics(
+                                        parent: ClampingScrollPhysics(),
+                                      ),
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight: constraints.maxHeight,
+                                        ),
+                                        child: KanbanColumnPane(
+                                          column: col,
+                                          tasks: tasks,
+                                          dark: dark,
+                                          onAdd: () =>
+                                              context.push('/task-create?status=${col.id}'),
+                                          onOpenTask: (task) => context.push('/task/${task.id}'),
+                                          onDraggingChanged: _setDragging,
+                                          onDragPointer: _onDragPointer,
+                                          onTaskDropped: (task) => context
+                                              .read<BoardCubit>()
+                                              .moveToColumn(task, col.id),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
                             );

@@ -172,7 +172,11 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                 label: 'Мои задачи',
                 icon: AppIcons.myTasks,
                 selected: false,
-                onTap: () => context.go('/my-tasks'),
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Сначала откройте проект')),
+                  );
+                },
               ),
               TaktBottomNavItem(
                 label: 'Профиль',
