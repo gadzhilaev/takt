@@ -1,5 +1,6 @@
 import asyncio
 import os
+import tempfile
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -19,6 +20,8 @@ os.environ["ADMIN_EMAIL"] = "admin@test.com"
 os.environ["ADMIN_PASSWORD"] = "Admin123!Test"
 os.environ["ADMIN_NAME"] = "Admin"
 os.environ["SEED_DEMO_DATA"] = "false"
+# Prod default /data/uploads is not writable in CI runners.
+os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="takt-test-uploads-")
 
 from app.core.config import get_settings
 
