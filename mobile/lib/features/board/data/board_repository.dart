@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../../../core/api_client.dart';
 import '../../../shared/models/models.dart';
 
@@ -27,6 +29,13 @@ class BoardRepository {
     final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/tasks/$taskId');
     final raw = res.data?['task'] as Map<String, dynamic>? ?? res.data!;
     return TaskItem.fromJson(raw);
+  }
+
+  Future<List<TaskActivityItem>> listActivity(String taskId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/tasks/$taskId/activity');
+    return (res.data?['items'] as List<dynamic>? ?? [])
+        .map((e) => TaskActivityItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<({List<StatusColumn> columns, List<TaskItem> tasks})> loadBoard(String projectId) async {
@@ -117,6 +126,44 @@ class BoardRepository {
 
   Future<void> deleteTask(String taskId) async {
     await _api.dio.delete('/api/v1/tasks/$taskId');
+  }
+
+  Future<({TaskAttachment attachment, TaskItem task})> uploadAttachment({
+    required String taskId,
+    required String path,
+    required String filename,
+  }) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(path, filename: filename),
+    });
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/api/v1/tasks/$taskId/attachments',
+      data: form,
+    );
+    final att = TaskAttachment.fromJson(res.data!['attachment'] as Map<String, dynamic>);
+    final task = TaskItem.fromJson(res.data!['task'] as Map<String, dynamic>);
+    return (attachment: att, task: task);
+  }
+
+  Future<TaskItem> deleteAttachment({
+    required String taskId,
+    required String attachmentId,
+  }) async {
+    final res = await _api.dio.delete<Map<String, dynamic>>(
+      '/api/v1/tasks/$taskId/attachments/$attachmentId',
+    );
+    return TaskItem.fromJson(res.data!['task'] as Map<String, dynamic>);
+  }
+
+  Future<List<int>> downloadBytes(String relativeOrAbsoluteUrl) async {
+    final path = relativeOrAbsoluteUrl.startsWith('http')
+        ? relativeOrAbsoluteUrl
+        : relativeOrAbsoluteUrl;
+    final res = await _api.dio.get<List<int>>(
+      path,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return res.data ?? const [];
   }
 
   Future<StatusColumn> createColumn({

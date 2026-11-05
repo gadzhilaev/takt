@@ -62,6 +62,24 @@ class ChecklistItemOut(BaseModel):
         return _as_str(value)
 
 
+class AttachmentOut(BaseModel):
+    id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    is_image: bool
+    url: str
+    preview_url: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def coerce_id(cls, value: Any) -> str:
+        return _as_str(value)
+
+
 class TaskOut(BaseModel):
     id: str
     project_id: str | None = None
@@ -88,6 +106,7 @@ class TaskOut(BaseModel):
     comment_count: int = 0
     subtask_total: int = 0
     subtask_done: int = 0
+    attachments: list[AttachmentOut] = []
 
 
 class TaskCreate(BaseModel):
@@ -149,8 +168,11 @@ class CommentOut(BaseModel):
 class ActivityOut(BaseModel):
     id: str
     action: str
-    field: str | None
-    old_value: str | None
-    new_value: str | None
+    field: str | None = None
+    old_value: str | None = None
+    new_value: str | None = None
+    old_label: str | None = None
+    new_label: str | None = None
+    summary: str
     user: UserBrief
     created_at: datetime

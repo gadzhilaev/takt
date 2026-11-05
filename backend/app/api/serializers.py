@@ -1,6 +1,7 @@
-from app.models.task import ChecklistItem, Task, TaskAssignee, TaskLabel
+from app.models.task import Attachment, ChecklistItem, Task, TaskAssignee, TaskLabel
 from app.models.user import User
-from app.schemas.task import ChecklistItemOut, LabelOut, StatusOut, TaskOut, UserBrief
+from app.schemas.task import AttachmentOut, ChecklistItemOut, LabelOut, StatusOut, TaskOut, UserBrief
+from app.services.attachment_service import is_image_content_type
 
 
 def avatar_url(user: User) -> str | None:
@@ -33,6 +34,25 @@ def checklist_to_out(item: ChecklistItem) -> ChecklistItemOut:
     )
 
 
+def attachment_to_out(att: Attachment) -> AttachmentOut:
+    aid = str(att.id)
+    is_image = is_image_content_type(att.content_type)
+    return AttachmentOut(
+        id=aid,
+        filename=att.filename,
+        content_type=att.content_type,
+        size_bytes=att.size_bytes,
+        is_image=is_image,
+        url=f"/api/v1/files/attachments/{aid}",
+        preview_url=(
+            f"/api/v1/files/attachments/{aid}/preview"
+            if att.preview_stored_name or is_image
+            else None
+        ),
+        created_at=att.created_at,
+    )
+
+
 def task_to_out(task: Task, *, comment_count: int = 0, subtask_total: int = 0, subtask_done: int = 0) -> TaskOut:
     assignees = []
     for a in task.assignees or []:
@@ -45,6 +65,7 @@ def task_to_out(task: Task, *, comment_count: int = 0, subtask_total: int = 0, s
                 LabelOut(id=str(tl.label.id), name=tl.label.name, color=tl.label.color)
             )
     items: list[ChecklistItem] = list(task.checklist_items or [])
+    attachments = [attachment_to_out(a) for a in (task.attachments or [])]
     return TaskOut(
         id=str(task.id),
         project_id=str(task.project_id) if task.project_id else None,
@@ -71,4 +92,5 @@ def task_to_out(task: Task, *, comment_count: int = 0, subtask_total: int = 0, s
         comment_count=comment_count,
         subtask_total=subtask_total,
         subtask_done=subtask_done,
+        attachments=attachments,
     )

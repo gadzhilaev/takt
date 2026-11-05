@@ -491,6 +491,7 @@ class BoardCubit extends Cubit<BoardState> {
     String priority = 'medium',
     List<String> assigneeIds = const [],
     String? statusId,
+    List<({String path, String filename})> files = const [],
   }) async {
     final project = state.project;
     final col = state.currentColumn;
@@ -501,7 +502,7 @@ class BoardCubit extends Cubit<BoardState> {
       return;
     }
     try {
-      final task = await board.createTask(
+      var task = await board.createTask(
         projectId: project.id,
         statusId: targetStatusId,
         title: title,
@@ -509,6 +510,14 @@ class BoardCubit extends Cubit<BoardState> {
         priority: priority,
         assigneeIds: assigneeIds,
       );
+      for (final f in files) {
+        final uploaded = await board.uploadAttachment(
+          taskId: task.id,
+          path: f.path,
+          filename: f.filename,
+        );
+        task = uploaded.task;
+      }
       final next = [task, ...state.tasks.where((t) => t.id != task.id)];
       emit(state.copyWith(tasks: next, clearError: true));
       await _persistBoard();
@@ -516,6 +525,12 @@ class BoardCubit extends Cubit<BoardState> {
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
     }
+  }
+
+  void replaceTask(TaskItem task) {
+    final next = state.tasks.map((t) => t.id == task.id ? task : t).toList();
+    emit(state.copyWith(tasks: next, clearError: true));
+    unawaited(_persistBoard());
   }
 
   Future<void> moveToColumn(TaskItem task, String statusId) async {

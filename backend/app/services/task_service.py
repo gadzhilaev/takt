@@ -68,6 +68,7 @@ def task_query_base():
         selectinload(Task.assignees).selectinload(TaskAssignee.user),
         selectinload(Task.labels).selectinload(TaskLabel.label),
         selectinload(Task.checklist_items),
+        selectinload(Task.attachments),
     ).where(Task.deleted_at.is_(None))
 
 

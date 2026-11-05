@@ -181,7 +181,16 @@ class _TaskSheetState extends State<TaskSheet> {
                             ),
                           )
                           .toList(),
+                      attachments: widget.task.attachments,
                       closedAt: widget.task.closedAt,
+                      statusEnteredAt: widget.task.statusEnteredAt,
+                      createdAt: widget.task.createdAt,
+                      updatedAt: widget.task.updatedAt,
+                      authorId: widget.task.authorId,
+                      authorName: widget.task.authorName,
+                      authorAvatarUrl: widget.task.authorAvatarUrl,
+                      commentCount: widget.task.commentCount,
+                      statusName: widget.task.statusName,
                     );
                     if (_statusId != widget.task.statusId) {
                       await cubit.moveToColumn(widget.task, _statusId);

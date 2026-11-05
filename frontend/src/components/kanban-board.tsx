@@ -22,6 +22,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Select } from "@/components/ui/select";
 import { ColumnStartDroppable, KanbanColumn } from "@/components/kanban-column";
 import { TaskCard } from "@/components/task-card";
+import { PendingFilesList } from "@/components/task-attachments";
 import { TaskDrawer } from "@/components/task-drawer";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -29,6 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { uploadTaskAttachment } from "@/lib/attachments";
 import {
   COLUMN_COLOR_PALETTE,
   columnShellStyle,
@@ -94,6 +96,7 @@ export function KanbanBoard({
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [quickCol, setQuickCol] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
   /** По умолчанию полная доска; «Мои задачи» — отдельная вкладка. */
@@ -215,20 +218,28 @@ export function KanbanBoard({
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: {
+    mutationFn: async (payload: {
       title: string;
       status_id: string;
       description?: string | null;
       assignee_ids?: string[];
       priority?: string;
-    }) =>
-      api("/api/v1/tasks", {
+      files: File[];
+    }) => {
+      const { files, ...body } = payload;
+      const res = await api<{ task: Task }>("/api/v1/tasks", {
         method: "POST",
-        json: { ...payload, project_id: projectId },
-      }),
+        json: { ...body, project_id: projectId },
+      });
+      for (const file of files) {
+        await uploadTaskAttachment(res.task.id, file);
+      }
+      return res;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks", projectId] });
       setDraft(emptyDraft());
+      setPendingFiles([]);
       setQuickCol(null);
     },
   });
@@ -308,7 +319,14 @@ export function KanbanBoard({
       description: draft.description.trim() || null,
       assignee_ids: draft.assigneeIds,
       priority: draft.priority,
+      files: pendingFiles,
     });
+  }
+
+  function resetCreateForm() {
+    setQuickCol(null);
+    setDraft(emptyDraft());
+    setPendingFiles([]);
   }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -555,10 +573,7 @@ export function KanbanBoard({
             value={draft.title}
             onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
             onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setQuickCol(null);
-                setDraft(emptyDraft());
-              }
+              if (e.key === "Escape") resetCreateForm();
             }}
           />
           <label className="label-text" htmlFor={`quick-desc-${status.id}`}>
@@ -599,6 +614,14 @@ export function KanbanBoard({
             }
             options={URGENCY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           />
+          <PendingFilesList
+            files={pendingFiles}
+            onRemove={(index) => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
+            onAdd={(list) => {
+              if (!list?.length) return;
+              setPendingFiles((prev) => [...prev, ...Array.from(list)]);
+            }}
+          />
           <div className="flex gap-2">
             <Button
               type="submit"
@@ -611,15 +634,7 @@ export function KanbanBoard({
             >
               Создать
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setQuickCol(null);
-                setDraft(emptyDraft());
-              }}
-            >
+            <Button type="button" size="sm" variant="ghost" onClick={resetCreateForm}>
               Отмена
             </Button>
           </div>
@@ -632,6 +647,7 @@ export function KanbanBoard({
         className="flex w-full items-center gap-1 rounded-[var(--radius)] px-2 py-1 text-left text-[13px] text-muted hover:bg-[var(--surface)]/60 hover:text-foreground"
         onClick={() => {
           setDraft(emptyDraft());
+          setPendingFiles([]);
           setQuickCol(status.id);
         }}
       >

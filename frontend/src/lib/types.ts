@@ -78,6 +78,17 @@ export type Project = {
   progress?: { total: number; done: number; percent: number } | null;
 };
 
+export type TaskAttachment = {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  is_image: boolean;
+  url: string;
+  preview_url: string | null;
+  created_at: string;
+};
+
 export type Task = {
   id: string;
   project_id: string | null;
@@ -104,6 +115,7 @@ export type Task = {
   comment_count?: number;
   subtask_total?: number;
   subtask_done?: number;
+  attachments?: TaskAttachment[];
 };
 
 export type NotificationItem = {
@@ -113,6 +125,7 @@ export type NotificationItem = {
   body: string | null;
   task_id: string | null;
   project_id: string | null;
+  project_name?: string | null;
   is_read: boolean;
   created_at: string;
 };

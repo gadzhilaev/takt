@@ -168,6 +168,98 @@ class TaskAssignee extends Equatable {
   List<Object?> get props => [id, name, avatarUrl];
 }
 
+class TaskActivityItem extends Equatable {
+  const TaskActivityItem({
+    required this.id,
+    required this.action,
+    required this.summary,
+    required this.createdAt,
+    required this.userId,
+    required this.userName,
+    this.userAvatarUrl,
+    this.field,
+    this.oldLabel,
+    this.newLabel,
+  });
+
+  final String id;
+  final String action;
+  final String summary;
+  final String createdAt;
+  final String userId;
+  final String userName;
+  final String? userAvatarUrl;
+  final String? field;
+  final String? oldLabel;
+  final String? newLabel;
+
+  factory TaskActivityItem.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>? ?? const {};
+    return TaskActivityItem(
+      id: json['id'] as String,
+      action: json['action'] as String? ?? '',
+      summary: json['summary'] as String? ?? json['action'] as String? ?? '',
+      createdAt: json['created_at'] as String? ?? '',
+      userId: user['id'] as String? ?? '',
+      userName: user['name'] as String? ?? 'Участник',
+      userAvatarUrl: user['avatar_url'] as String?,
+      field: json['field'] as String?,
+      oldLabel: json['old_label'] as String?,
+      newLabel: json['new_label'] as String?,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, action, summary, createdAt, userId];
+}
+
+class TaskAttachment extends Equatable {
+  const TaskAttachment({
+    required this.id,
+    required this.filename,
+    required this.contentType,
+    required this.sizeBytes,
+    required this.isImage,
+    required this.url,
+    this.previewUrl,
+    this.createdAt,
+  });
+
+  final String id;
+  final String filename;
+  final String contentType;
+  final int sizeBytes;
+  final bool isImage;
+  final String url;
+  final String? previewUrl;
+  final String? createdAt;
+
+  factory TaskAttachment.fromJson(Map<String, dynamic> json) => TaskAttachment(
+        id: json['id'] as String,
+        filename: json['filename'] as String? ?? 'file',
+        contentType: json['content_type'] as String? ?? 'application/octet-stream',
+        sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
+        isImage: json['is_image'] as bool? ?? false,
+        url: json['url'] as String? ?? '',
+        previewUrl: json['preview_url'] as String?,
+        createdAt: json['created_at'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'filename': filename,
+        'content_type': contentType,
+        'size_bytes': sizeBytes,
+        'is_image': isImage,
+        'url': url,
+        'preview_url': previewUrl,
+        'created_at': createdAt,
+      };
+
+  @override
+  List<Object?> get props => [id, filename, sizeBytes, isImage, url, previewUrl];
+}
+
 class TaskItem extends Equatable {
   const TaskItem({
     required this.id,
@@ -178,6 +270,7 @@ class TaskItem extends Equatable {
     this.projectId,
     this.description,
     this.assignees = const [],
+    this.attachments = const [],
     this.closedAt,
     this.statusEnteredAt,
     this.updatedAt,
@@ -197,6 +290,7 @@ class TaskItem extends Equatable {
   final String? projectId;
   final String? description;
   final List<TaskAssignee> assignees;
+  final List<TaskAttachment> attachments;
   final String? closedAt;
   final String? statusEnteredAt;
   final String? updatedAt;
@@ -235,6 +329,9 @@ class TaskItem extends Equatable {
       authorName: author?['name'] as String?,
       authorAvatarUrl: author?['avatar_url'] as String?,
       commentCount: (json['comment_count'] as num?)?.toInt() ?? 0,
+      attachments: (json['attachments'] as List<dynamic>? ?? [])
+          .map((e) => TaskAttachment.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -247,6 +344,7 @@ class TaskItem extends Equatable {
     String? priority,
     String? projectId,
     List<TaskAssignee>? assignees,
+    List<TaskAttachment>? attachments,
     Object? closedAt = _unset,
     Object? statusEnteredAt = _unset,
     String? updatedAt,
@@ -264,6 +362,7 @@ class TaskItem extends Equatable {
         projectId: projectId ?? this.projectId,
         description: description ?? this.description,
         assignees: assignees ?? this.assignees,
+        attachments: attachments ?? this.attachments,
         closedAt: identical(closedAt, _unset) ? this.closedAt : closedAt as String?,
         statusEnteredAt:
             identical(statusEnteredAt, _unset) ? this.statusEnteredAt : statusEnteredAt as String?,
@@ -285,6 +384,7 @@ class TaskItem extends Equatable {
         'project_id': projectId,
         'description': description,
         'assignees': assignees.map((a) => a.toJson()).toList(),
+        'attachments': attachments.map((a) => a.toJson()).toList(),
         'closed_at': closedAt,
         'status_entered_at': statusEnteredAt,
         'updated_at': updatedAt,
@@ -319,6 +419,7 @@ class TaskItem extends Equatable {
         position,
         description,
         assignees,
+        attachments,
         closedAt,
         statusEnteredAt,
         commentCount,
@@ -334,6 +435,7 @@ class AppNotification extends Equatable {
     this.body,
     this.taskId,
     this.projectId,
+    this.projectName,
     this.isRead = false,
   });
 
@@ -344,6 +446,7 @@ class AppNotification extends Equatable {
   final String? body;
   final String? taskId;
   final String? projectId;
+  final String? projectName;
   final bool isRead;
 
   factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
@@ -354,11 +457,24 @@ class AppNotification extends Equatable {
         body: json['body'] as String?,
         taskId: json['task_id'] as String?,
         projectId: json['project_id'] as String?,
+        projectName: json['project_name'] as String?,
         isRead: json['is_read'] as bool? ?? false,
       );
 
+  AppNotification copyWith({bool? isRead}) => AppNotification(
+        id: id,
+        title: title,
+        kind: kind,
+        createdAt: createdAt,
+        body: body,
+        taskId: taskId,
+        projectId: projectId,
+        projectName: projectName,
+        isRead: isRead ?? this.isRead,
+      );
+
   @override
-  List<Object?> get props => [id, title, isRead];
+  List<Object?> get props => [id, title, isRead, projectName];
 }
 
 class ProjectInvite extends Equatable {

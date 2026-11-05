@@ -8,6 +8,7 @@ import '../../../shared/widgets/assignee_picker_dialog.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_select.dart';
 import '../../../shared/widgets/takt_ui.dart';
+import '../../../shared/widgets/task_attachments_section.dart';
 import '../cubit/board_cubit.dart';
 
 class TaskFormPage extends StatefulWidget {
@@ -34,6 +35,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
   late Set<String> _assigneeIds;
   bool _saving = false;
   TaskItem? _existing;
+  List<PendingLocalFile> _pendingFiles = [];
 
   @override
   void initState() {
@@ -90,6 +92,9 @@ class _TaskFormPageState extends State<TaskFormPage> {
           priority: _priority,
           assigneeIds: _assigneeIds.toList(),
           statusId: _statusId,
+          files: [
+            for (final f in _pendingFiles) (path: f.path, filename: f.name),
+          ],
         );
       } else if (_existing != null) {
         if (_statusId != _existing!.statusId) {
@@ -108,6 +113,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
                 .where((m) => _assigneeIds.contains(m.userId))
                 .map((m) => TaskAssignee(id: m.userId, name: m.name, avatarUrl: m.avatarUrl))
                 .toList(),
+            attachments: _existing!.attachments,
             closedAt: _existing!.closedAt,
             statusEnteredAt: _existing!.statusEnteredAt,
             updatedAt: _existing!.updatedAt,
@@ -251,7 +257,6 @@ class _TaskFormPageState extends State<TaskFormPage> {
               ),
             TaktFormField(
               label: 'Срочность',
-              bottomGap: 0,
               child: TaktSelectField<String>(
                 label: '',
                 value: _priority,
@@ -263,6 +268,20 @@ class _TaskFormPageState extends State<TaskFormPage> {
                 onChanged: (v) => setState(() => _priority = v),
               ),
             ),
+            if (widget.isCreate)
+              PendingFilesSection(
+                files: _pendingFiles,
+                onChanged: (files) => setState(() => _pendingFiles = files),
+              )
+            else if (_existing != null)
+              TaskAttachmentsSection(
+                taskId: _existing!.id,
+                attachments: _existing!.attachments,
+                onChanged: (task) {
+                  setState(() => _existing = task);
+                  context.read<BoardCubit>().replaceTask(task);
+                },
+              ),
           ],
         ),
       ),

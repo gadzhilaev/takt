@@ -20,6 +20,8 @@ import {
 } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
+import { TaskAttachmentsPanel } from "@/components/task-attachments";
+import { TaskActivityPanel } from "@/components/task-activity";
 
 export function TaskDrawer({
   taskId,
@@ -75,6 +77,7 @@ export function TaskDrawer({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["task", taskId] });
+      qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
     },
   });
 
@@ -206,6 +209,17 @@ export function TaskDrawer({
                     options={URGENCY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                   />
                 </div>
+                <TaskAttachmentsPanel
+                  taskId={task.id}
+                  attachments={task.attachments ?? []}
+                  editable
+                  onChanged={() => {
+                    qc.invalidateQueries({ queryKey: ["task", taskId] });
+                    qc.invalidateQueries({ queryKey: ["tasks"] });
+                    qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+                  }}
+                />
+                <TaskActivityPanel taskId={task.id} />
                 {patch.isPending && <p className="text-xs text-muted">Сохранение…</p>}
                 {isAuthor && (
                   <div className="border-t border-hairline pt-4">
@@ -308,6 +322,17 @@ export function TaskDrawer({
                     <p className="text-sm text-muted">Не назначены</p>
                   )}
                 </div>
+                <TaskAttachmentsPanel
+                  taskId={task.id}
+                  attachments={task.attachments ?? []}
+                  editable
+                  onChanged={() => {
+                    qc.invalidateQueries({ queryKey: ["task", taskId] });
+                    qc.invalidateQueries({ queryKey: ["tasks"] });
+                    qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+                  }}
+                />
+                <TaskActivityPanel taskId={task.id} />
               </>
             )
           ) : (

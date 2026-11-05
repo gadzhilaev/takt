@@ -3,13 +3,13 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, verify_csrf
-from app.api.serializers import task_to_out, user_brief
+from app.api.serializers import attachment_to_out, task_to_out, user_brief
 from app.db.session import get_db
 from app.models.task import (
     ActivityLog,
@@ -22,6 +22,7 @@ from app.models.task import (
 )
 from app.models.user import User
 from app.schemas.task import (
+    ActivityOut,
     ChecklistCreate,
     ChecklistUpdate,
     CommentCreate,
@@ -31,7 +32,9 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.models.project import ProjectMemberRole
-from app.services import notify_service, task_service
+from app.services import attachment_service, notify_service, task_service
+from app.services.activity_format import activity_summary, label_for, resolve_status_labels
+from app.services.attachment_service import AttachmentError
 from app.services.websocket_hub import ws_manager
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -341,9 +344,13 @@ async def move_task(
     status = await task_service.get_status(db, body.status_id)
     if not status:
         raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
+    old_status_id = task.status_id
     newly_done = await task_service.apply_status_change(db, task, status)
     task.position = body.position
-    await task_service.log_activity(db, task.id, user.id, "moved", "status_id", None, str(status.id))
+    if old_status_id != status.id:
+        await task_service.log_activity(
+            db, task.id, user.id, "moved", "status_id", str(old_status_id), str(status.id)
+        )
     if newly_done:
         await notify_service.notify_task_completed(db, actor=user, task=task)
     await db.commit()
@@ -442,6 +449,60 @@ async def duplicate_task(
     out = await _task_out(db, task)  # type: ignore[arg-type]
     await ws_manager.broadcast("task.created", {"task": out.model_dump(mode="json")})
     return {"task": out}
+
+
+@router.post("/{task_id}/attachments", dependencies=[Depends(verify_csrf)])
+async def upload_attachment(
+    task_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...),
+):
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
+    try:
+        att = await attachment_service.save_upload(db, task=task, user=user, upload=file)
+    except AttachmentError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": e.code, "message": e.message}},
+        )
+    await task_service.log_activity(
+        db, task.id, user.id, "attachment_added", "filename", None, att.filename
+    )
+    await db.commit()
+    await db.refresh(att)
+    out = attachment_to_out(att)
+    task_out = await _task_out(db, await task_service.get_task(db, task_id))  # type: ignore[arg-type]
+    await ws_manager.broadcast("task.updated", {"task": task_out.model_dump(mode="json")})
+    return {"attachment": out, "task": task_out}
+
+
+@router.delete("/{task_id}/attachments/{attachment_id}", dependencies=[Depends(verify_csrf)])
+async def delete_attachment(
+    task_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+    await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
+    att = await attachment_service.get_attachment(db, attachment_id)
+    if not att or att.task_id != task_id:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Файл не найден"}})
+    filename = att.filename
+    await attachment_service.delete_attachment(db, att)
+    await task_service.log_activity(
+        db, task.id, user.id, "attachment_removed", "filename", filename, None
+    )
+    await db.commit()
+    task_out = await _task_out(db, await task_service.get_task(db, task_id))  # type: ignore[arg-type]
+    await ws_manager.broadcast("task.updated", {"task": task_out.model_dump(mode="json")})
+    return {"ok": True, "task": task_out}
 
 
 @router.get("/{task_id}/comments")
@@ -544,20 +605,34 @@ async def activity(
         .order_by(ActivityLog.created_at.desc())
     )
     logs = (await db.execute(q)).scalars().all()
-    return {
-        "items": [
-            {
-                "id": str(l.id),
-                "action": l.action,
-                "field": l.field,
-                "old_value": l.old_value,
-                "new_value": l.new_value,
-                "user": user_brief(l.user),
-                "created_at": l.created_at,
-            }
-            for l in logs
-        ]
-    }
+    status_names = await resolve_status_labels(
+        db,
+        [v for l in logs for v in (l.old_value, l.new_value)],
+    )
+    items: list[ActivityOut] = []
+    for log in logs:
+        old_label = label_for(field=log.field, value=log.old_value, status_names=status_names)
+        new_label = label_for(field=log.field, value=log.new_value, status_names=status_names)
+        items.append(
+            ActivityOut(
+                id=str(log.id),
+                action=log.action,
+                field=log.field,
+                old_value=log.old_value,
+                new_value=log.new_value,
+                old_label=old_label,
+                new_label=new_label,
+                summary=activity_summary(
+                    action=log.action,
+                    field=log.field,
+                    old_label=old_label,
+                    new_label=new_label,
+                ),
+                user=user_brief(log.user),
+                created_at=log.created_at,
+            )
+        )
+    return {"items": items}
 
 
 @router.post("/{task_id}/checklist", dependencies=[Depends(verify_csrf)])

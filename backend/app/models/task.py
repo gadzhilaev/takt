@@ -161,6 +161,7 @@ class Attachment(Base, TimestampMixin):
     uploaded_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     stored_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    preview_stored_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     size_bytes: Mapped[int] = mapped_column(nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
 

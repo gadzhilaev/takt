@@ -156,6 +156,22 @@ export function TaskCard({
               {task.description}
             </p>
           )}
+          {!!task.attachments?.some((a) => a.is_image && a.preview_url) && (
+            <div className="mt-1.5 flex gap-1 overflow-hidden">
+              {task.attachments
+                .filter((a) => a.is_image && a.preview_url)
+                .slice(0, 3)
+                .map((a) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={a.id}
+                    src={a.preview_url!}
+                    alt=""
+                    className="h-10 w-10 rounded object-cover"
+                  />
+                ))}
+            </div>
+          )}
         </button>
 
         {task.assignees.length > 0 && (

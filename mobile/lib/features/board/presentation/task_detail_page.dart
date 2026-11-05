@@ -11,6 +11,8 @@ import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_sheet.dart';
 import '../../../shared/widgets/takt_ui.dart';
+import '../../../shared/widgets/task_activity_section.dart';
+import '../../../shared/widgets/task_attachments_section.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../cubit/board_cubit.dart';
 import '../data/board_repository.dart';
@@ -413,6 +415,17 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                   ),
                               ],
                             ),
+                          const SizedBox(height: 16),
+                          TaskAttachmentsSection(
+                            taskId: task.id,
+                            attachments: task.attachments,
+                            onChanged: (updated) {
+                              setState(() => _task = updated);
+                              context.read<BoardCubit>().replaceTask(updated);
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TaskActivitySection(taskId: task.id),
                         ],
                       ),
       ),
