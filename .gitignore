@@ -51,8 +51,9 @@ mobile/.flutter-plugins-dependencies
 mobile/**/Pods/
 mobile/ios/Flutter/Flutter.podspec
 
-# Local agent / cursor noise
-.cursor/*.log
+# Local Cursor / AI agent materials (kept on disk for Cursor, not published)
+.cursor/
+AGENTS.md
 
 # Ephemeral e2e screenshot dumps
 docs/screenshots/.e2e-capture/

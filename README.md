@@ -43,7 +43,7 @@ Takt помогает небольшим командам вести проек�
 
 ### Web
 
-Актуальная Kanban-доска проекта (демо «Колледж ДГУ»): столбцы, приоритеты, исполнители, блок «Мои задачи».
+Актуальная Kanban-доска проекта: столбцы, приоритеты, исполнители; вкладки «Мои задачи» / «Доска».
 
 <p align="center">
   <img src="docs/screenshots/readme/web-kanban-light.png" alt="Takt — Kanban на web" width="920" />
@@ -202,17 +202,9 @@ CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: 
 | [`docs/deployment.md`](docs/deployment.md) | Docker и production |
 | [`docs/oauth.md`](docs/oauth.md) | Настройка OAuth |
 | [`docs/release.md`](docs/release.md) | Mobile / магазины (кратко) |
-| [`AGENTS.md`](AGENTS.md) | Правила для AI-агентов |
 
-## Статус и лицензия
+## Лицензия
 
-Активная разработка. Production: **https://taktapp.ru**.
+Исходный код принадлежит [@gadzhilaev](https://github.com/gadzhilaev). Production: **https://taktapp.ru**.
 
-- Web: Kanban, проекты, участники, единый вход `/login`, платформенная админка `/admin` (light-only)
-- Mobile: доска, мои задачи, профиль, home widgets; OAuth VK / Яндекс / Apple на экране входа
-- OAuth на prod: VK ID и Яндекс ID (web + mobile), Sign in with Apple — только mobile  
-  Политика оператора и 149-ФЗ: [`docs/oauth.md`](docs/oauth.md)
-
-Исходный код принадлежит [@gadzhilaev](https://github.com/gadzhilaev).
-
-**Лицензия:** proprietary / source-available — см. [`LICENSE`](LICENSE). Код можно **просматривать** в репозитории; это **не** open-source (нет права копировать, менять или использовать коммерчески без письменного разрешения). MIT/Apache **не** применяются.
+**Лицензия:** proprietary / source-available — [`LICENSE`](LICENSE). Код можно просматривать; это не open-source (копирование и коммерческое использование без письменного разрешения запрещены).
