@@ -419,10 +419,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                           TaskAttachmentsSection(
                             taskId: task.id,
                             attachments: task.attachments,
-                            onChanged: (updated) {
-                              setState(() => _task = updated);
-                              context.read<BoardCubit>().replaceTask(updated);
-                            },
+                            editable: false,
                           ),
                           const SizedBox(height: 16),
                           TaskActivitySection(taskId: task.id),

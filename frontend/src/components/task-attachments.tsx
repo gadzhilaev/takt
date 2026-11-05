@@ -1,7 +1,12 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/app-icon";
-import { formatBytes, deleteTaskAttachment, uploadTaskAttachment } from "@/lib/attachments";
+import {
+  assertAttachmentSize,
+  formatBytes,
+  deleteTaskAttachment,
+  uploadTaskAttachment,
+} from "@/lib/attachments";
 import type { TaskAttachment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
@@ -27,9 +32,10 @@ export function TaskAttachmentsPanel({
     setBusy(true);
     setError("");
     try {
-      for (const file of Array.from(files)) {
-        await uploadTaskAttachment(taskId, file);
-      }
+      const list = Array.from(files);
+      for (const file of list) assertAttachmentSize(file);
+      // Upload in parallel so several files finish together.
+      await Promise.all(list.map((file) => uploadTaskAttachment(taskId, file)));
       onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось загрузить");
@@ -51,6 +57,11 @@ export function TaskAttachmentsPanel({
     } finally {
       setBusy(false);
     }
+  }
+
+  // View mode without files — hide the whole block (no «Нет вложений»).
+  if (!editable && !attachments.length) {
+    return null;
   }
 
   return (
@@ -77,7 +88,9 @@ export function TaskAttachmentsPanel({
           </>
         )}
       </div>
-      {!attachments.length && <p className="text-sm text-muted">Нет вложений</p>}
+      {editable && (
+        <p className="text-[11px] text-muted">Можно несколько файлов, до 20 МБ каждый</p>
+      )}
       <ul className="space-y-1.5">
         {attachments.map((att) => (
           <li
@@ -196,6 +209,7 @@ export function PendingFilesList({
           }}
         />
       </div>
+      <p className="text-[11px] text-muted">Можно несколько файлов, до 20 МБ каждый</p>
       {files.length > 0 && (
         <ul className="space-y-1">
           {files.map((f, i) => (

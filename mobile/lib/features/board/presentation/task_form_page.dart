@@ -277,6 +277,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
               TaskAttachmentsSection(
                 taskId: _existing!.id,
                 attachments: _existing!.attachments,
+                editable: true,
                 onChanged: (task) {
                   setState(() => _existing = task);
                   context.read<BoardCubit>().replaceTask(task);

@@ -49,6 +49,6 @@ async def test_task_activity_created_and_moved(admin_client: AsyncClient):
     assert items[0]["action"] == "moved"
     assert items[0]["old_label"] == todo["name"]
     assert items[0]["new_label"] == doing["name"]
-    assert "перенёс из" in items[0]["summary"]
+    assert "перенёс" in items[0]["summary"]
     assert items[0]["user"]["id"] == me["id"]
     assert any(i["action"] == "created" and "создал" in i["summary"] for i in items)

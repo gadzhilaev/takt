@@ -16,6 +16,9 @@ PRIORITY_LABELS = {
     "urgent": "Срочно",
 }
 
+# Column / board moves only — used by clients that hide other noise.
+COLUMN_MOVE_ACTIONS = frozenset({"moved", "status_changed"})
+
 
 def _looks_like_uuid(value: str | None) -> bool:
     if not value:
@@ -65,42 +68,49 @@ def activity_summary(
     old_label: str | None,
     new_label: str | None,
 ) -> str:
-    if action == "created":
-        return "создал задачу"
-    if action in ("moved", "status_changed"):
+    """Always return Russian copy — never raw English action codes."""
+    key = (action or "").strip().lower()
+    if key == "created":
+        return "создал(а) задачу"
+    if key in ("moved", "status_changed") or field == "status_id":
         if old_label and new_label:
-            return f"перенёс из «{old_label}» в «{new_label}»"
+            return f"перенёс(ла) из «{old_label}» в «{new_label}»"
         if new_label:
-            return f"перенёс в «{new_label}»"
-        return "изменил столбец"
-    if action == "updated":
+            return f"перенёс(ла) в «{new_label}»"
+        return "изменил(а) столбец"
+    if key == "updated":
         if field == "title":
             if old_label and new_label:
-                return f"изменил название: «{old_label}» → «{new_label}»"
-            return "изменил название"
+                return f"изменил(а) название: «{old_label}» → «{new_label}»"
+            return "изменил(а) название"
         if field == "priority":
             if old_label and new_label:
-                return f"изменил срочность: {old_label} → {new_label}"
-            return "изменил срочность"
+                return f"изменил(а) срочность: {old_label} → {new_label}"
+            return "изменил(а) срочность"
         if field == "due_date":
-            return "изменил срок"
+            return "изменил(а) срок"
         if field == "description":
-            return "изменил описание"
-        return "обновил задачу"
-    if action == "assignees_changed":
-        return "изменил исполнителей"
-    if action == "archived":
-        return "архивировал задачу"
-    if action == "unarchived":
-        return "вернул задачу из архива"
-    if action == "restored":
-        return "восстановил задачу"
-    if action == "attachment_added":
+            return "изменил(а) описание"
+        return "обновил(а) задачу"
+    if key in ("assignees_changed", "assignee_changed"):
+        return "изменил(а) исполнителей"
+    if key == "archived":
+        return "архивировал(а) задачу"
+    if key == "unarchived":
+        return "вернул(а) задачу из архива"
+    if key == "restored":
+        return "восстановил(а) задачу"
+    if key in ("attachment_added", "attachment_uploaded"):
         if new_label:
-            return f"прикрепил файл «{new_label}»"
-        return "прикрепил файл"
-    if action == "attachment_removed":
+            return f"прикрепил(а) файл «{new_label}»"
+        return "прикрепил(а) файл"
+    if key in ("attachment_removed", "attachment_deleted"):
         if old_label:
-            return f"удалил файл «{old_label}»"
-        return "удалил файл"
-    return action
+            return f"удалил(а) файл «{old_label}»"
+        return "удалил(а) файл"
+    return "обновил(а) задачу"
+
+
+def is_column_move_action(action: str | None, field: str | None = None) -> bool:
+    key = (action or "").strip().lower()
+    return key in COLUMN_MOVE_ACTIONS or field == "status_id"

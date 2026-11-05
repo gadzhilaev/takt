@@ -70,3 +70,44 @@ async def test_upload_image_attachment_with_webp_preview(admin_client: AsyncClie
     deleted = await admin_client.delete(f"/api/v1/tasks/{task_id}/attachments/{att['id']}")
     assert deleted.status_code == 200, deleted.text
     assert deleted.json()["task"]["attachments"] == []
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_over_20mb(admin_client: AsyncClient):
+    project = await admin_client.post(
+        "/api/v1/projects",
+        json={
+            "name": "Attach Limit",
+            "description": None,
+            "color": "#315F72",
+            "icon": "folder",
+            "member_ids": [],
+        },
+    )
+    pid = project.json()["project"]["id"]
+    status_id = (
+        await admin_client.get(f"/api/v1/settings/statuses?project_id={pid}")
+    ).json()["items"][0]["id"]
+    uid = (await admin_client.get("/api/v1/auth/me")).json()["user"]["id"]
+    task_id = (
+        await admin_client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Big file",
+                "status_id": status_id,
+                "project_id": pid,
+                "assignee_ids": [uid],
+                "priority": "medium",
+            },
+        )
+    ).json()["task"]["id"]
+
+    too_big = b"x" * (20 * 1024 * 1024 + 1)
+    uploaded = await admin_client.post(
+        f"/api/v1/tasks/{task_id}/attachments",
+        files={"file": ("huge.bin", too_big, "application/octet-stream")},
+    )
+    assert uploaded.status_code == 400, uploaded.text
+    detail = uploaded.json()["detail"]["error"]
+    assert detail["code"] == "too_large"
+    assert "20" in detail["message"]

@@ -1,16 +1,29 @@
 import { messageFromApiError } from "@/lib/api";
 import type { Task, TaskAttachment } from "@/lib/types";
 
+/** Must match backend `attachment_service.MAX_BYTES` and nginx `client_max_body_size`. */
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
 function csrfToken(): string | undefined {
   if (typeof document === "undefined") return undefined;
   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : undefined;
 }
 
+export function assertAttachmentSize(file: File): void {
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error(`«${file.name}» больше 20 МБ`);
+  }
+  if (file.size <= 0) {
+    throw new Error(`«${file.name}» пустой`);
+  }
+}
+
 export async function uploadTaskAttachment(
   taskId: string,
   file: File
 ): Promise<{ attachment: TaskAttachment; task: Task }> {
+  assertAttachmentSize(file);
   const fd = new FormData();
   fd.append("file", file, file.name);
   const headers = new Headers();

@@ -619,7 +619,13 @@ export function KanbanBoard({
             onRemove={(index) => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
             onAdd={(list) => {
               if (!list?.length) return;
-              setPendingFiles((prev) => [...prev, ...Array.from(list)]);
+              const next = Array.from(list);
+              const tooBig = next.find((f) => f.size > 20 * 1024 * 1024);
+              if (tooBig) {
+                window.alert(`«${tooBig.name}» больше 20 МБ`);
+                return;
+              }
+              setPendingFiles((prev) => [...prev, ...next]);
             }}
           />
           <div className="flex gap-2">

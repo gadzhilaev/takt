@@ -17,7 +17,7 @@ from app.core.config import get_settings
 from app.models.task import Attachment, Task
 from app.models.user import User
 
-MAX_BYTES = 25 * 1024 * 1024
+MAX_BYTES = 20 * 1024 * 1024  # keep in sync with nginx client_max_body_size 20m
 PREVIEW_MAX_EDGE = 1280
 PREVIEW_QUALITY = 80
 
@@ -133,7 +133,7 @@ async def save_upload(
     if not data:
         raise AttachmentError("empty", "Пустой файл")
     if len(data) > MAX_BYTES:
-        raise AttachmentError("too_large", "Файл больше 25 МБ")
+        raise AttachmentError("too_large", "Файл больше 20 МБ")
 
     att_id = uuid.uuid4()
     ext = _ext_for(content_type, filename)
