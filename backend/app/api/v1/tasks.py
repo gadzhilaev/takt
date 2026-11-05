@@ -209,6 +209,7 @@ async def create_task(
         priority=body.priority,
         author_id=user.id,
         due_date=body.due_date,
+        due_basis_at=now if body.due_date is not None else None,
         position=pos,
         status_entered_at=now,
     )
@@ -225,6 +226,11 @@ async def create_task(
         db.add(TaskLabel(task_id=task.id, label_id=label.id))
     await task_service.log_activity(db, task.id, user.id, "created")
     await db.flush()
+    if body.due_date is not None:
+        from app.services.due_urgency_service import apply_urgency_to_task
+
+        apply_urgency_to_task(task, now=now)
+        await db.flush()
     if body.assignee_ids:
         name_map = await _user_names(db, body.assignee_ids)
         await notify_service.notify_assignees(
@@ -275,11 +281,21 @@ async def update_task(
             db, task.id, user.id, "updated", "priority", task.priority.value, body.priority.value
         )
         task.priority = body.priority
-    if body.due_date is not None:
+    if "due_date" in body.model_fields_set:
         old = task.due_date.isoformat() if task.due_date else None
         new = body.due_date.isoformat() if body.due_date else None
-        await task_service.log_activity(db, task.id, user.id, "updated", "due_date", old, new)
-        task.due_date = body.due_date
+        if old != new:
+            await task_service.log_activity(db, task.id, user.id, "updated", "due_date", old, new)
+            task.due_date = body.due_date
+            task.due_soon_notified_at = None
+            task.overdue_notified_at = None
+            if body.due_date is None:
+                task.due_basis_at = None
+            else:
+                task.due_basis_at = datetime.now(UTC)
+                from app.services.due_urgency_service import apply_urgency_to_task
+
+                apply_urgency_to_task(task)
     if body.position is not None:
         task.position = body.position
     newly_done = False
@@ -416,6 +432,7 @@ async def duplicate_task(
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
     await _require_task_project_access(db, user, source, min_role=ProjectMemberRole.member)
     pos = await task_service.next_position(db, source.status_id)
+    clone_now = datetime.now(UTC)
     clone = Task(
         title=f"{source.title} (копия)",
         description=source.description,
@@ -425,6 +442,7 @@ async def duplicate_task(
         priority=source.priority,
         author_id=user.id,
         due_date=source.due_date,
+        due_basis_at=clone_now if source.due_date is not None else None,
         position=pos,
         status_entered_at=datetime.now(UTC),
     )

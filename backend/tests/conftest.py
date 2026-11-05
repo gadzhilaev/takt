@@ -22,6 +22,8 @@ os.environ["ADMIN_NAME"] = "Admin"
 os.environ["SEED_DEMO_DATA"] = "false"
 # Prod default /data/uploads is not writable in CI runners.
 os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="takt-test-uploads-")
+# Background due-reminder loop must not run during tests.
+os.environ["DUE_REMINDER_ENABLED"] = "false"
 
 from app.core.config import get_settings
 

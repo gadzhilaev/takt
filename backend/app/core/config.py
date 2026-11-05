@@ -104,6 +104,11 @@ class Settings(BaseSettings):
     # Set false after all clients ship header-based WS auth.
     ALLOW_WS_QUERY_TOKEN: bool = True
 
+    # Due-date reminders (in-app + web push + FCM). Interval 0 disables the loop.
+    DUE_SOON_HOURS: int = 24
+    DUE_REMINDER_INTERVAL_SECONDS: int = 300
+    DUE_REMINDER_ENABLED: bool = True
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

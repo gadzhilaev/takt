@@ -160,3 +160,63 @@ async def notify_task_completed(
             "url": link,
         },
     )
+
+
+async def notify_task_due(
+    db: AsyncSession,
+    *,
+    task: Task,
+    kind: str,
+    subject: str,
+    push_title: str,
+    settings: Settings | None = None,
+) -> None:
+    """Notify all assignees about due-soon or overdue (no actor)."""
+    settings = settings or get_settings()
+    recipients = [a.user_id for a in (task.assignees or [])]
+    if not recipients:
+        return
+
+    link = task_deep_link(task.project_id, task.id)
+    project_name: str | None = None
+    if task.project_id:
+        project = await db.get(Project, task.project_id)
+        project_name = project.name if project else None
+
+    body = subject if not project_name else f"{subject}\nПроект {project_name}"
+    card_title = (task.title or "Задача").strip()[:255]
+    push_body = f"{card_title}\n{subject}"
+
+    for uid in recipients:
+        await create_in_app(
+            db,
+            user_id=uid,
+            actor_id=None,
+            kind=kind,
+            title=card_title,
+            body=body,
+            task_id=task.id,
+            project_id=task.project_id,
+        )
+        await push_service.send_push_to_users(
+            db,
+            settings,
+            user_ids=[uid],
+            title=push_title,
+            body=push_body,
+            url=link,
+            tag=f"{kind}-{task.id}",
+        )
+        await fcm_service.send_fcm_to_users(
+            db,
+            settings,
+            user_ids=[uid],
+            title=push_title,
+            body=push_body,
+            data={
+                "kind": kind,
+                "task_id": str(task.id),
+                "project_id": str(task.project_id) if task.project_id else "",
+                "url": link,
+            },
+        )

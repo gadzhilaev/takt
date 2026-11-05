@@ -41,6 +41,7 @@ def _project_out(project, members_users: dict[uuid.UUID, User], progress: dict |
         is_default=project.is_default,
         is_archived=project.is_archived,
         is_demo=bool(getattr(project, "is_demo", False)),
+        auto_urgency_from_due=bool(getattr(project, "auto_urgency_from_due", True)),
         created_at=project.created_at,
         updated_at=project.updated_at,
         members=members,
@@ -156,6 +157,8 @@ async def update_project(
                 detail={"error": {"code": "default_project", "message": "Нельзя архивировать проект «Общее»"}},
             )
         project.is_archived = body.is_archived
+    if body.auto_urgency_from_due is not None:
+        project.auto_urgency_from_due = body.auto_urgency_from_due
     await db.commit()
     project = await project_service.get_project(db, project_id)
     umap = await _users_map(db, [m.user_id for m in project.members])  # type: ignore[union-attr]

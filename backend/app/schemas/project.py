@@ -23,6 +23,7 @@ class ProjectOut(BaseModel):
     is_default: bool
     is_archived: bool
     is_demo: bool = False
+    auto_urgency_from_due: bool = True
     created_at: datetime
     updated_at: datetime
     members: list[ProjectMemberOut] = []
@@ -35,6 +36,7 @@ class ProjectCreate(BaseModel):
     color: str = "#4f46e5"
     icon: str = "folder"
     member_ids: list[UUID] = []
+    auto_urgency_from_due: bool = True
 
 
 class ProjectUpdate(BaseModel):
@@ -43,6 +45,7 @@ class ProjectUpdate(BaseModel):
     color: str | None = None
     icon: str | None = None
     is_archived: bool | None = None
+    auto_urgency_from_due: bool | None = None
 
 
 class ProjectMemberUpdate(BaseModel):

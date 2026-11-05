@@ -25,6 +25,8 @@ class Project(Base, TimestampMixin):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    # Escalate task priority as due_date approaches (see due_urgency_service).
+    auto_urgency_from_due: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     members: Mapped[list["ProjectMember"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"

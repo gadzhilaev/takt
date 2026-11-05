@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 import sys
 from contextlib import asynccontextmanager
@@ -16,6 +17,7 @@ from app.core.config import get_settings
 from app.core.limiter import limiter
 from app.db.session import AsyncSessionLocal
 from app.services.bootstrap import bootstrap_db
+from app.services.due_reminder_service import due_reminder_loop
 
 
 def run_migrations() -> None:
@@ -58,7 +60,20 @@ async def lifespan(app: FastAPI):
 
         async with AsyncSessionLocal() as db:
             await seed_demo(db)
-    yield
+    stop = asyncio.Event()
+    reminder_task: asyncio.Task | None = None
+    if settings.DUE_REMINDER_ENABLED and settings.DUE_REMINDER_INTERVAL_SECONDS > 0:
+        reminder_task = asyncio.create_task(due_reminder_loop(stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        if reminder_task is not None:
+            reminder_task.cancel()
+            try:
+                await reminder_task
+            except asyncio.CancelledError:
+                pass
 
 
 settings = get_settings()

@@ -55,6 +55,14 @@ class Task(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id"), index=True, nullable=False
     )
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Start of the due window (when current due_date was set) — for % remaining urgency.
+    due_basis_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_soon_notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    overdue_notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status_entered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

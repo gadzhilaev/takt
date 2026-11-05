@@ -37,8 +37,9 @@ async def remove_member(
     target_user_id: uuid.UUID,
     actor: User,
 ) -> None:
-    await project_service.ensure_project_access(
-        db, actor, project_id, min_role=ProjectMemberRole.admin
+    # Any member (not viewer) can remove others; only admins can remove an admin.
+    actor_role = await project_service.ensure_project_access(
+        db, actor, project_id, min_role=ProjectMemberRole.member
     )
     if target_user_id == actor.id:
         raise LeaveRequestError("self", "Нельзя удалить себя этим действием")
@@ -52,6 +53,8 @@ async def remove_member(
     if target is None:
         raise LeaveRequestError("not_found", "Участник не найден")
     if target.role == ProjectMemberRole.admin:
+        if actor_role != ProjectMemberRole.admin:
+            raise PermissionError("Только владелец может удалить другого владельца")
         admins = await _admin_user_ids(db, project_id)
         if len(admins) <= 1:
             raise LeaveRequestError("last_admin", "Нельзя удалить единственного владельца")
