@@ -11,6 +11,7 @@ from app.api.deps import get_current_user, verify_csrf
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.notification import Notification
+from app.models.project import Project
 from app.models.user import User
 from app.services import fcm_service, push_service
 
@@ -57,6 +58,13 @@ async def list_notifications(
             Notification.user_id == user.id, Notification.is_read.is_(False)
         )
     )
+    project_ids = {n.project_id for n in rows if n.project_id}
+    project_names: dict[uuid.UUID, str] = {}
+    if project_ids:
+        for pid, name in (
+            await db.execute(select(Project.id, Project.name).where(Project.id.in_(project_ids)))
+        ).all():
+            project_names[pid] = name
     return {
         "items": [
             {
@@ -66,6 +74,7 @@ async def list_notifications(
                 "body": n.body,
                 "task_id": str(n.task_id) if n.task_id else None,
                 "project_id": str(n.project_id) if n.project_id else None,
+                "project_name": project_names.get(n.project_id) if n.project_id else None,
                 "is_read": n.is_read,
                 "created_at": n.created_at,
             }

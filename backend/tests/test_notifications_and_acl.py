@@ -104,8 +104,9 @@ async def test_assignment_and_completion_notifications(client: AsyncClient):
     notes = (await client.get("/api/v1/notifications")).json()["items"]
     assign = [n for n in notes if n["kind"] == "task_assigned"]
     assert assign
-    assert "Вам" in assign[0]["title"]
-    assert "Исправить 1С" in assign[0]["title"]
+    assert assign[0]["title"] == "Исправить 1С"
+    assert "вам задачу" in (assign[0]["body"] or "")
+    assert assign[0].get("project_name")
 
     moved = await client.post(
         f"/api/v1/tasks/{task_id}/move",
@@ -117,8 +118,9 @@ async def test_assignment_and_completion_notifications(client: AsyncClient):
     notes2 = (await client.get("/api/v1/notifications")).json()["items"]
     done_notes = [n for n in notes2 if n["kind"] == "task_completed"]
     assert done_notes
-    assert "Кадачиев Алибек" in done_notes[0]["title"]
-    assert "завершил" in done_notes[0]["title"]
+    assert done_notes[0]["title"] == "Исправить 1С"
+    assert "Кадачиев Алибек" in (done_notes[0]["body"] or "")
+    assert "завершил" in (done_notes[0]["body"] or "")
 
     await client.post(
         f"/api/v1/tasks/{task_id}/move",
@@ -200,18 +202,9 @@ async def test_task_endpoints_require_project_membership(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_ru_assignment_copy():
-    from app.services.ru_names import format_assignment_title, format_completed_title
+    from app.services.ru_names import format_assignment_line, format_completed_line
 
-    title = format_assignment_title(
-        actor_name="Велиева Сабина",
-        recipient_id="1",
-        assignees=[("1", "Кадачиев Алибек"), ("2", "Рагимов Рахман")],
-        task_title="Проверить",
-    )
-    assert "Вам" in title
-    assert "назначила" in title
-    assert "Рагимов Рахман" in title
-    assert "Рагимову" not in title
-    assert format_completed_title(actor_name="Кадачиев Алибек", task_title="X").startswith(
-        "Кадачиев Алибек завершил"
-    )
+    line = format_assignment_line(actor_name="Велиева Сабина")
+    assert line == "Велиева Сабина назначила вам задачу"
+    assert "Рагимов" not in line
+    assert format_completed_line(actor_name="Кадачиев Алибек") == "Кадачиев Алибек завершил задачу"

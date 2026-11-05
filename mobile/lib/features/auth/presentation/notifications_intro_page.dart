@@ -16,21 +16,25 @@ class NotificationsIntroPage extends StatefulWidget {
 class _NotificationsIntroPageState extends State<NotificationsIntroPage> {
   bool _busy = false;
 
-  Future<void> _continue({required bool requestPermission}) async {
+  Future<void> _allow() async {
     if (_busy) return;
     setState(() => _busy = true);
     final fcm = context.read<FcmBootstrap>();
     try {
-      if (requestPermission) {
-        await fcm.enablePush();
-        await fcm.registerForUser();
-      } else {
-        // Skip OS prompt; in-app notification center still works.
-        await fcm.markPromptSeen();
-      }
+      await fcm.enablePush();
+      await fcm.registerForUser();
     } catch (_) {
-      await fcm.markPromptSeen();
+      await fcm.markPromptNever();
     }
+    if (!mounted) return;
+    context.go('/projects');
+  }
+
+  Future<void> _notNow() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    // Don't ask on every launch — can enable later in profile.
+    await context.read<FcmBootstrap>().markPromptNever();
     if (!mounted) return;
     context.go('/projects');
   }
@@ -53,111 +57,88 @@ class _NotificationsIntroPageState extends State<NotificationsIntroPage> {
           ),
         ),
         child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                child: Material(
-                  color: dark ? const Color(0xFF1A1E24) : Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: dark
-                          ? Colors.white.withValues(alpha: 0.06)
-                          : TaktColors.graphite.withValues(alpha: 0.08),
-                    ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              child: Material(
+                color: dark ? const Color(0xFF1A1E24) : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: dark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : TaktColors.graphite.withValues(alpha: 0.08),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: TaktColors.accent.withValues(alpha: dark ? 0.22 : 0.12),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: AppIcon(
-                              AppIcons.notifications,
-                              color: dark ? const Color(0xFF6A9AAB) : TaktColors.accent,
-                              size: 28,
-                            ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 26, 22, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: TaktColors.accent.withValues(alpha: dark ? 0.22 : 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: AppIcon(
+                            AppIcons.notifications,
+                            color: dark ? const Color(0xFF6A9AAB) : TaktColors.accent,
+                            size: 24,
                           ),
                         ),
-                        const SizedBox(height: 22),
-                        Text(
-                          'Не пропускайте важное',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -0.3,
-                              ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Takt пришлёт уведомление, когда вам назначат задачу, '
-                          'изменят статус или упомянут в комментарии. '
-                          'Так команда быстрее реагирует на изменения на доске.',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: hint,
-                                height: 1.45,
-                              ),
-                        ),
-                        const SizedBox(height: 20),
-                        _Benefit(
-                          icon: AppIcons.assignment,
-                          text: 'Новые назначения и срочные задачи',
-                          dark: dark,
-                        ),
-                        const SizedBox(height: 10),
-                        _Benefit(
-                          icon: AppIcons.forum,
-                          text: 'Упоминания и ответы в обсуждении',
-                          dark: dark,
-                        ),
-                        const SizedBox(height: 10),
-                        _Benefit(
-                          icon: AppIcons.status,
-                          text: 'Смена статуса по вашим задачам',
-                          dark: dark,
-                        ),
-                        const SizedBox(height: 28),
-                        FilledButton(
-                          onPressed: _busy ? null : () => _continue(requestPermission: true),
-                          child: _busy
-                              ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Включить уведомления'),
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: _busy ? null : () => _continue(requestPermission: false),
-                          child: const Text('Позже'),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Системный запрос появится только после «Включить уведомления». '
-                          'Центр уведомлений в приложении работает без разрешения push.',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: hint,
-                                height: 1.35,
-                              ),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Будьте в курсе важных событий',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.3,
+                              fontSize: 18,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Узнавайте о новых задачах, комментариях и изменениях в проектах.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: hint,
+                              height: 1.4,
+                            ),
+                      ),
+                      const SizedBox(height: 18),
+                      _Benefit(icon: AppIcons.assignment, text: 'Назначения и новые задачи', dark: dark),
+                      const SizedBox(height: 10),
+                      _Benefit(icon: AppIcons.forum, text: 'Упоминания и комментарии', dark: dark),
+                      const SizedBox(height: 10),
+                      _Benefit(icon: AppIcons.status, text: 'Важные изменения задач', dark: dark),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _busy ? null : _allow,
+                        child: _busy
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Разрешить уведомления'),
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton(
+                        onPressed: _busy ? null : _notNow,
+                        child: const Text('Не сейчас'),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
+          ),
         ),
       ),
     );
@@ -174,14 +155,13 @@ class _Benefit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppIcon(icon, size: 20, color: dark ? const Color(0xFF6A9AAB) : TaktColors.accent),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.35),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.3),
           ),
         ),
       ],

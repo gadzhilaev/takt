@@ -21,7 +21,9 @@ class FcmBootstrap {
   FcmBootstrap(this._notifications);
 
   final NotificationsRepository _notifications;
-  static const _promptSeenKey = 'takt_push_prompt_seen';
+  static const _promptNeverKey = 'takt_push_prompt_never';
+  /// Legacy key from older builds — treated as «больше не показывать».
+  static const _promptSeenLegacyKey = 'takt_push_prompt_seen';
 
   /// Firebase initialized (no system permission yet).
   bool firebaseReady = false;
@@ -29,25 +31,51 @@ class FcmBootstrap {
   /// Permission requested and token pipeline wired.
   bool ready = false;
 
-  /// Drives go_router refresh when the intro is completed.
-  final ValueNotifier<bool> promptSeenListenable = ValueNotifier(false);
+  /// User chose «Больше не показывать» (or completed Allow).
+  final ValueNotifier<bool> promptNeverListenable = ValueNotifier(false);
 
-  bool get promptSeen => promptSeenListenable.value;
+  /// Skip only for this app process — next cold start may ask again.
+  bool skippedThisSession = false;
+
+  bool get promptNever => promptNeverListenable.value;
+
+  /// Whether router should send user to the soft permission screen.
+  bool get shouldShowPrompt => !promptNever && !skippedThisSession;
+
+  /// Back-compat for older call sites / splash.
+  bool get promptSeen => promptNever || skippedThisSession;
+
+  final ValueNotifier<bool> promptSeenListenable = ValueNotifier(false);
 
   String? token;
   StreamSubscription<String>? _refreshSub;
+  StreamSubscription<RemoteMessage>? _foregroundSub;
+
+  /// Latest foreground FCM payload for in-app toast UI.
+  final ValueNotifier<RemoteMessage?> foregroundMessage = ValueNotifier(null);
 
   Future<void> loadPromptState() async {
     final prefs = await SharedPreferences.getInstance();
-    promptSeenListenable.value = prefs.getBool(_promptSeenKey) ?? false;
+    final never = prefs.getBool(_promptNeverKey) ?? prefs.getBool(_promptSeenLegacyKey) ?? false;
+    promptNeverListenable.value = never;
+    promptSeenListenable.value = never || skippedThisSession;
   }
 
-  Future<void> markPromptSeen() async {
-    if (promptSeenListenable.value) return;
+  Future<void> markPromptNever() async {
+    promptNeverListenable.value = true;
+    skippedThisSession = false;
     promptSeenListenable.value = true;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_promptSeenKey, true);
+    await prefs.setBool(_promptNeverKey, true);
   }
+
+  Future<void> markPromptSkipped() async {
+    skippedThisSession = true;
+    promptSeenListenable.value = true;
+  }
+
+  @Deprecated('Use markPromptNever / markPromptSkipped')
+  Future<void> markPromptSeen() => markPromptNever();
 
   /// Soft Firebase init only. Does **not** ask for notification permission.
   Future<void> init() async {
@@ -55,10 +83,18 @@ class FcmBootstrap {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       firebaseReady = true;
+      await _wireForegroundToast();
     } catch (e) {
       firebaseReady = false;
       debugPrint('FCM unavailable (проверьте GoogleService-Info / google-services): $e');
     }
+  }
+
+  Future<void> _wireForegroundToast() async {
+    await _foregroundSub?.cancel();
+    _foregroundSub = FirebaseMessaging.onMessage.listen((message) {
+      foregroundMessage.value = message;
+    });
   }
 
   /// Call after the in-app intro: system permission dialog, then token.
@@ -66,7 +102,7 @@ class FcmBootstrap {
     if (!firebaseReady) {
       await init();
       if (!firebaseReady) {
-        await markPromptSeen();
+        await markPromptNever();
         return;
       }
     }
@@ -98,7 +134,7 @@ class FcmBootstrap {
         debugPrint('FCM enable failed: $e');
       }
     } finally {
-      await markPromptSeen();
+      await markPromptNever();
     }
   }
 
@@ -179,7 +215,10 @@ class FcmBootstrap {
 
   void dispose() {
     _refreshSub?.cancel();
+    _foregroundSub?.cancel();
     promptSeenListenable.dispose();
+    promptNeverListenable.dispose();
+    foregroundMessage.dispose();
   }
 }
 

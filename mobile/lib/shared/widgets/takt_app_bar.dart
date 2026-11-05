@@ -66,13 +66,20 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
       );
     }
 
-    final titleStyle = TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-      letterSpacing: -0.2,
-      height: 1.15,
-      color: fg,
-    );
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
+          height: 1.15,
+          color: fg,
+        ) ??
+        TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
+          height: 1.15,
+          color: fg,
+        );
     final hasSubtitle = subtitle != null && subtitle!.isNotEmpty;
     final Widget titleBlock = hasSubtitle
         ? Column(
@@ -90,12 +97,18 @@ class TaktAppBar extends StatelessWidget implements PreferredSizeWidget {
                 subtitle!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  height: 1.2,
-                  fontWeight: FontWeight.w500,
-                  color: muted,
-                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 11.5,
+                      height: 1.2,
+                      fontWeight: FontWeight.w500,
+                      color: muted,
+                    ) ??
+                    TextStyle(
+                      fontSize: 11.5,
+                      height: 1.2,
+                      fontWeight: FontWeight.w500,
+                      color: muted,
+                    ),
               ),
             ],
           )

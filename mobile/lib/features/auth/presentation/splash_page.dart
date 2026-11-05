@@ -113,8 +113,8 @@ class _SplashPageState extends State<SplashPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (state is AuthAuthenticated) {
-        final seen = context.read<FcmBootstrap>().promptSeen;
-        context.go(seen ? '/projects' : '/enable-notifications');
+        final fcm = context.read<FcmBootstrap>();
+        context.go(fcm.shouldShowPrompt ? '/enable-notifications' : '/projects');
       } else if (state is AuthGuest || state is AuthFailure) {
         context.go('/login');
       }

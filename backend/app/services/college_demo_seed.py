@@ -24,7 +24,7 @@ from app.models.team import TaskStatus
 from app.models.user import User, UserRole
 from app.services.notify_service import create_in_app
 from app.services.project_service import DEFAULT_STATUS_TEMPLATE
-from app.services.ru_names import format_assignment_title, format_completed_title
+from app.services.ru_names import format_assignment_line, format_completed_line
 
 COLLEGE_PROJECT_NAME = "Колледж ДГУ"
 COLLEGE_PROJECT_DESC = (
@@ -533,26 +533,18 @@ async def _seed_notifications(
         )
         if not has:
             db.add(TaskAssignee(task_id=t1.id, user_id=demo_user.id))
-        pairs = [(str(demo_user.id), demo_user.name), (str(isaeva.id), isaeva.name)]
-        # Only demo user as recipient for «вам» copy — use assignees list with just demo
-        title = format_assignment_title(
-            actor_name=isaeva.name,
-            recipient_id=str(demo_user.id),
-            assignees=[(str(demo_user.id), demo_user.name)],
-            task_title=t1.title,
-        )
+        line = format_assignment_line(actor_name=isaeva.name)
         await create_in_app(
             db,
             user_id=demo_user.id,
             actor_id=isaeva.id,
             kind="task_assigned",
-            title=title,
-            body=f"Вас назначили исполнителем этой задачи. {NOTIF_MARKER}",
+            title=t1.title,
+            body=f"{line}\nПроект {project.name} {NOTIF_MARKER}",
             task_id=t1.id,
             project_id=project.id,
         )
         report["notifications"] += 1
-        _ = pairs
 
     # 2) Велиева назначила задачу нескольким участникам
     t2 = await task_by_title("Подготовить оборудование для мероприятия")
@@ -565,29 +557,14 @@ async def _seed_notifications(
         )
         if not has:
             db.add(TaskAssignee(task_id=t2.id, user_id=demo_user.id))
-        assignees = (
-            await db.scalars(select(TaskAssignee).where(TaskAssignee.task_id == t2.id))
-        ).all()
-        pairs: list[tuple[str, str]] = []
-        for a in assignees:
-            u = await db.get(User, a.user_id)
-            if u:
-                pairs.append((str(u.id), u.name))
-        if not any(uid == str(demo_user.id) for uid, _ in pairs):
-            pairs.append((str(demo_user.id), demo_user.name))
-        title = format_assignment_title(
-            actor_name=velieva.name,
-            recipient_id=str(demo_user.id),
-            assignees=pairs,
-            task_title=t2.title,
-        )
+        line = format_assignment_line(actor_name=velieva.name)
         await create_in_app(
             db,
             user_id=demo_user.id,
             actor_id=velieva.id,
             kind="task_assigned",
-            title=title,
-            body=f"Вас добавили в список исполнителей вместе с коллегами. {NOTIF_MARKER}",
+            title=t2.title,
+            body=f"{line}\nПроект {project.name} {NOTIF_MARKER}",
             task_id=t2.id,
             project_id=project.id,
         )
@@ -602,14 +579,14 @@ async def _seed_notifications(
         if done:
             t3.status_id = done.id
             t3.closed_at = t3.closed_at or datetime.now(UTC)
-        title = format_completed_title(actor_name=kadachiev.name, task_title=t3.title)
+        line = format_completed_line(actor_name=kadachiev.name)
         await create_in_app(
             db,
             user_id=demo_user.id,
             actor_id=kadachiev.id,
             kind="task_completed",
-            title=title,
-            body=f"Задача отмечена как выполненная. {NOTIF_MARKER}",
+            title=t3.title,
+            body=f"{line}\nПроект {project.name} {NOTIF_MARKER}",
             task_id=t3.id,
             project_id=project.id,
         )

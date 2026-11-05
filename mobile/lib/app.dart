@@ -22,6 +22,7 @@ import 'features/notifications/data/notifications_repository.dart';
 import 'features/profile/data/profile_repository.dart';
 import 'features/projects/data/projects_repository.dart';
 import 'features/widget_sync/widget_sync.dart';
+import 'shared/widgets/notification_toast_host.dart';
 
 class TaktApp extends StatefulWidget {
   const TaktApp({
@@ -176,6 +177,11 @@ class _TaktAppState extends State<TaktApp> {
                   themeMode: _themeController.mode,
                   routerConfig: _router,
                   debugShowCheckedModeBanner: false,
+                  builder: (context, child) {
+                    return NotificationToastHost(
+                      child: child ?? const SizedBox.shrink(),
+                    );
+                  },
                 );
               },
             ),

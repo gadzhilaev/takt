@@ -65,7 +65,7 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
       if (auth is AuthAuthenticated) {
         if (onSplash) return null;
         if (onPushIntro) return null;
-        if (!fcm.promptSeen) return '/enable-notifications';
+        if (fcm.shouldShowPrompt) return '/enable-notifications';
         // Задание/сброс пароля доступен и из профиля (OAuth-only аккаунты).
         if (loc == '/forgot-password') return null;
         if (loggingIn) {

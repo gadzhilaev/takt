@@ -3,30 +3,20 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import {
+  DATE_GROUP_LABEL,
+  notificationCardModel,
+  notificationDateGroup,
+  type DateGroupKey,
+  type NotificationCardModel,
+} from "@/lib/notification-display";
 import type { NotificationItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-function sanitize(text: string | null | undefined) {
-  if (!text) return "";
-  return text.replace(/\[demo-seed\]\s*/gi, "").replace(/\s+/g, " ").trim();
-}
-
-function relativeTime(iso: string) {
-  const dt = new Date(iso);
-  if (Number.isNaN(dt.getTime())) return "";
-  const diff = Date.now() - dt.getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "только что";
-  if (min < 60) return `${min} мин`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h} ч`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d} д`;
-  return dt.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
-}
+type Filter = "all" | "unread";
 
 export function NotificationsDrawer({
   open,
@@ -37,6 +27,7 @@ export function NotificationsDrawer({
 }) {
   const router = useRouter();
   const qc = useQueryClient();
+  const [filter, setFilter] = useState<Filter>("all");
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["notifications"],
@@ -57,10 +48,29 @@ export function NotificationsDrawer({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose, refetch]);
 
-  if (!open) return null;
-
-  const items = data?.items ?? [];
   const unread = data?.unread ?? 0;
+
+  const filtered = useMemo(() => {
+    const items = data?.items ?? [];
+    return filter === "unread" ? items.filter((n) => !n.is_read) : items;
+  }, [data?.items, filter]);
+
+  const groups = useMemo(() => {
+    const order: DateGroupKey[] = ["today", "yesterday", "earlier"];
+    const map: Record<DateGroupKey, NotificationItem[]> = {
+      today: [],
+      yesterday: [],
+      earlier: [],
+    };
+    for (const n of filtered) {
+      map[notificationDateGroup(n.created_at)].push(n);
+    }
+    return order
+      .map((key) => ({ key, label: DATE_GROUP_LABEL[key], items: map[key] }))
+      .filter((g) => g.items.length > 0);
+  }, [filtered]);
+
+  if (!open) return null;
 
   async function openItem(n: NotificationItem) {
     if (!n.is_read) {
@@ -77,11 +87,11 @@ export function NotificationsDrawer({
       <button type="button" className="absolute inset-0 bg-black/25" aria-label="Закрыть" onClick={onClose} />
       <aside
         className={cn(
-          "relative z-10 flex h-full w-full flex-col border-l border-hairline bg-[var(--surface)] shadow-sm",
+          "relative z-10 flex h-full w-full flex-col border-l border-hairline bg-[var(--background)] shadow-sm",
           "md:w-[420px] md:max-w-[480px]"
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-hairline px-4 py-3">
+        <div className="flex items-center justify-between gap-2 border-b border-hairline bg-[var(--surface)] px-4 py-3">
           <div>
             <h2 className="text-base font-semibold">Уведомления</h2>
             <p className="text-xs text-muted">
@@ -108,44 +118,108 @@ export function NotificationsDrawer({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {isLoading && <p className="px-4 py-10 text-center text-sm text-muted">Загрузка…</p>}
-          {!isLoading && items.length === 0 && (
-            <div className="px-4 py-16 text-center">
-              <p className="text-sm font-medium text-foreground">Пока нет уведомлений</p>
+        <div className="flex gap-2 px-3 pb-2 pt-2.5">
+          {(
+            [
+              ["all", "Все"],
+              ["unread", "Непрочитанные"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setFilter(id)}
+              className={cn(
+                "rounded-full px-3 py-[7px] text-[13px] font-semibold transition",
+                filter === id
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--surface-2)] text-muted hover:text-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-1">
+          {isLoading && <p className="px-1 py-10 text-center text-sm text-muted">Загрузка…</p>}
+          {!isLoading && filtered.length === 0 && (
+            <div className="px-1 py-16 text-center">
+              <p className="text-sm font-medium text-foreground">
+                {filter === "unread" ? "Нет непрочитанных" : "Пока нет уведомлений"}
+              </p>
               <p className="mt-1 text-xs text-muted">
-                Здесь появятся назначения, приглашения и заявки по проектам.
+                Здесь появятся назначения, изменения статусов и приглашения
               </p>
             </div>
           )}
-          {items.map((n) => {
-            const title = sanitize(n.title) || "Уведомление";
-            const body = sanitize(n.body);
-            return (
-              <button
-                key={n.id}
-                type="button"
-                className={cn(
-                  "block w-full border-b border-hairline px-4 py-3.5 text-left last:border-b-0",
-                  n.is_read ? "opacity-80" : "bg-[var(--accent-soft)]"
-                )}
-                onClick={() => openItem(n)}
-              >
-                <div className="flex items-start gap-2.5">
-                  {!n.is_read && (
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
-                  )}
-                  <div className={cn("min-w-0 flex-1", n.is_read && "pl-3.5")}>
-                    <p className="text-[13px] font-medium leading-snug text-foreground">{title}</p>
-                    {body && <p className="mt-0.5 line-clamp-3 text-xs text-muted">{body}</p>}
-                    <p className="mt-1.5 text-[11px] text-muted">{relativeTime(n.created_at)}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+          {groups.map((group) => (
+            <section key={group.key} className="mb-3">
+              <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+                {group.label}
+              </h3>
+              <ul className="space-y-2">
+                {group.items.map((n) => (
+                  <li key={n.id}>
+                    <NotificationCardButton
+                      card={notificationCardModel(n)}
+                      onClick={() => void openItem(n)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </div>
       </aside>
     </div>
+  );
+}
+
+/** Same structure as mobile `_NotificationCard`. */
+function NotificationCardButton({
+  card,
+  onClick,
+}: {
+  card: NotificationCardModel;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full gap-2.5 rounded-[var(--radius-lg)] border px-3 py-[11px] text-left transition",
+        card.isRead
+          ? "border-hairline bg-[var(--surface)] shadow-none"
+          : "border-[#b5cad6] bg-[#dce8ee] shadow-sm dark:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] dark:bg-[#243840]"
+      )}
+    >
+      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[var(--accent)] dark:bg-[var(--surface-2)]">
+        <AppIcon name={card.icon} size={18} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-start gap-2">
+          <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-foreground">
+            {card.kindLabel}
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
+            {card.time ? <span className="text-[11px] font-medium text-muted">{card.time}</span> : null}
+            {!card.isRead && <span className="h-[7px] w-[7px] rounded-full bg-[var(--accent)]" />}
+          </span>
+        </span>
+        {card.subject ? (
+          <span className="mt-1 block text-[13.5px] font-semibold leading-snug text-foreground">
+            {card.subject}
+          </span>
+        ) : null}
+        {card.detail ? (
+          <span className="mt-[3px] block text-[12.5px] leading-snug text-muted">{card.detail}</span>
+        ) : null}
+        {card.project ? (
+          <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{card.project}</span>
+        ) : null}
+      </span>
+    </button>
   );
 }

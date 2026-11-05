@@ -442,11 +442,117 @@ String taktRelativeTime(String iso) {
   final dt = DateTime.tryParse(iso)?.toLocal();
   if (dt == null) return '';
   final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'только что';
+  if (diff.inMinutes < 1) return 'сейчас';
   if (diff.inMinutes < 60) return '${diff.inMinutes} мин';
   if (diff.inHours < 24) return '${diff.inHours} ч';
-  if (diff.inDays < 7) return '${diff.inDays} д';
+  if (diff.inDays < 7) return '${diff.inDays} дн.';
   return '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
 }
 
 String taktNotificationIcon(String kind) => AppIcon.notificationKind(kind);
+
+String taktNotificationKindLabel(String kind) {
+  switch (kind) {
+    case 'task_assigned':
+    case 'assignee_added':
+      return 'Новая задача';
+    case 'task_completed':
+      return 'Задача выполнена';
+    case 'status_changed':
+    case 'task_moved':
+      return 'Изменение задачи';
+    case 'comment':
+    case 'mention':
+      return 'Комментарий';
+    case 'project_invite':
+    case 'invite':
+      return 'Приглашение';
+    case 'leave_request':
+      return 'Заявка на выход';
+    case 'leave_approved':
+    case 'member_removed':
+      return 'Участник удалён';
+    case 'leave_rejected':
+      return 'Заявка отклонена';
+    default:
+      return 'Уведомление';
+  }
+}
+
+enum TaktDateGroup { today, yesterday, earlier }
+
+TaktDateGroup taktDateGroup(String iso, {DateTime? now}) {
+  final dt = DateTime.tryParse(iso)?.toLocal();
+  if (dt == null) return TaktDateGroup.earlier;
+  final n = now ?? DateTime.now();
+  final today = DateTime(n.year, n.month, n.day);
+  final day = DateTime(dt.year, dt.month, dt.day);
+  final diff = today.difference(day).inDays;
+  if (diff == 0) return TaktDateGroup.today;
+  if (diff == 1) return TaktDateGroup.yesterday;
+  return TaktDateGroup.earlier;
+}
+
+String taktDateGroupLabel(TaktDateGroup g) {
+  switch (g) {
+    case TaktDateGroup.today:
+      return 'Сегодня';
+    case TaktDateGroup.yesterday:
+      return 'Вчера';
+    case TaktDateGroup.earlier:
+      return 'Ранее';
+  }
+}
+
+({String detail, String projectLine}) taktParseNotificationBody(String? body) {
+  final raw = (body ?? '').replaceAll(RegExp(r'\[demo-seed\]\s*', caseSensitive: false), '').trim();
+  if (raw.isEmpty) return (detail: '', projectLine: '');
+  final lines = raw.split(RegExp(r'\n+')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+  if (lines.length >= 2 && RegExp(r'^Проект\s+', caseSensitive: false).hasMatch(lines.last)) {
+    return (detail: lines.sublist(0, lines.length - 1).join(' '), projectLine: lines.last);
+  }
+  final project = lines.where((l) => RegExp(r'^Проект\s+', caseSensitive: false).hasMatch(l)).firstOrNull;
+  if (project != null) {
+    return (
+      detail: lines.where((l) => l != project).join(' '),
+      projectLine: project,
+    );
+  }
+  return (detail: lines.join(' '), projectLine: '');
+}
+
+/// Card fields for list UI. Normalizes legacy long assignment titles.
+({String subject, String detail, String projectLine}) taktNotificationCardParts({
+  required String kind,
+  required String title,
+  String? body,
+  String? projectName,
+}) {
+  final cleanTitle = taktSanitizeNotificationText(title);
+  final parsed = taktParseNotificationBody(body);
+  var detail = parsed.detail;
+  if (detail.toLowerCase().contains('открывается по ссылке')) {
+    detail = '';
+  }
+  var project = parsed.projectLine;
+  if (project.isEmpty && projectName != null && projectName.trim().isNotEmpty) {
+    project = 'Проект ${projectName.trim()}';
+  }
+
+  final quote = RegExp(r'[«"](.+?)[»"]').firstMatch(cleanTitle);
+  final assign = RegExp(r'^(.+?)\s+(назначил[аи]?)\b', caseSensitive: false).firstMatch(cleanTitle);
+  final complete = RegExp(r'^(.+?)\s+(завершил[аи]?)\b', caseSensitive: false).firstMatch(cleanTitle);
+
+  if ((kind == 'task_assigned' || kind == 'assignee_added') && assign != null && quote != null) {
+    final actor = assign.group(1)!.trim();
+    final verb = assign.group(2)!.toLowerCase();
+    return (subject: quote.group(1)!.trim(), detail: '$actor $verb вам задачу', projectLine: project);
+  }
+  if (kind == 'task_completed' && complete != null && quote != null) {
+    final actor = complete.group(1)!.trim();
+    final verb = complete.group(2)!.toLowerCase();
+    return (subject: quote.group(1)!.trim(), detail: '$actor $verb задачу', projectLine: project);
+  }
+
+  return (subject: cleanTitle, detail: detail, projectLine: project);
+}

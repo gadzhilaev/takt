@@ -12,9 +12,11 @@ import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
 import { BrandLogo, BrandMark } from "@/components/brand-mark";
 import { Dialog } from "@/components/ui/dialog";
+import { NotificationToasts } from "@/components/notification-toasts";
 import { NotificationsDrawer } from "@/components/notifications-drawer";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { ProfileDrawer } from "@/components/profile-drawer";
+import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { ThemeMenu } from "@/components/ui/theme-menu";
 import { clearLastProjectId, getLastProjectId, setLastProjectId } from "@/lib/last-project";
 import { paths } from "@/lib/paths";
@@ -588,6 +590,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
       )}
       <NotificationsDrawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      {user && (
+        <>
+          <PushPermissionPrompt />
+          <NotificationToasts />
+        </>
+      )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen} title="Новый проект">
         <form

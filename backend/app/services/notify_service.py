@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.models.notification import Notification
+from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
 from app.services import fcm_service, push_service
-from app.services.ru_names import format_assignment_title, format_completed_title
+from app.services.ru_names import format_assignment_line, format_completed_line
 
 
 async def create_in_app(
@@ -54,32 +55,32 @@ async def notify_assignees(
     all_assignees: list[tuple[uuid.UUID, str]],
     settings: Settings | None = None,
 ) -> None:
-    """Notify only newly assigned users (exclude actor). Personalized «вам» copy."""
+    """Notify only newly assigned users (exclude actor). Short card copy."""
+    _ = all_assignees
     settings = settings or get_settings()
     recipients = [uid for uid in new_assignee_ids if uid != actor.id]
     if not recipients:
         return
 
-    pairs = [(str(uid), name) for uid, name in all_assignees]
     link = task_deep_link(task.project_id, task.id)
-    project_hint = None
+    project_name: str | None = None
     if task.project_id:
-        project_hint = f"Проект открывается по ссылке"
+        project = await db.get(Project, task.project_id)
+        project_name = project.name if project else None
+
+    subject = format_assignment_line(actor_name=actor.name)
+    body = subject if not project_name else f"{subject}\nПроект {project_name}"
+    card_title = (task.title or "Задача").strip()[:255]
+    push_body = f"{card_title}\n{subject}"
 
     for uid in recipients:
-        title = format_assignment_title(
-            actor_name=actor.name,
-            recipient_id=str(uid),
-            assignees=pairs,
-            task_title=task.title,
-        )
         await create_in_app(
             db,
             user_id=uid,
             actor_id=actor.id,
             kind="task_assigned",
-            title=title,
-            body=project_hint,
+            title=card_title,
+            body=body,
             task_id=task.id,
             project_id=task.project_id,
         )
@@ -87,8 +88,8 @@ async def notify_assignees(
             db,
             settings,
             user_ids=[uid],
-            title="Takt",
-            body=title,
+            title="Новая задача",
+            body=push_body,
             url=link,
             tag=f"assign-{task.id}",
         )
@@ -96,8 +97,8 @@ async def notify_assignees(
             db,
             settings,
             user_ids=[uid],
-            title="Takt",
-            body=title,
+            title="Новая задача",
+            body=push_body,
             data={
                 "kind": "task_assigned",
                 "task_id": str(task.id),
@@ -118,25 +119,31 @@ async def notify_task_completed(
     if task.author_id == actor.id:
         return
     settings = settings or get_settings()
-    title = format_completed_title(actor_name=actor.name, task_title=task.title)
-    body = "Задача перенесена в завершённый столбец"
+    subject = format_completed_line(actor_name=actor.name)
+    project_name: str | None = None
+    if task.project_id:
+        project = await db.get(Project, task.project_id)
+        project_name = project.name if project else None
+    body = subject if not project_name else f"{subject}\nПроект {project_name}"
+    card_title = (task.title or "Задача").strip()[:255]
     await create_in_app(
         db,
         user_id=task.author_id,
         actor_id=actor.id,
         kind="task_completed",
-        title=title,
+        title=card_title,
         body=body,
         task_id=task.id,
         project_id=task.project_id,
     )
     link = task_deep_link(task.project_id, task.id)
+    push_body = f"{card_title}\n{subject}"
     await push_service.send_push_to_users(
         db,
         settings,
         user_ids=[task.author_id],
-        title="Takt",
-        body=title,
+        title="Задача выполнена",
+        body=push_body,
         url=link,
         tag=f"done-{task.id}",
     )
@@ -144,8 +151,8 @@ async def notify_task_completed(
         db,
         settings,
         user_ids=[task.author_id],
-        title="Takt",
-        body=title,
+        title="Задача выполнена",
+        body=push_body,
         data={
             "kind": "task_completed",
             "task_id": str(task.id),
