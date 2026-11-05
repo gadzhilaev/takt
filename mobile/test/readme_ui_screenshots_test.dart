@@ -5,16 +5,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:takt_mobile/core/theme.dart';
+import 'package:takt_mobile/features/shell/takt_bottom_nav.dart';
 import 'package:takt_mobile/shared/models/models.dart';
 import 'package:takt_mobile/shared/widgets/app_icon.dart';
 import 'package:takt_mobile/shared/widgets/kanban_column.dart';
 import 'package:takt_mobile/shared/widgets/takt_app_bar.dart';
 import 'package:takt_mobile/shared/widgets/user_avatar.dart';
 
-/// README device shots → `docs/screenshots/readme/mobile-*.png`.
+/// README + store device shots.
 /// `flutter test test/readme_ui_screenshots_test.dart --update-goldens`
 
 const _out = '../../docs/screenshots/readme';
+const _phoneSize = Size(402, 874);
 
 Future<bool> _loadCyrillicFont() async {
   const candidates = [
@@ -32,6 +34,16 @@ Future<bool> _loadCyrillicFont() async {
     return true;
   }
   return false;
+}
+
+Future<void> _loadMaterialIcons() async {
+  const path = '/Users/gadzhilaev/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf';
+  final file = File(path);
+  if (!file.existsSync()) return;
+  final bytes = await file.readAsBytes();
+  final loader = FontLoader('MaterialIcons')
+    ..addFont(Future.value(ByteData.sublistView(Uint8List.fromList(bytes))));
+  await loader.load();
 }
 
 ThemeData _shotTheme() {
@@ -68,17 +80,59 @@ TaskItem _task({
   );
 }
 
-Widget _phoneShell({required Widget body, required String title, required int tab}) {
+Widget _phoneShell({required Widget body, required String title, required int tab, String? subtitle}) {
   return Scaffold(
     backgroundColor: const Color(0xFFF4F7F8),
-    appBar: TaktAppBar(title: title),
+    appBar: TaktAppBar(title: title, subtitle: subtitle),
     body: body,
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: tab,
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.check_circle_outline), label: 'Мои задачи'),
-        NavigationDestination(icon: Icon(Icons.view_column_outlined), label: 'Доска'),
-        NavigationDestination(icon: Icon(Icons.person_outline), label: 'Профиль'),
+    bottomNavigationBar: TaktBottomNav(
+      items: [
+        TaktBottomNavItem(
+          label: 'Главная',
+          icon: AppIcons.home,
+          selected: tab == 0,
+          onTap: () {},
+        ),
+        TaktBottomNavItem(
+          label: 'Мои задачи',
+          icon: AppIcons.myTasks,
+          selected: tab == 1,
+          onTap: () {},
+        ),
+        TaktBottomNavItem(
+          label: 'Профиль',
+          icon: AppIcons.profile,
+          selected: tab == 2,
+          onTap: () {},
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _oauthBtn(String asset, String label) {
+  return OutlinedButton(
+    style: OutlinedButton.styleFrom(
+      shape: const StadiumBorder(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    ),
+    onPressed: () {},
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: SvgPicture.asset(
+            asset,
+            width: 22,
+            height: 22,
+            colorFilter: asset.contains('apple')
+                ? const ColorFilter.mode(Color(0xFF1A2330), BlendMode.srcIn)
+                : null,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(label, style: const TextStyle(fontFamily: 'TaktShot')),
       ],
     ),
   );
@@ -171,11 +225,11 @@ Widget _loginShot() {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          OutlinedButton(onPressed: () {}, child: const Text('Продолжить с Apple', style: TextStyle(fontFamily: 'TaktShot'))),
+                          _oauthBtn('assets/brand/oauth/oauth-apple.svg', 'Продолжить с Apple'),
                           const SizedBox(height: 8),
-                          OutlinedButton(onPressed: () {}, child: const Text('Продолжить с VK ID', style: TextStyle(fontFamily: 'TaktShot'))),
+                          _oauthBtn('assets/brand/oauth/oauth-vk.svg', 'Продолжить с VK ID'),
                           const SizedBox(height: 8),
-                          OutlinedButton(onPressed: () {}, child: const Text('Продолжить с Яндекс ID', style: TextStyle(fontFamily: 'TaktShot'))),
+                          _oauthBtn('assets/brand/oauth/oauth-yandex.svg', 'Продолжить с Яндекс ID'),
                         ],
                       ),
                     ),
@@ -208,6 +262,7 @@ void main() {
   setUpAll(() async {
     if (!Platform.isMacOS) return;
     ready = await _loadCyrillicFont();
+    if (ready) await _loadMaterialIcons();
   });
 
   testWidgets('readme mobile-login', (tester) async {
@@ -215,18 +270,19 @@ void main() {
       markTestSkipped('README mobile goldens require macOS + Cyrillic font');
       return;
     }
-    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.binding.setSurfaceSize(_phoneSize);
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: _shotTheme(),
         home: DefaultTextStyle.merge(
           style: const TextStyle(fontFamily: 'TaktShot'),
-          child: _loginShot(),
+          child: RepaintBoundary(child: _loginShot()),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_out/mobile-login.png'));
   });
 
@@ -235,7 +291,7 @@ void main() {
       markTestSkipped('README mobile goldens require macOS + Cyrillic font');
       return;
     }
-    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.binding.setSurfaceSize(_phoneSize);
     const col = StatusColumn(id: 's1', name: 'В работе', position: 1, color: '#347FA4');
     final tasks = [
       _task(
@@ -248,10 +304,10 @@ void main() {
       ),
       _task(
         id: '2',
-        title: 'Настроить Web Push',
+        title: 'Настроить уведомления',
         statusId: 's1',
         priority: 'high',
-        description: 'VAPID, soft-prompt и тост при назначении.',
+        description: 'Push и тост при назначении задачи.',
         assignees: [_assignee('p', 'Пётр Орлов'), _assignee('m', 'Мария Волкова')],
       ),
       _task(
@@ -259,7 +315,7 @@ void main() {
         title: 'Сверить mobile с web-доской',
         statusId: 's1',
         priority: 'medium',
-        description: 'Вкладки «Мои задачи» / «Доска».',
+        description: 'Вкладки «Мои задачи» и «Доска».',
         assignees: [_assignee('i', 'Игорь Лебедев')],
       ),
     ];
@@ -269,22 +325,26 @@ void main() {
         theme: _shotTheme(),
         home: DefaultTextStyle.merge(
           style: const TextStyle(fontFamily: 'TaktShot'),
-          child: _phoneShell(
-            title: 'Запуск продукта',
-            tab: 1,
-            body: KanbanColumnPane(
-              column: col,
-              tasks: tasks,
-              dark: false,
-              onOpenTask: (_) {},
-              onAdd: () {},
-              draggable: false,
+          child: RepaintBoundary(
+            child: _phoneShell(
+              title: 'Проверка магазина',
+              subtitle: 'Доска проекта',
+              tab: 0,
+              body: KanbanColumnPane(
+                column: col,
+                tasks: tasks,
+                dark: false,
+                onOpenTask: (_) {},
+                onAdd: () {},
+                draggable: false,
+              ),
             ),
           ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_out/mobile-kanban.png'));
   });
 
@@ -293,7 +353,7 @@ void main() {
       markTestSkipped('README mobile goldens require macOS + Cyrillic font');
       return;
     }
-    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.binding.setSurfaceSize(_phoneSize);
     const col = StatusColumn(id: 's0', name: 'К выполнению', position: 0, color: '#607FA4');
     final tasks = [
       _task(
@@ -302,7 +362,7 @@ void main() {
         statusId: 's0',
         priority: 'high',
         description: 'Пройти регистрацию и первый проект.',
-        assignees: [_assignee('d', 'Демо пользователь'), _assignee('a', 'Алина Смирнова')],
+        assignees: [_assignee('d', 'Store Reviewer'), _assignee('a', 'Алина Смирнова')],
       ),
       _task(
         id: '2',
@@ -310,7 +370,7 @@ void main() {
         statusId: 's0',
         priority: 'urgent',
         description: 'Открыть приглашение без аккаунта.',
-        assignees: [_assignee('d', 'Демо пользователь'), _assignee('p', 'Пётр Орлов')],
+        assignees: [_assignee('d', 'Store Reviewer'), _assignee('p', 'Пётр Орлов')],
       ),
     ];
     await tester.pumpWidget(
@@ -319,28 +379,30 @@ void main() {
         theme: _shotTheme(),
         home: DefaultTextStyle.merge(
           style: const TextStyle(fontFamily: 'TaktShot'),
-          child: _phoneShell(
-            title: 'Мои задачи',
-            tab: 0,
-            body: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-              children: [
-                Text('Запуск продукта', style: TextStyle(fontFamily: 'TaktShot', fontSize: 13, color: TaktColors.muted)),
-                const SizedBox(height: 8),
-                KanbanColumnPane(
-                  column: col,
-                  tasks: tasks,
-                  dark: false,
-                  onOpenTask: (_) {},
-                  draggable: false,
-                ),
-              ],
+          child: RepaintBoundary(
+            child: _phoneShell(
+              title: 'Мои задачи',
+              subtitle: 'Проверка магазина',
+              tab: 1,
+              body: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                children: [
+                  KanbanColumnPane(
+                    column: col,
+                    tasks: tasks,
+                    dark: false,
+                    onOpenTask: (_) {},
+                    draggable: false,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_out/mobile-my-tasks.png'));
   });
 
@@ -349,62 +411,65 @@ void main() {
       markTestSkipped('README mobile goldens require macOS + Cyrillic font');
       return;
     }
-    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.binding.setSurfaceSize(_phoneSize);
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: _shotTheme(),
         home: DefaultTextStyle.merge(
           style: const TextStyle(fontFamily: 'TaktShot'),
-          child: _phoneShell(
-            title: 'Профиль',
-            tab: 2,
-            body: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              children: [
-                Row(
-                  children: [
-                    const TaktUserAvatar(name: 'Демо пользователь', size: 56),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Демо пользователь',
-                            style: TextStyle(
-                              fontFamily: 'TaktShot',
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: TaktColors.graphite,
+          child: RepaintBoundary(
+            child: _phoneShell(
+              title: 'Профиль',
+              tab: 2,
+              body: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                children: [
+                  Row(
+                    children: [
+                      const TaktUserAvatar(name: 'Store Reviewer', size: 56),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Store Reviewer',
+                              style: TextStyle(
+                                fontFamily: 'TaktShot',
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: TaktColors.graphite,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'demo@example.com',
-                            style: TextStyle(fontFamily: 'TaktShot', fontSize: 13, color: TaktColors.muted),
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Text(
+                              'store.review@taktapp.ru',
+                              style: TextStyle(fontFamily: 'TaktShot', fontSize: 13, color: TaktColors.muted),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                _profileTile(AppIcons.notifications, 'Уведомления', 'Разрешены'),
-                _profileTile(AppIcons.assignment, 'Мои проекты', '3 проекта'),
-                _profileTile(AppIcons.theme, 'Тема', 'Системная'),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('Выйти', style: TextStyle(fontFamily: 'TaktShot')),
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _profileTile(AppIcons.notifications, 'Уведомления', 'Разрешены'),
+                  _profileTile(AppIcons.assignment, 'Мои проекты', '1 проект'),
+                  _profileTile(AppIcons.theme, 'Тема', 'Системная'),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text('Выйти', style: TextStyle(fontFamily: 'TaktShot')),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_out/mobile-profile.png'));
   });
 }
