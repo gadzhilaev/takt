@@ -23,7 +23,6 @@ import { Select } from "@/components/ui/select";
 import { ColumnStartDroppable, KanbanColumn } from "@/components/kanban-column";
 import { TaskCard } from "@/components/task-card";
 import { TaskDrawer } from "@/components/task-drawer";
-import { MemberSelect, MemberTasksSection } from "@/components/member-tasks-section";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,7 +30,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { COLUMN_COLOR_PALETTE, columnShellStyle } from "@/lib/column-colors";
-import { memberTasksTitle, tasksForMember } from "@/lib/member-tasks";
+import { tasksForMember } from "@/lib/member-tasks";
 import { URGENCY_OPTIONS, urgencyFromPriority } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 
@@ -89,21 +88,18 @@ export function KanbanBoard({
   const searchParams = useSearchParams();
   /** Совпадает с sidebar `lg` в app-shell: ниже — компакт как в мобильном приложении. */
   const isDesktop = useMediaQuery("(min-width: 1024px)");
-  /** Достаточно высоты для split «мои 2/5 + проект 3/5»; иначе мои — capped, проект занимает остаток. */
-  const tallBoard = useMediaQuery("(min-height: 900px)");
   const [quickCol, setQuickCol] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
-  const [compactMode, setCompactMode] = useState<"mine" | "board">("mine");
-  const [compactMemberId, setCompactMemberId] = useState<string | null>(null);
+  /** По умолчанию полная доска; «Мои задачи» — отдельная вкладка. */
+  const [boardTab, setBoardTab] = useState<"mine" | "board">("board");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [addingColumn, setAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
   const [deleteColumn, setDeleteColumn] = useState<Status | null>(null);
   const [moveToStatusId, setMoveToStatusId] = useState("");
-  const [mineHasTasks, setMineHasTasks] = useState(false);
 
   useBoardRealtime(projectId);
 
@@ -161,29 +157,21 @@ export function KanbanBoard({
     return map;
   }, [statuses, tasks]);
 
-  const compactMember = compactMemberId ?? meId;
-  const compactTasks = useMemo(() => {
-    if (compactMode === "board" || !compactMember) return tasks;
-    return tasksForMember(tasks, compactMember);
-  }, [compactMode, compactMember, tasks]);
-  const compactByStatus = useMemo(() => {
+  const boardTasks = useMemo(() => {
+    if (boardTab === "mine" && meId) return tasksForMember(tasks, meId);
+    return tasks;
+  }, [boardTab, meId, tasks]);
+
+  const boardByStatus = useMemo(() => {
     const map: Record<string, Task[]> = {};
     for (const s of statuses) map[s.id] = [];
-    for (const t of compactTasks) {
+    for (const t of boardTasks) {
       if (!map[t.status_id]) map[t.status_id] = [];
       map[t.status_id].push(t);
     }
     for (const id of Object.keys(map)) map[id].sort((a, b) => a.position - b.position);
     return map;
-  }, [statuses, compactTasks]);
-  const compactMineLabel =
-    meId && compactMember ? memberTasksTitle(members, compactMember, meId) : "Мои задачи";
-
-  useEffect(() => {
-    if (meId && (!compactMemberId || !members.some((m) => m.user_id === compactMemberId))) {
-      setCompactMemberId(meId);
-    }
-  }, [meId, compactMemberId, members]);
+  }, [statuses, boardTasks]);
 
   useEffect(() => {
     if (startCreate && statuses[0] && quickCol == null) setQuickCol(statuses[0].id);
@@ -294,7 +282,7 @@ export function KanbanBoard({
 
   function moveToStatus(task: Task, statusId: string) {
     if (task.status_id === statusId) return;
-    const col = [...(byStatus[statusId] ?? [])].filter((t) => t.id !== task.id);
+    const col = [...(boardByStatus[statusId] ?? [])].filter((t) => t.id !== task.id);
     const last = col[col.length - 1];
     moveMutation.mutate({
       id: task.id,
@@ -319,12 +307,12 @@ export function KanbanBoard({
 
   const resolveDrop = useCallback(
     (taskId: string, overId: string): { statusId: string; position: number } | null => {
-      const activeTask = tasks.find((t) => t.id === taskId);
+      const activeTask = boardTasks.find((t) => t.id === taskId);
       if (!activeTask) return null;
 
       // Prefer live dropIndicator — most accurate for edge/start.
       if (dropIndicator?.kind === "start") {
-        const column = [...(byStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
+        const column = [...(boardByStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
         const first = column[0];
         return {
           statusId: dropIndicator.statusId,
@@ -332,7 +320,7 @@ export function KanbanBoard({
         };
       }
       if (dropIndicator?.kind === "column") {
-        const column = [...(byStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
+        const column = [...(boardByStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
         const last = column[column.length - 1];
         return {
           statusId: dropIndicator.statusId,
@@ -340,7 +328,7 @@ export function KanbanBoard({
         };
       }
       if (dropIndicator?.kind === "task") {
-        const column = [...(byStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
+        const column = [...(boardByStatus[dropIndicator.statusId] ?? [])].filter((t) => t.id !== taskId);
         const idx = column.findIndex((t) => t.id === dropIndicator.taskId);
         if (idx < 0) {
           const last = column[column.length - 1];
@@ -361,7 +349,7 @@ export function KanbanBoard({
 
       const colDrop = parseColumnDropId(overId);
       if (colDrop) {
-        const column = [...(byStatus[colDrop.statusId] ?? [])].filter((t) => t.id !== taskId);
+        const column = [...(boardByStatus[colDrop.statusId] ?? [])].filter((t) => t.id !== taskId);
         if (colDrop.atStart) {
           return {
             statusId: colDrop.statusId,
@@ -375,15 +363,15 @@ export function KanbanBoard({
         };
       }
 
-      const overTask = tasks.find((t) => t.id === overId);
+      const overTask = boardTasks.find((t) => t.id === overId);
       if (!overTask) return null;
-      const column = [...(byStatus[overTask.status_id] ?? [])].filter((t) => t.id !== taskId);
+      const column = [...(boardByStatus[overTask.status_id] ?? [])].filter((t) => t.id !== taskId);
       const idx = column.findIndex((t) => t.id === overTask.id);
       const before = idx > 0 ? column[idx - 1]?.position : undefined;
       const after = column[idx]?.position;
       return { statusId: overTask.status_id, position: midPosition(before, after) };
     },
-    [byStatus, dropIndicator, tasks]
+    [boardByStatus, boardTasks, dropIndicator]
   );
 
   const onDragOver = useCallback(
@@ -406,7 +394,7 @@ export function KanbanBoard({
           setDropIndicator({ kind: "start", statusId: colDrop.statusId });
           return;
         }
-        const colTasks = (byStatus[colDrop.statusId] ?? []).filter((t) => t.id !== activeIdStr);
+        const colTasks = (boardByStatus[colDrop.statusId] ?? []).filter((t) => t.id !== activeIdStr);
         if (!colTasks.length) {
           setDropIndicator({ kind: "column", statusId: colDrop.statusId });
         } else {
@@ -416,7 +404,7 @@ export function KanbanBoard({
         return;
       }
 
-      const overTask = tasks.find((t) => t.id === overId);
+      const overTask = boardTasks.find((t) => t.id === overId);
       if (!overTask) {
         setDropIndicator(null);
         return;
@@ -431,7 +419,7 @@ export function KanbanBoard({
       }
 
       // First card "before" ≡ start of column — one indicator, not two.
-      const colPeers = (byStatus[overTask.status_id] ?? []).filter((t) => t.id !== activeIdStr);
+      const colPeers = (boardByStatus[overTask.status_id] ?? []).filter((t) => t.id !== activeIdStr);
       if (edge === "before" && colPeers[0]?.id === overId) {
         setDropIndicator({ kind: "start", statusId: overTask.status_id });
         return;
@@ -439,7 +427,7 @@ export function KanbanBoard({
 
       setDropIndicator({ kind: "task", statusId: overTask.status_id, taskId: overId, edge });
     },
-    [byStatus, tasks]
+    [boardByStatus, boardTasks]
   );
 
   const onDragEnd = useCallback(
@@ -457,7 +445,7 @@ export function KanbanBoard({
       setDropIndicator(null);
       if (!resolved) return;
 
-      const activeTask = tasks.find((t) => t.id === taskId);
+      const activeTask = boardTasks.find((t) => t.id === taskId);
       if (!activeTask) return;
       if (
         activeTask.status_id === resolved.statusId &&
@@ -471,7 +459,7 @@ export function KanbanBoard({
         position: resolved.position,
       });
     },
-    [moveMutation, resolveDrop, tasks]
+    [boardTasks, moveMutation, resolveDrop]
   );
 
   if (statusesQuery.isLoading || tasksQuery.isLoading) {
@@ -527,8 +515,6 @@ export function KanbanBoard({
       />
     );
   }
-
-  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : undefined;
 
   function taskDropEdge(taskId: string): "before" | "after" | null {
     if (dropIndicator?.kind === "task" && dropIndicator.taskId === taskId) {
@@ -844,95 +830,96 @@ export function KanbanBoard({
     </Dialog>
   );
 
-  /* Phone / tablet: один режим + горизонтальные столбцы со snap (как в приложении). */
-  if (!isDesktop) {
-    const addColumnBlock = addingColumn ? (
-      <form
-        className="flex shrink-0 flex-col gap-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/70 p-2.5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (newColumnName.trim()) {
-            columnMutation.mutate({ type: "create", name: newColumnName.trim() });
-          }
-        }}
-      >
-        <Input
-          value={newColumnName}
-          onChange={(e) => setNewColumnName(e.target.value)}
-          placeholder="Новый столбец"
-          autoFocus
-        />
-        <div className="flex gap-2">
-          <Button type="submit" size="sm">
-            Добавить
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setAddingColumn(false)}>
-            Отмена
-          </Button>
-        </div>
-      </form>
-    ) : (
+  const showMineTab = Boolean(meId);
+  const activeTask = activeId ? boardTasks.find((t) => t.id === activeId) : undefined;
+
+  const tabBar = showMineTab ? (
+    <div
+      className="flex w-full max-w-md shrink-0 rounded-[var(--radius)] bg-[var(--surface-2)] p-0.5 sm:max-w-sm"
+      role="tablist"
+      aria-label="Режим доски"
+    >
       <button
         type="button"
-        className="min-h-11 shrink-0 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-3 text-sm text-muted hover:text-foreground"
-        onClick={() => setAddingColumn(true)}
+        role="tab"
+        aria-selected={boardTab === "mine"}
+        className={cn(
+          "min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium transition-colors",
+          boardTab === "mine"
+            ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
+            : "text-muted hover:text-foreground"
+        )}
+        onClick={() => setBoardTab("mine")}
       >
-        + Столбец
+        Мои задачи
       </button>
-    );
+      <button
+        type="button"
+        role="tab"
+        aria-selected={boardTab === "board"}
+        className={cn(
+          "min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium transition-colors",
+          boardTab === "board"
+            ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
+            : "text-muted hover:text-foreground"
+        )}
+        onClick={() => setBoardTab("board")}
+      >
+        Доска
+      </button>
+    </div>
+  ) : null;
 
+  const addColumnForm = addingColumn ? (
+    <form
+      className={cn(
+        "space-y-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/70 p-2.5",
+        !isDesktop && "flex flex-col gap-2"
+      )}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (newColumnName.trim()) {
+          columnMutation.mutate({ type: "create", name: newColumnName.trim() });
+        }
+      }}
+    >
+      <Input
+        value={newColumnName}
+        onChange={(e) => setNewColumnName(e.target.value)}
+        placeholder={isDesktop ? "Название столбца" : "Новый столбец"}
+        autoFocus
+      />
+      <div className="flex gap-2">
+        <Button type="submit" size="sm">
+          Добавить
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setAddingColumn(false)}>
+          Отмена
+        </Button>
+      </div>
+    </form>
+  ) : (
+    <button
+      type="button"
+      className={
+        isDesktop
+          ? "w-full rounded-[var(--radius-lg)] px-3 py-2 text-left text-sm text-muted hover:bg-[var(--surface-2)] hover:text-foreground"
+          : "min-h-11 shrink-0 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-3 text-sm text-muted hover:text-foreground"
+      }
+      onClick={() => setAddingColumn(true)}
+    >
+      {isDesktop ? "+ Добавить столбец" : "+ Столбец"}
+    </button>
+  );
+
+  /* Phone / tablet: вкладки + горизонтальные столбцы со snap. */
+  if (!isDesktop) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-        <div className="flex shrink-0 items-center gap-2">
-          <div
-            className="flex min-w-0 flex-1 rounded-[var(--radius)] bg-[var(--surface-2)] p-0.5"
-            role="tablist"
-            aria-label="Режим доски"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={compactMode === "mine"}
-              className={cn(
-                "min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium transition-colors",
-                compactMode === "mine"
-                  ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
-                  : "text-muted hover:text-foreground"
-              )}
-              onClick={() => setCompactMode("mine")}
-            >
-              {compactMineLabel}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={compactMode === "board"}
-              className={cn(
-                "min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium transition-colors",
-                compactMode === "board"
-                  ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
-                  : "text-muted hover:text-foreground"
-              )}
-              onClick={() => setCompactMode("board")}
-            >
-              Доска
-            </button>
-          </div>
-          {compactMode === "mine" && meId && members.length > 0 && (
-            <div className="max-w-[42%] shrink-0 [&_.field]:max-w-full">
-              <MemberSelect
-                members={members}
-                currentUserId={meId}
-                value={compactMember || meId}
-                onChange={setCompactMemberId}
-              />
-            </div>
-          )}
-        </div>
-
+        {tabBar}
         <div className="flex min-h-0 flex-1 snap-x snap-mandatory items-start gap-3 overflow-x-auto overflow-y-auto overscroll-contain px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {statuses.map((status) => {
-            const colTasks = compactByStatus[status.id] ?? [];
+            const colTasks = boardByStatus[status.id] ?? [];
             return (
               <div
                 key={status.id}
@@ -966,9 +953,9 @@ export function KanbanBoard({
               </div>
             );
           })}
-          {compactMode === "board" && (
+          {boardTab === "board" && (
             <div className="flex w-[min(16rem,70%)] shrink-0 snap-center flex-col self-start pt-0.5">
-              {addColumnBlock}
+              {addColumnForm}
             </div>
           )}
         </div>
@@ -978,35 +965,10 @@ export function KanbanBoard({
     );
   }
 
-  /* Desktop: на высоких экранах — 2/5 мои / 3/5 проект; на низких — мои capped, проект flex-1 */
-  const splitTall = mineHasTasks && tallBoard;
+  /* Desktop: те же вкладки; по умолчанию доска проекта. */
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-      <div
-        className={cn(
-          "flex min-h-0 flex-col overflow-hidden",
-          splitTall && "flex-[2]",
-          mineHasTasks && !tallBoard && "max-h-[min(34vh,20rem)] shrink-0",
-          !mineHasTasks && "shrink-0"
-        )}
-      >
-        <MemberTasksSection
-          projectId={projectId}
-          members={members}
-          statuses={statuses}
-          tasks={tasks}
-          onOpenTask={openTask}
-          fillParent={mineHasTasks}
-          onMoveTask={(args) => moveMutation.mutate(args)}
-          onHasTasksChange={setMineHasTasks}
-        />
-      </div>
-      <div
-        className={cn(
-          "flex min-h-0 flex-col overflow-hidden",
-          splitTall ? "flex-[3]" : "flex-1"
-        )}
-      >
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+      {tabBar}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -1020,7 +982,7 @@ export function KanbanBoard({
       >
         <div className="kanban-board-track flex h-full min-h-0 min-w-0 flex-1 items-start gap-3 overflow-x-auto overflow-y-hidden pb-1">
           {statuses.map((status) => {
-            const colTasks = byStatus[status.id] ?? [];
+            const colTasks = boardByStatus[status.id] ?? [];
             const emptyDrop =
               dropIndicator?.kind === "column" &&
               dropIndicator.statusId === status.id &&
@@ -1048,6 +1010,9 @@ export function KanbanBoard({
                         onOpen={() => openTask(task.id)}
                       />
                     ))}
+                    {!colTasks.length && (
+                      <p className="py-3 text-center text-sm text-muted">Пока пусто</p>
+                    )}
                   </div>,
                   { fillHeight: false }
                 )}
@@ -1055,42 +1020,9 @@ export function KanbanBoard({
             );
           })}
 
-          <div className="kanban-col-width shrink-0 self-start">
-            {addingColumn ? (
-              <form
-                className="space-y-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/70 p-2.5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (newColumnName.trim()) {
-                    columnMutation.mutate({ type: "create", name: newColumnName.trim() });
-                  }
-                }}
-              >
-                <Input
-                  value={newColumnName}
-                  onChange={(e) => setNewColumnName(e.target.value)}
-                  placeholder="Название столбца"
-                  autoFocus
-                />
-                <div className="flex gap-2">
-                  <Button type="submit" size="sm">
-                    Добавить
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setAddingColumn(false)}>
-                    Отмена
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <button
-                type="button"
-                className="w-full rounded-[var(--radius-lg)] px-3 py-2 text-left text-sm text-muted hover:bg-[var(--surface-2)] hover:text-foreground"
-                onClick={() => setAddingColumn(true)}
-              >
-                + Добавить столбец
-              </button>
-            )}
-          </div>
+          {boardTab === "board" && (
+            <div className="kanban-col-width shrink-0 self-start">{addColumnForm}</div>
+          )}
         </div>
         <DragOverlay dropAnimation={null}>
           {activeTask ? (
@@ -1105,7 +1037,6 @@ export function KanbanBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
-      </div>
       {drawer}
       {deleteColumnDialog}
     </div>
