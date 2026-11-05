@@ -15,10 +15,9 @@ import {
   formatDueAbsolute,
   formatDueChip,
   formatDueLabel,
-  fromDatetimeLocalValue,
   isDueOverdue,
-  toDatetimeLocalValue,
 } from "@/lib/format-due-date";
+import { DateTimePickerField } from "@/components/ui/datetime-picker";
 import {
   URGENCY_OPTIONS,
   urgencyCssVars,
@@ -221,28 +220,11 @@ export function TaskDrawer({
                   <label className="label-text" htmlFor="drawer-due">
                     Срок
                   </label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="drawer-due"
-                      type="datetime-local"
-                      className="min-w-0 flex-1"
-                      value={toDatetimeLocalValue(task.due_date)}
-                      onChange={(e) => {
-                        const due_date = fromDatetimeLocalValue(e.target.value);
-                        patch.mutate({ due_date });
-                      }}
-                    />
-                    {task.due_date ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => patch.mutate({ due_date: null })}
-                      >
-                        Убрать
-                      </Button>
-                    ) : null}
-                  </div>
+                  <DateTimePickerField
+                    id="drawer-due"
+                    valueIso={task.due_date}
+                    onChange={(due_date) => patch.mutate({ due_date })}
+                  />
                 </div>
                 <TaskAttachmentsPanel
                   taskId={task.id}

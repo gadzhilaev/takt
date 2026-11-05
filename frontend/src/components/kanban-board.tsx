@@ -36,7 +36,7 @@ import {
   columnShellStyle,
   suggestUnusedColumnColor,
 } from "@/lib/column-colors";
-import { fromDatetimeLocalValue } from "@/lib/format-due-date";
+import { DateTimePickerField } from "@/components/ui/datetime-picker";
 import { tasksForMember } from "@/lib/member-tasks";
 import { URGENCY_OPTIONS, urgencyFromPriority } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
@@ -66,7 +66,7 @@ type Draft = {
   description: string;
   assigneeIds: string[];
   priority: "medium" | "high" | "urgent";
-  dueLocal: string;
+  dueIso: string | null;
 };
 
 const emptyDraft = (): Draft => ({
@@ -74,7 +74,7 @@ const emptyDraft = (): Draft => ({
   description: "",
   assigneeIds: [],
   priority: "medium",
-  dueLocal: "",
+  dueIso: null,
 });
 
 type DropIndicator =
@@ -323,7 +323,7 @@ export function KanbanBoard({
       description: draft.description.trim() || null,
       assignee_ids: draft.assigneeIds,
       priority: draft.priority,
-      due_date: fromDatetimeLocalValue(draft.dueLocal),
+      due_date: draft.dueIso,
       files: pendingFiles,
     });
   }
@@ -622,25 +622,11 @@ export function KanbanBoard({
           <label className="label-text" htmlFor={`quick-due-${status.id}`}>
             Срок
           </label>
-          <div className="flex items-center gap-2">
-            <Input
-              id={`quick-due-${status.id}`}
-              type="datetime-local"
-              className="min-w-0 flex-1"
-              value={draft.dueLocal}
-              onChange={(e) => setDraft((d) => ({ ...d, dueLocal: e.target.value }))}
-            />
-            {draft.dueLocal ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setDraft((d) => ({ ...d, dueLocal: "" }))}
-              >
-                Убрать
-              </Button>
-            ) : null}
-          </div>
+          <DateTimePickerField
+            id={`quick-due-${status.id}`}
+            valueIso={draft.dueIso}
+            onChange={(dueIso) => setDraft((d) => ({ ...d, dueIso }))}
+          />
           <PendingFilesList
             files={pendingFiles}
             onRemove={(index) => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}

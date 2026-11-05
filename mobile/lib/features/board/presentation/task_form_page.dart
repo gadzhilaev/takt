@@ -6,6 +6,7 @@ import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/assignee_picker_dialog.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
+import '../../../shared/widgets/takt_datetime_picker.dart';
 import '../../../shared/widgets/takt_select.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../../../shared/widgets/task_attachments_section.dart';
@@ -157,25 +158,12 @@ class _TaskFormPageState extends State<TaskFormPage> {
   }
 
   Future<void> _pickDue() async {
-    final now = DateTime.now();
-    final initial = _dueAt ?? now.add(const Duration(days: 1));
-    final date = await showDatePicker(
+    final picked = await showTaktDateTimePicker(
       context: context,
-      initialDate: initial,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 10),
-      useRootNavigator: true,
+      initial: _dueAt,
     );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-      useRootNavigator: true,
-    );
-    if (time == null || !mounted) return;
-    setState(() {
-      _dueAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    });
+    if (picked == null || !mounted) return;
+    setState(() => _dueAt = picked);
   }
 
   String? get _dueLabel {
