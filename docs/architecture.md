@@ -176,7 +176,7 @@ mobile/lib/
 ## База данных
 
 PostgreSQL 16. Технические имена по умолчанию: `track` / `track`. Хост-порт Docker: **5433**.  
-Миграции `backend/alembic/versions/` — **001–016** (head `016_task_status_entered_at`). Runtime: `alembic upgrade head` в lifespan.
+Миграции `backend/alembic/versions/` — **001–020** (head `020_due_basis_auto_urgency`). Runtime: `alembic upgrade head` в lifespan.
 
 | Rev | Суть |
 |-----|------|
