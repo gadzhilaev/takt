@@ -10,6 +10,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
+const SEEN_STORAGE_KEY = "takt.notifications.seenToastIds";
+const SEEN_CAP = 200;
+
 type ToastItem = {
   id: string;
   title: string;
@@ -17,6 +20,30 @@ type ToastItem = {
   projectId: string | null;
   taskId: string | null;
 };
+
+function loadSeenIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = sessionStorage.getItem(SEEN_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((x): x is string => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistSeenIds(ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    const list = Array.from(ids);
+    const trimmed = list.length > SEEN_CAP ? list.slice(list.length - SEEN_CAP) : list;
+    sessionStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 function showBrowserNotification(n: NotificationItem, toast: ToastItem) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -58,10 +85,11 @@ function toastFromNotification(n: NotificationItem): ToastItem {
 export function NotificationToasts() {
   const router = useRouter();
   const qc = useQueryClient();
+  /** null until first successful notifications fetch — avoids toasting history on reload. */
   const seenIds = useRef<Set<string> | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const { data } = useQuery({
+  const { data, isSuccess } = useQuery({
     queryKey: ["notifications"],
     queryFn: () =>
       api<{ items: NotificationItem[]; unread: number }>("/api/v1/notifications?page_size=30"),
@@ -84,18 +112,27 @@ export function NotificationToasts() {
   }, []);
 
   useEffect(() => {
-    const items = data?.items ?? [];
-    if (!items.length && seenIds.current == null) {
-      seenIds.current = new Set();
-      return;
-    }
+    if (!isSuccess || !data) return;
+    const items = data.items ?? [];
+
     if (seenIds.current == null) {
-      seenIds.current = new Set(items.map((n) => n.id));
+      const persisted = loadSeenIds();
+      for (const n of items) persisted.add(n.id);
+      seenIds.current = persisted;
+      persistSeenIds(persisted);
       return;
     }
-    const fresh = items.filter((n) => !seenIds.current!.has(n.id));
-    if (!fresh.length) return;
-    for (const n of fresh) seenIds.current.add(n.id);
+
+    // Only toast unread that we have not already shown this session.
+    const fresh = items.filter((n) => !n.is_read && !seenIds.current!.has(n.id));
+    if (!fresh.length) {
+      for (const n of items) seenIds.current.add(n.id);
+      persistSeenIds(seenIds.current);
+      return;
+    }
+    for (const n of items) seenIds.current.add(n.id);
+    persistSeenIds(seenIds.current);
+
     const incoming = [...fresh].reverse();
     for (const n of incoming) {
       const toast = toastFromNotification(n);
@@ -105,7 +142,7 @@ export function NotificationToasts() {
         setToasts((prev) => prev.filter((t) => t.id !== toast.id));
       }, 6500);
     }
-  }, [data?.items]);
+  }, [data, isSuccess]);
 
   async function openToast(t: ToastItem) {
     try {

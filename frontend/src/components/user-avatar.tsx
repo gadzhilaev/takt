@@ -33,7 +33,7 @@ export function UserAvatar({
   const cls = sizeMap[size] ?? sizeMap[8];
   // Solid 1px border (not box-shadow ring) keeps small circles sharp.
   const shape = cn(
-    "box-border shrink-0 overflow-hidden rounded-full border border-[var(--border-strong)] leading-none",
+    "box-border shrink-0 overflow-hidden rounded-full border border-[var(--border-strong)]",
     cls,
     className
   );
@@ -53,13 +53,23 @@ export function UserAvatar({
   const color = colors[name.charCodeAt(0) % colors.length];
   return (
     <span
-      className={cn(shape, "inline-flex items-center justify-center font-semibold text-white")}
+      className={cn(shape, "inline-grid place-items-center font-semibold text-white")}
       style={{ backgroundColor: color }}
       title={title ?? name}
       role="img"
       aria-label={name}
     >
-      <span className="translate-y-px select-none">{getInitials(name)}</span>
+      {/*
+        Grid + explicit 1em box beats flex+line-height quirks across fonts/OS
+        (Cyrillic metrics often look top-left biased with plain flex).
+      */}
+      <span
+        aria-hidden
+        className="flex h-[1em] w-[1.15em] select-none items-center justify-center leading-none tracking-tight"
+        style={{ lineHeight: 1, fontSize: "1em" }}
+      >
+        {getInitials(name)}
+      </span>
     </span>
   );
 }

@@ -72,6 +72,8 @@ export type Project = {
   is_default: boolean;
   is_archived: boolean;
   is_demo?: boolean;
+  /** Escalate priority as due date approaches (≤35% → важно, ≤10% → срочно). */
+  auto_urgency_from_due?: boolean;
   created_at: string;
   updated_at: string;
   members: ProjectMember[];

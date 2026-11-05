@@ -12,6 +12,10 @@ export function notificationKindLabel(kind: string): string {
       return "Новая задача";
     case "task_completed":
       return "Задача выполнена";
+    case "task_due_soon":
+      return "Скоро срок";
+    case "task_overdue":
+      return "Срок просрочен";
     case "status_changed":
     case "task_moved":
       return "Изменение задачи";
@@ -40,7 +44,9 @@ export type NotificationIconName =
   | "message"
   | "mail"
   | "profile"
-  | "notifications";
+  | "notifications"
+  | "timer"
+  | "alert";
 
 export function notificationIconName(kind: string): NotificationIconName {
   switch (kind) {
@@ -49,6 +55,10 @@ export function notificationIconName(kind: string): NotificationIconName {
       return "invite";
     case "task_completed":
       return "circle-check";
+    case "task_due_soon":
+      return "timer";
+    case "task_overdue":
+      return "alert";
     case "status_changed":
     case "task_moved":
       return "status";

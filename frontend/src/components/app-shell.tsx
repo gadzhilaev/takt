@@ -54,6 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [membersProjectId, setMembersProjectId] = useState<string | null>(null);
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [renameAutoUrgency, setRenameAutoUrgency] = useState(true);
   const [inviteOpen, setInviteOpen] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
@@ -328,7 +329,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!name) return;
     await api(`/api/v1/projects/${renameProject.id}`, {
       method: "PATCH",
-      json: { name },
+      json: { name, auto_urgency_from_due: renameAutoUrgency },
     });
     setRenameProjectId(null);
     qc.invalidateQueries({ queryKey: ["projects"] });
@@ -473,11 +474,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         onClick={() => {
                           setMenuProjectId(null);
                           setRenameValue(p.name);
+                          setRenameAutoUrgency(p.auto_urgency_from_due !== false);
                           setRenameProjectId(p.id);
                         }}
                       >
                         <AppIcon name="edit" size={18} className="shrink-0 text-muted" />
-                        Переименовать
+                        Настройки
                       </button>
                     )}
                     <button
@@ -659,7 +661,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Dialog
         open={!!renameProject}
         onOpenChange={(v) => !v && setRenameProjectId(null)}
-        title="Название проекта"
+        title="Настройки проекта"
         centerTitle
       >
         {renameProject && (
@@ -681,6 +683,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 autoFocus
               />
             </div>
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius)] border border-hairline px-3 py-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+                checked={renameAutoUrgency}
+                onChange={(e) => setRenameAutoUrgency(e.target.checked)}
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-foreground">
+                  Автосрочность по дедлайну
+                </span>
+                <span className="mt-0.5 block text-xs leading-snug text-muted">
+                  При ≤35% оставшегося срока — «Важно», при ≤10% или просрочке — «Срочно».
+                  Только повышает срочность, не понижает.
+                </span>
+              </span>
+            </label>
             <Button type="submit" className="w-full" disabled={!renameValue.trim()}>
               Сохранить
             </Button>
@@ -837,7 +856,10 @@ function ProjectMembersDialog({
   onDecideLeave: (requestId: string, approve: boolean) => void;
 }) {
   const [memberMenuId, setMemberMenuId] = useState<string | null>(null);
-  const isOwner = project.members.some((m) => m.user_id === userId && m.role === "admin");
+  const myRole = project.members.find((m) => m.user_id === userId)?.role;
+  const isOwner = myRole === "admin";
+  /** Admin or regular member can open remove menu (viewers cannot). */
+  const canManageMembers = myRole === "admin" || myRole === "member";
   const count = project.members.length;
   const { data: leaveData } = useQuery({
     queryKey: ["leave-requests", project.id],
@@ -865,7 +887,11 @@ function ProjectMembersDialog({
       </div>
       <ul className="-mx-1 space-y-0.5">
         {project.members.map((m) => {
-          const canRemove = isOwner && m.user_id !== userId;
+          const isTargetOwner = m.role === "admin";
+          const canRemove =
+            canManageMembers &&
+            m.user_id !== userId &&
+            (isOwner || !isTargetOwner);
           const open = memberMenuId === m.user_id;
           return (
             <li
@@ -873,13 +899,10 @@ function ProjectMembersDialog({
               className="relative flex items-center gap-2.5 rounded-[var(--radius)] px-1 py-1.5 text-[14px]"
             >
               <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={7} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold leading-tight">{m.name}</span>
-                {m.role === "admin" && (
-                  <span className="text-[12px] text-muted">Владелец</span>
-                )}
-              </span>
-              {canRemove && (
+              <span className="min-w-0 flex-1 truncate font-semibold leading-tight">{m.name}</span>
+              {isTargetOwner ? (
+                <span className="shrink-0 text-[12px] text-muted">Владелец</span>
+              ) : canRemove ? (
                 <button
                   type="button"
                   className="shrink-0 rounded p-1 text-muted hover:bg-[var(--surface-2)] hover:text-foreground"
@@ -888,8 +911,8 @@ function ProjectMembersDialog({
                 >
                   <AppIcon name="more" size={16} />
                 </button>
-              )}
-              {open && (
+              ) : null}
+              {open && canRemove && (
                 <>
                   <button
                     type="button"

@@ -12,6 +12,14 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { resolveColumnColors } from "@/lib/column-colors";
 import { formatCreatedAt } from "@/lib/format-created-at";
 import {
+  formatDueAbsolute,
+  formatDueChip,
+  formatDueLabel,
+  fromDatetimeLocalValue,
+  isDueOverdue,
+  toDatetimeLocalValue,
+} from "@/lib/format-due-date";
+import {
   URGENCY_OPTIONS,
   urgencyCssVars,
   urgencyFromPriority,
@@ -209,6 +217,33 @@ export function TaskDrawer({
                     options={URGENCY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                   />
                 </div>
+                <div>
+                  <label className="label-text" htmlFor="drawer-due">
+                    Срок
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="drawer-due"
+                      type="datetime-local"
+                      className="min-w-0 flex-1"
+                      value={toDatetimeLocalValue(task.due_date)}
+                      onChange={(e) => {
+                        const due_date = fromDatetimeLocalValue(e.target.value);
+                        patch.mutate({ due_date });
+                      }}
+                    />
+                    {task.due_date ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => patch.mutate({ due_date: null })}
+                      >
+                        Убрать
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
                 <TaskAttachmentsPanel
                   taskId={task.id}
                   attachments={task.attachments ?? []}
@@ -269,6 +304,34 @@ export function TaskDrawer({
                       </span>
                       <span className="text-muted">Статус:</span> {statusName}
                     </p>
+                    {formatDueLabel(task.due_date, new Date(), {
+                      isDone: Boolean(task.closed_at),
+                    }) && (
+                      <p className="text-sm leading-snug text-foreground">
+                        <span className="text-muted">
+                          {task.closed_at
+                            ? "Срок:"
+                            : isDueOverdue(task.due_date)
+                              ? "Просрочено:"
+                              : "До сдачи:"}
+                        </span>{" "}
+                        <span
+                          className={cn(
+                            "font-medium",
+                            !task.closed_at && isDueOverdue(task.due_date)
+                              ? "text-[var(--danger)]"
+                              : undefined
+                          )}
+                        >
+                          {formatDueChip(task.due_date, new Date(), {
+                            isDone: Boolean(task.closed_at),
+                          })}
+                          {!task.closed_at && formatDueAbsolute(task.due_date)
+                            ? ` · ${formatDueAbsolute(task.due_date)}`
+                            : null}
+                        </span>
+                      </p>
+                    )}
                     <div className="flex min-w-0 items-center gap-2">
                       {task.author?.name ? (
                         <>

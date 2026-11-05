@@ -36,6 +36,7 @@ import {
   columnShellStyle,
   suggestUnusedColumnColor,
 } from "@/lib/column-colors";
+import { fromDatetimeLocalValue } from "@/lib/format-due-date";
 import { tasksForMember } from "@/lib/member-tasks";
 import { URGENCY_OPTIONS, urgencyFromPriority } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ type Draft = {
   description: string;
   assigneeIds: string[];
   priority: "medium" | "high" | "urgent";
+  dueLocal: string;
 };
 
 const emptyDraft = (): Draft => ({
@@ -72,6 +74,7 @@ const emptyDraft = (): Draft => ({
   description: "",
   assigneeIds: [],
   priority: "medium",
+  dueLocal: "",
 });
 
 type DropIndicator =
@@ -224,6 +227,7 @@ export function KanbanBoard({
       description?: string | null;
       assignee_ids?: string[];
       priority?: string;
+      due_date?: string | null;
       files: File[];
     }) => {
       const { files, ...body } = payload;
@@ -319,6 +323,7 @@ export function KanbanBoard({
       description: draft.description.trim() || null,
       assignee_ids: draft.assigneeIds,
       priority: draft.priority,
+      due_date: fromDatetimeLocalValue(draft.dueLocal),
       files: pendingFiles,
     });
   }
@@ -614,6 +619,28 @@ export function KanbanBoard({
             }
             options={URGENCY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           />
+          <label className="label-text" htmlFor={`quick-due-${status.id}`}>
+            Срок
+          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              id={`quick-due-${status.id}`}
+              type="datetime-local"
+              className="min-w-0 flex-1"
+              value={draft.dueLocal}
+              onChange={(e) => setDraft((d) => ({ ...d, dueLocal: e.target.value }))}
+            />
+            {draft.dueLocal ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setDraft((d) => ({ ...d, dueLocal: "" }))}
+              >
+                Убрать
+              </Button>
+            ) : null}
+          </div>
           <PendingFilesList
             files={pendingFiles}
             onRemove={(index) => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
