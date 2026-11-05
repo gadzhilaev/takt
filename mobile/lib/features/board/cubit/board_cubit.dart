@@ -109,6 +109,9 @@ class BoardCubit extends Cubit<BoardState> {
   /// Last successful /projects network sync (splash / pull-to-refresh).
   DateTime? _projectsSyncedAt;
 
+  /// Cancels stale background board fetches when switching projects quickly.
+  int _boardFetchGen = 0;
+
   static const _lastProjectKey = 'takt_last_project_id';
   static const _projectsFreshFor = Duration(seconds: 90);
 
@@ -277,10 +280,11 @@ class BoardCubit extends Cubit<BoardState> {
         ));
       }
     } catch (e) {
+      // Кэш на экране — не помечаем «офлайн» из-за таймаута одного запроса.
       emit(state.copyWith(
         loading: false,
         refreshing: false,
-        offline: true,
+        offline: false,
         error: hasLocal ? null : api.messageFromError(e),
       ));
     }
@@ -335,7 +339,7 @@ class BoardCubit extends Cubit<BoardState> {
       emit(state.copyWith(
         loading: false,
         refreshing: false,
-        offline: true,
+        offline: false,
         error: state.projects.isEmpty ? api.messageFromError(e) : null,
       ));
     }
@@ -411,6 +415,7 @@ class BoardCubit extends Cubit<BoardState> {
     required List<Project> list,
     Project? project,
   }) async {
+    final gen = ++_boardFetchGen;
     final hadLocal = state.project?.id == projectId && state.columns.isNotEmpty;
     try {
       project ??= list.isNotEmpty
@@ -423,6 +428,7 @@ class BoardCubit extends Cubit<BoardState> {
         throw StateError('no project');
       }
       final loaded = await board.loadBoard(projectId);
+      if (gen != _boardFetchGen || isClosed) return;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastProjectKey, projectId);
       final keepColumn = state.project?.id == projectId ? state.columnIndex : 0;
@@ -451,10 +457,13 @@ class BoardCubit extends Cubit<BoardState> {
       unawaited(_prefetchAvatars(projects: nextProjects, tasks: loaded.tasks));
       await _publishWidget();
     } catch (e) {
+      if (gen != _boardFetchGen || isClosed) return;
+      // Устаревший/фоновый таймаут не блокирует доску с кэшем.
+      if (state.project?.id != null && state.project?.id != projectId) return;
       emit(state.copyWith(
         loading: false,
         refreshing: false,
-        offline: true,
+        offline: false,
         error: hadLocal ? null : api.messageFromError(e),
       ));
     }
@@ -586,6 +595,55 @@ class BoardCubit extends Cubit<BoardState> {
       await cache.saveProjects(list);
       emit(state.copyWith(projects: list));
       await openProject(p.id, projects: list);
+    } catch (e) {
+      emit(state.copyWith(error: api.messageFromError(e)));
+    }
+  }
+
+  Future<StatusColumn?> createColumn({
+    required String name,
+    required String color,
+  }) async {
+    final project = state.project;
+    if (project == null) return null;
+    if (state.offline) {
+      emit(state.copyWith(error: 'Нет сети: создание столбца заблокировано'));
+      return null;
+    }
+    try {
+      final col = await board.createColumn(
+        projectId: project.id,
+        name: name,
+        color: color,
+      );
+      final next = [...state.columns, col]..sort((a, b) => a.position.compareTo(b.position));
+      final idx = next.indexWhere((c) => c.id == col.id);
+      emit(state.copyWith(
+        columns: next,
+        columnIndex: idx >= 0 ? idx : state.columnIndex,
+        clearError: true,
+      ));
+      await _persistBoard();
+      return col;
+    } catch (e) {
+      emit(state.copyWith(error: api.messageFromError(e)));
+      return null;
+    }
+  }
+
+  Future<void> updateColumnColor({
+    required String statusId,
+    required String color,
+  }) async {
+    if (state.offline) {
+      emit(state.copyWith(error: 'Нет сети: изменение заблокировано'));
+      return;
+    }
+    try {
+      final col = await board.updateColumnColor(statusId: statusId, color: color);
+      final next = state.columns.map((c) => c.id == col.id ? col : c).toList();
+      emit(state.copyWith(columns: next, clearError: true));
+      await _persistBoard();
     } catch (e) {
       emit(state.copyWith(error: api.messageFromError(e)));
     }

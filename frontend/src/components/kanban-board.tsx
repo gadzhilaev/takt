@@ -29,7 +29,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { COLUMN_COLOR_PALETTE, columnShellStyle } from "@/lib/column-colors";
+import {
+  COLUMN_COLOR_PALETTE,
+  columnShellStyle,
+  suggestUnusedColumnColor,
+} from "@/lib/column-colors";
 import { tasksForMember } from "@/lib/member-tasks";
 import { URGENCY_OPTIONS, urgencyFromPriority } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
@@ -241,7 +245,11 @@ export function KanbanBoard({
       if (action.type === "create") {
         return api("/api/v1/settings/statuses", {
           method: "POST",
-                  json: { name: action.name, project_id: projectId, color: action.color || "#607FA4" },
+          json: {
+            name: action.name,
+            project_id: projectId,
+            color: action.color || suggestUnusedColumnColor(statuses.map((s) => s.color)),
+          },
         });
       }
       if (action.type === "rename" && action.id) {
@@ -495,11 +503,15 @@ export function KanbanBoard({
         description="Добавьте первый столбец, чтобы начать"
         action={
           <form
-            className="flex gap-2"
+            className="flex flex-wrap items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               if (newColumnName.trim()) {
-                columnMutation.mutate({ type: "create", name: newColumnName.trim() });
+                columnMutation.mutate({
+                  type: "create",
+                  name: newColumnName.trim(),
+                  color: suggestUnusedColumnColor([]),
+                });
               }
             }}
           >
@@ -870,6 +882,11 @@ export function KanbanBoard({
     </div>
   ) : null;
 
+  const openAddColumn = () => {
+    setNewColumnName("");
+    setAddingColumn(true);
+  };
+
   const addColumnForm = addingColumn ? (
     <form
       className={cn(
@@ -879,7 +896,13 @@ export function KanbanBoard({
       onSubmit={(e) => {
         e.preventDefault();
         if (newColumnName.trim()) {
-          columnMutation.mutate({ type: "create", name: newColumnName.trim() });
+          columnMutation.mutate({
+            type: "create",
+            name: newColumnName.trim(),
+            color: suggestUnusedColumnColor(statuses.map((s) => s.color)),
+          });
+          setAddingColumn(false);
+          setNewColumnName("");
         }
       }}
     >
@@ -906,7 +929,7 @@ export function KanbanBoard({
           ? "w-full rounded-[var(--radius-lg)] px-3 py-2 text-left text-sm text-muted hover:bg-[var(--surface-2)] hover:text-foreground"
           : "min-h-11 shrink-0 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-3 text-sm text-muted hover:text-foreground"
       }
-      onClick={() => setAddingColumn(true)}
+      onClick={openAddColumn}
     >
       {isDesktop ? "+ Добавить столбец" : "+ Столбец"}
     </button>

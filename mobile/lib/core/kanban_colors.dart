@@ -1,9 +1,49 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 /// Shared Kanban palette (aligned with web `frontend/src/lib/column-colors.ts`
 /// and `urgency.ts`). Resolve surfaces from API `status.color` accents.
 class KanbanColors {
   KanbanColors._();
+
+  /// Board accents in preferred order — first free one wins for new columns.
+  static const accentCandidates = <String>[
+    '#607FA4',
+    '#347FA4',
+    '#9062B8',
+    '#398A62',
+    '#7B8794',
+    '#A8895C',
+    '#C45C4A',
+    '#3D8B7A',
+    '#B06A2B',
+    '#5B6FCF',
+  ];
+
+  /// Next palette accent not already used on the board.
+  static String suggestUnusedAccent(Iterable<String?> used) {
+    final taken = <String>{
+      for (final c in used)
+        if (c != null && c.trim().isNotEmpty) c.trim().toLowerCase(),
+    };
+    for (final p in accentCandidates) {
+      if (!taken.contains(p.toLowerCase())) return p;
+    }
+    final rng = Random();
+    for (var i = 0; i < 32; i++) {
+      final color = HSVColor.fromAHSV(
+        1,
+        rng.nextDouble() * 360,
+        0.42 + rng.nextDouble() * 0.35,
+        0.55 + rng.nextDouble() * 0.25,
+      ).toColor();
+      final hex =
+          '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
+      if (!taken.contains(hex.toLowerCase())) return hex;
+    }
+    return accentCandidates.first;
+  }
 
   static const boardBgLight = Color(0xFFE9EDF2);
   static const boardBgDark = Color(0xFF22272E);

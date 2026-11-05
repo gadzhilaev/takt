@@ -143,6 +143,17 @@ class BoardRepository {
     );
   }
 
+  Future<StatusColumn> updateColumnColor({
+    required String statusId,
+    required String color,
+  }) async {
+    final res = await _api.dio.patch<Map<String, dynamic>>(
+      '/api/v1/settings/statuses/$statusId',
+      data: {'color': color},
+    );
+    return StatusColumn.fromJson(res.data?['status'] as Map<String, dynamic>? ?? res.data!);
+  }
+
   Future<void> deleteColumn({
     required String statusId,
     required String moveToStatusId,

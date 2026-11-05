@@ -4,6 +4,7 @@ import {
   columnAccentBar,
   resolveColumnColors,
   resolveColumnPreset,
+  suggestUnusedColumnColor,
 } from "./column-colors";
 
 describe("column-colors", () => {
@@ -32,5 +33,12 @@ describe("column-colors", () => {
   it("exposes four standard board colors in the palette", () => {
     const ids = COLUMN_COLOR_PALETTE.map((c) => c.id);
     expect(ids).toEqual(expect.arrayContaining(["todo", "doing", "review", "done"]));
+  });
+
+  it("suggests a color not already used on the board", () => {
+    const used = COLUMN_COLOR_PALETTE.map((c) => c.value);
+    const next = suggestUnusedColumnColor(used);
+    expect(used.map((c) => c.toLowerCase())).not.toContain(next.toLowerCase());
+    expect(next).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 });

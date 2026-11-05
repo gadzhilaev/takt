@@ -147,3 +147,41 @@ export function columnAccentBar(color: string): CSSProperties {
   const c = resolveColumnColors(color);
   return { backgroundColor: c.value };
 }
+
+/** Random vivid accent not already used by current columns. */
+export function suggestUnusedColumnColor(used: Array<string | null | undefined>): string {
+  const taken = new Set(
+    used
+      .filter((c): c is string => typeof c === "string" && c.trim().length > 0)
+      .map((c) => normalizeHex(c))
+  );
+  for (const preset of COLUMN_COLOR_PALETTE) {
+    if (!taken.has(normalizeHex(preset.value))) return preset.value;
+  }
+  const extras = ["#C45C4A", "#3D8B7A", "#B06A2B", "#5B6FCF", "#8A5A44", "#2F7D9A"];
+  for (const hex of extras) {
+    if (!taken.has(normalizeHex(hex))) return hex;
+  }
+  for (let i = 0; i < 48; i++) {
+    const h = Math.floor(Math.random() * 360);
+    const s = 42 + Math.floor(Math.random() * 38);
+    const l = 38 + Math.floor(Math.random() * 18);
+    const hex = hslToHex(h, s, l);
+    if (!taken.has(normalizeHex(hex))) return hex;
+  }
+  return DEFAULT_ACCENT;
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sat = s / 100;
+  const light = l / 100;
+  const a = sat * Math.min(light, 1 - light);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = light - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+}
