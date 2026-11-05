@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:home_widget/home_widget.dart';
 
 import 'app.dart';
@@ -13,7 +14,9 @@ import 'features/notifications/data/notifications_repository.dart';
 import 'features/widget_sync/widget_sync.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  // Keep native splash (same brand as Dart SplashPage) until first Flutter frame.
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   await HomeWidget.setAppGroupId(AppConfig.appGroupId);
 
   final tokens = TokenStorage();

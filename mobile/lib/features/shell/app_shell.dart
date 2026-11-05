@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
 import '../../shared/widgets/app_icon.dart';
+import '../../shared/widgets/project_actions.dart';
 import '../../shared/widgets/swipe_back_edge.dart';
 import '../../shared/widgets/takt_app_bar.dart';
 import '../board/cubit/board_cubit.dart';
-import '../notifications/data/notifications_repository.dart';
 import '../projects/presentation/projects_welcome_page.dart';
 import 'takt_bottom_nav.dart';
 
@@ -22,24 +22,7 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _unread = 0;
-
   StatefulNavigationShell get navigationShell => widget.navigationShell;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUnread();
-  }
-
-  Future<void> _loadUnread() async {
-    try {
-      final list = await context.read<NotificationsRepository>().list(unreadOnly: true);
-      if (mounted) setState(() => _unread = list.length);
-    } catch (_) {
-      /* ignore */
-    }
-  }
 
   void _goBranch(int index) {
     navigationShell.goBranch(
@@ -53,10 +36,26 @@ class _AppShellState extends State<AppShell> {
     context.go('/projects');
   }
 
+  Future<void> _openProjectMenu() async {
+    final board = context.read<BoardCubit>();
+    final project = board.state.project;
+    if (project == null) return;
+    await showProjectActionsMenu(
+      context,
+      project: project,
+      currentUserId: board.currentUserId,
+      onChanged: () {
+        if (!mounted) return;
+        board.refreshProjects(forceLoading: true);
+      },
+    );
+  }
+
   PreferredSizeWidget _buildAppBar({
     required int idx,
     required bool dark,
     required String? projectName,
+    required bool hasProject,
   }) {
     if (idx == 2) {
       return const TaktAppBar(title: 'Профиль');
@@ -66,11 +65,28 @@ class _AppShellState extends State<AppShell> {
       return const TaktAppBar(title: 'Доска');
     }
 
+    final editAction = hasProject
+        ? [
+            IconButton(
+              tooltip: 'Проект',
+              visualDensity: VisualDensity.compact,
+              onPressed: _openProjectMenu,
+              icon: AppIcon(
+                AppIcons.edit,
+                size: 22,
+                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ]
+        : null;
+
     if (idx == 1) {
       return TaktAppBar(
         title: 'Мои задачи',
         subtitle: projectName,
         onBack: _backToProjects,
+        actions: editAction,
       );
     }
 
@@ -78,27 +94,7 @@ class _AppShellState extends State<AppShell> {
       title: projectName,
       subtitle: 'Доска проекта',
       onBack: _backToProjects,
-      actions: [
-        IconButton(
-          tooltip: 'Уведомления',
-          visualDensity: VisualDensity.compact,
-          onPressed: () async {
-            await context.push('/notifications');
-            await _loadUnread();
-          },
-          icon: Badge(
-            isLabelVisible: _unread > 0,
-            smallSize: 8,
-            backgroundColor: TaktColors.urgent,
-            child: AppIcon(
-              AppIcons.notifications,
-              size: 22,
-              color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-      ],
+      actions: editAction,
     );
   }
 
@@ -152,7 +148,12 @@ class _AppShellState extends State<AppShell> {
       onBack: _backToProjects,
       underlay: const ProjectsWelcomePage(previewOnly: true),
       child: Scaffold(
-        appBar: _buildAppBar(idx: idx, dark: dark, projectName: projectName),
+        appBar: _buildAppBar(
+          idx: idx,
+          dark: dark,
+          projectName: projectName,
+          hasProject: hasProject,
+        ),
         body: navigationShell,
         bottomNavigationBar: TaktBottomNav(items: items),
       ),

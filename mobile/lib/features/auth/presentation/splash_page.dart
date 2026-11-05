@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,6 +13,7 @@ import '../../board/cubit/board_cubit.dart';
 import '../cubit/auth_cubit.dart';
 import '../data/oauth_repository.dart';
 
+/// Shared with web [SplashScreen]: gradient, logo, tagline, accent spinner.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -19,26 +21,39 @@ class SplashPage extends StatefulWidget {
   State<SplashPage> createState() => _SplashPageState();
 }
 
-class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateMixin {
-  late final AnimationController _motion;
-  late final Animation<double> _fade;
-  late final Animation<double> _rise;
+class _SplashPageState extends State<SplashPage> {
   bool _minElapsed = false;
   bool _warmDone = false;
   bool _warmStarted = false;
+  bool _nativeRemoved = false;
+
+  static const _lightGradient = [
+    Color(0xFFF4F7F8),
+    Color(0xFFE4EEF1),
+    Color(0xFFD7E6EA),
+  ];
+  static const _darkGradient = [
+    Color(0xFF12151A),
+    Color(0xFF1A2830),
+    Color(0xFF152028),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _motion = AnimationController(vsync: this, duration: const Duration(milliseconds: 720));
-    _fade = CurvedAnimation(parent: _motion, curve: Curves.easeOutCubic);
-    _rise = Tween<double>(begin: 10, end: 0).animate(CurvedAnimation(parent: _motion, curve: Curves.easeOutCubic));
-    _motion.forward();
-    Future<void>.delayed(const Duration(milliseconds: 900), () {
+    // Native splash already shows the same brand — paint Flutter immediately opaque.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _removeNativeSplash());
+    Future<void>.delayed(const Duration(milliseconds: 700), () {
       if (!mounted) return;
       setState(() => _minElapsed = true);
       _leaveIfReady(context.read<AuthCubit>().state);
     });
+  }
+
+  void _removeNativeSplash() {
+    if (_nativeRemoved) return;
+    _nativeRemoved = true;
+    FlutterNativeSplash.remove();
   }
 
   @override
@@ -49,14 +64,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     unawaited(_warm());
   }
 
-  @override
-  void dispose() {
-    _motion.dispose();
-    super.dispose();
-  }
-
   /// Пока виден splash — сессия, способы входа и (если залогинен) проекты из кэша + сеть.
-  /// Если сеть дольше 10с — уходим с кэшем, sync продолжается в фоне.
   Future<void> _warm() async {
     final auth = context.read<AuthCubit>();
     final oauth = context.read<OAuthRepository>();
@@ -71,7 +79,6 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     final state = auth.state;
     if (state is AuthAuthenticated) {
       board.setCurrentUserId(state.user.id);
-      // Кэш проектов + привязки входа + аватары до ухода со splash.
       await Future.wait<void>([
         board.hydrateFromCache(),
         oauth.prefetchIdentities(),
@@ -103,7 +110,6 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
 
   void _leaveIfReady(AuthState state) {
     if (!_minElapsed || !_warmDone || !mounted) return;
-    // Не вызывать go() прямо из build/listener — иначе Router markNeedsBuild mid-build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (state is AuthAuthenticated) {
@@ -126,48 +132,39 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: dark
-                  ? const [Color(0xFF12151A), Color(0xFF1A2830), Color(0xFF152028)]
-                  : const [Color(0xFFF4F7F8), Color(0xFFE4EEF1), Color(0xFFD7E6EA)],
+              colors: dark ? _darkGradient : _lightGradient,
             ),
           ),
           child: SafeArea(
             child: Center(
-              child: AnimatedBuilder(
-                animation: _motion,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fade.value,
-                    child: Transform.translate(offset: Offset(0, _rise.value), child: child),
-                  );
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SvgPicture.asset(
-                      dark ? 'assets/brand/takt-logo-on-dark.svg' : 'assets/brand/takt-logo.svg',
-                      height: 44,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    dark ? 'assets/brand/takt-logo-on-dark.svg' : 'assets/brand/takt-logo.svg',
+                    height: 44,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Задачи команды',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: dark
+                              ? const Color(0xFF9BB0BC)
+                              : TaktColors.accent.withValues(alpha: 0.85),
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.2,
+                        ),
+                  ),
+                  const SizedBox(height: 36),
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: dark ? const Color(0xFF6A9AAB) : TaktColors.accent,
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Задачи команды',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: dark ? const Color(0xFF9BB0BC) : TaktColors.accent.withValues(alpha: 0.85),
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.2,
-                          ),
-                    ),
-                    const SizedBox(height: 36),
-                    SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: dark ? const Color(0xFF6A9AAB) : TaktColors.accent,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

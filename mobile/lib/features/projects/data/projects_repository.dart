@@ -31,6 +31,22 @@ class ProjectsRepository {
     return Project.fromJson(res.data!['project'] as Map<String, dynamic>);
   }
 
+  Future<Project> renameProject({required String projectId, required String name}) async {
+    final res = await _api.dio.patch<Map<String, dynamic>>(
+      '/api/v1/projects/$projectId',
+      data: {'name': name.trim()},
+    );
+    return Project.fromJson(res.data!['project'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteProject(String projectId) async {
+    await _api.dio.delete('/api/v1/projects/$projectId');
+  }
+
+  Future<void> leaveProject(String projectId) async {
+    await _api.dio.post('/api/v1/projects/$projectId/leave');
+  }
+
   Future<List<ProjectInvite>> myInvites() async {
     final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/invites/mine');
     final items = res.data?['items'] as List<dynamic>? ?? [];

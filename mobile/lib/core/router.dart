@@ -14,6 +14,7 @@ import '../features/board/presentation/task_form_page.dart';
 import '../features/my_tasks/presentation/my_tasks_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/profile_page.dart';
+import '../features/projects/presentation/project_members_page.dart';
 import '../features/projects/presentation/projects_welcome_page.dart';
 import '../features/shell/app_shell.dart';
 import '../features/shell/sliding_branch_stack.dart';
@@ -111,6 +112,16 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
       GoRoute(
         path: '/projects',
         builder: (_, _) => const ProjectsWelcomePage(),
+      ),
+      GoRoute(
+        path: '/projects/:projectId/members',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['projectId']!;
+          return CupertinoPage(
+            key: state.pageKey,
+            child: ProjectMembersPage(projectId: id),
+          );
+        },
       ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) => AppShell(navigationShell: navigationShell),

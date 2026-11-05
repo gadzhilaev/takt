@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -155,6 +155,17 @@ async def create_project(
         )
     await db.flush()
     return await get_project(db, project.id)  # type: ignore[return-value]
+
+
+async def delete_project(db: AsyncSession, *, project_id: uuid.UUID, actor: User) -> None:
+    """Hard-delete project and cascaded tasks/columns. Admin only; not default inbox."""
+    await ensure_project_access(db, actor, project_id, min_role=ProjectMemberRole.admin)
+    project = await get_project(db, project_id)
+    if not project:
+        raise LookupError("not_found")
+    if project.is_default:
+        raise PermissionError("default_project")
+    await db.execute(delete(Project).where(Project.id == project_id))
 
 
 async def project_progress(db: AsyncSession, project_id: uuid.UUID) -> dict:

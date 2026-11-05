@@ -92,6 +92,46 @@ async def remove_member(
     )
 
 
+async def leave_project_now(
+    db: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    user: User,
+) -> None:
+    """Member leaves immediately (no approval). Sole admin cannot leave."""
+    role = await project_service.ensure_project_access(
+        db, user, project_id, min_role=ProjectMemberRole.viewer
+    )
+    if role == ProjectMemberRole.admin:
+        admins = await _admin_user_ids(db, project_id)
+        if len(admins) <= 1:
+            raise LeaveRequestError(
+                "last_admin",
+                "Единственный владелец не может покинуть проект — "
+                "удалите его или назначьте другого владельца",
+            )
+
+    await db.execute(
+        delete(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id,
+        )
+    )
+    pending = (
+        await db.execute(
+            select(ProjectLeaveRequest).where(
+                ProjectLeaveRequest.project_id == project_id,
+                ProjectLeaveRequest.user_id == user.id,
+                ProjectLeaveRequest.status == ProjectLeaveRequestStatus.pending,
+            )
+        )
+    ).scalars().all()
+    now = datetime.now(UTC)
+    for req in pending:
+        req.status = ProjectLeaveRequestStatus.cancelled
+        req.responded_at = now
+
+
 async def create_leave_request(
     db: AsyncSession,
     *,
@@ -140,7 +180,10 @@ async def create_leave_request(
                 project_id=project_id,
                 kind="leave_request",
                 title="Заявка на выход из проекта",
-                body=f"{user.name} просит удалить его из «{project.name if project else 'проекта'}»",
+                body=(
+                    f"{user.name} просит удалить его из "
+                    f"«{project.name if project else 'проекта'}»"
+                ),
                 created_at=now,
                 is_read=False,
             )

@@ -163,6 +163,55 @@ async def update_project(
     return {"project": _project_out(project, umap, progress)}
 
 
+@router.delete("/{project_id}", dependencies=[Depends(verify_csrf)])
+async def delete_project(
+    project_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        await project_service.delete_project(db, project_id=project_id, actor=user)
+    except PermissionError as e:
+        code = str(e) if str(e) in {"default_project", "forbidden"} else "forbidden"
+        messages = {
+            "default_project": "Нельзя удалить проект «Общее»",
+            "forbidden": "Нужны права администратора проекта",
+        }
+        raise HTTPException(
+            status_code=400 if code == "default_project" else 403,
+            detail={"error": {"code": code, "message": messages.get(code, "Нет прав")}},
+        )
+    except LookupError:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "not_found", "message": "Проект не найден"}},
+        )
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/{project_id}/leave", dependencies=[Depends(verify_csrf)])
+async def leave_project(
+    project_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        await leave_request_service.leave_project_now(db, project_id=project_id, user=user)
+    except PermissionError:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "forbidden", "message": "Нет доступа"}},
+        )
+    except LeaveRequestError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": e.code, "message": e.message}},
+        )
+    await db.commit()
+    return {"ok": True}
+
+
 @router.put("/{project_id}/members", dependencies=[Depends(verify_csrf)])
 async def set_members(
     project_id: uuid.UUID,

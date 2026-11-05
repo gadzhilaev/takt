@@ -1,0 +1,17 @@
+# Native launch must match Dart SplashPage + web SplashScreen.
+flutter_native_splash:
+  color: "#E4EEF1"
+  color_dark: "#152028"
+  image: assets/brand/splash_logo.png
+  image_dark: assets/brand/splash_logo_on_dark.png
+  android: true
+  ios: true
+  web: false
+  fullscreen: true
+  android_12:
+    color: "#E4EEF1"
+    color_dark: "#152028"
+    image: assets/brand/splash_android12.png
+    image_dark: assets/brand/splash_android12_dark.png
+  android_gravity: center
+  ios_content_mode: center

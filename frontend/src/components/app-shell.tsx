@@ -45,11 +45,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const qc = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(false);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
+  const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
+  const [membersProjectId, setMembersProjectId] = useState<string | null>(null);
+  const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const [inviteOpen, setInviteOpen] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
@@ -257,17 +259,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/app/projects/${id}`);
   }
 
-  function toggleExpand(id: string, e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  const settingsProject = useMemo(
-    () => projects.find((p) => p.id === settingsProjectId) ?? null,
-    [projects, settingsProjectId]
+  const membersProject = useMemo(
+    () => projects.find((p) => p.id === membersProjectId) ?? null,
+    [projects, membersProjectId]
   );
-
+  const renameProject = useMemo(
+    () => projects.find((p) => p.id === renameProjectId) ?? null,
+    [projects, renameProjectId]
+  );
   async function removeMember(projectId: string, member: Project["members"][number]) {
     if (!confirm(`Убрать ${member.name} из проекта?`)) return;
     await api(`/api/v1/projects/${projectId}/members/${member.user_id}`, { method: "DELETE" });
@@ -275,11 +274,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     qc.invalidateQueries({ queryKey: ["leave-requests", projectId] });
   }
 
-  async function requestLeave(projectId: string, projectName: string) {
-    if (!confirm(`Отправить заявку на выход из «${projectName}»?`)) return;
-    await api(`/api/v1/projects/${projectId}/leave-requests`, { method: "POST" });
-    qc.invalidateQueries({ queryKey: ["notifications"] });
-    alert("Заявка отправлена владельцу проекта");
+  async function leaveProject(projectId: string, projectName: string) {
+    if (
+      !confirm(
+        `Вы выйдете из проекта «${projectName}» и больше не будете видеть его задачи и доску. Продолжить?`
+      )
+    ) {
+      return;
+    }
+    await api(`/api/v1/projects/${projectId}/leave`, { method: "POST" });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    if (currentProjectId === projectId) {
+      clearLastProjectId();
+      router.push("/app/projects");
+    }
+  }
+
+  async function deleteProject(project: Project) {
+    if (project.is_default) {
+      alert("Нельзя удалить проект «Общее»");
+      return;
+    }
+    if (
+      !confirm(
+        `Если удалите проект «${project.name}», все задачи, столбцы и участники будут удалены безвозвратно. Удалить?`
+      )
+    ) {
+      return;
+    }
+    await api(`/api/v1/projects/${project.id}`, { method: "DELETE" });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    if (currentProjectId === project.id) {
+      clearLastProjectId();
+      router.push("/app/projects");
+    }
   }
 
   async function decideLeave(projectId: string, requestId: string, approve: boolean) {
@@ -290,6 +318,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["leave-requests", projectId] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
+  }
+
+  async function saveRename() {
+    if (!renameProject) return;
+    const name = renameValue.trim();
+    if (!name) return;
+    await api(`/api/v1/projects/${renameProject.id}`, {
+      method: "PATCH",
+      json: { name },
+    });
+    setRenameProjectId(null);
+    qc.invalidateQueries({ queryKey: ["projects"] });
   }
 
   const Sidebar = (
@@ -358,22 +398,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <p className="section-label truncate px-1 xl:px-1.5">Мои проекты</p>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] xl:px-2"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+          aria-label="Создать проект"
+          title="Создать"
           onClick={() => setCreateOpen(true)}
         >
-          <AppIcon name="add" size={16} />
-          <span className="hidden xl:inline">Создать</span>
+          <AppIcon name="add" size={18} />
         </button>
       </div>
 
       <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-2 pb-3" aria-label="Проекты">
         {projects.map((p) => {
           const active = p.id === currentProjectId;
-          const open = !!expanded[p.id];
+          const menuOpen = menuProjectId === p.id;
           const isOwner = p.members.some((m) => m.user_id === user?.id && m.role === "admin");
-          const adminCount = p.members.filter((m) => m.role === "admin").length;
           return (
-            <div key={p.id} className="rounded-[var(--radius)]">
+            <div key={p.id} className="relative rounded-[var(--radius)]">
               <div
                 className={cn(
                   "flex items-center gap-0.5 rounded-[var(--radius)] px-1 py-0.5",
@@ -382,18 +422,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <button
                   type="button"
-                  className="flex h-8 w-7 shrink-0 items-center justify-center rounded text-muted hover:text-foreground"
-                  aria-label={open ? "Свернуть участников" : "Показать участников"}
-                  title={open ? "Свернуть участников" : "Участники"}
-                  onClick={(e) => toggleExpand(p.id, e)}
-                >
-                  {open ? <AppIcon name="chevron-down" size={16} /> : <AppIcon name="chevron-right" size={16} />}
-                </button>
-                <button
-                  type="button"
                   className={cn(
-                    "min-w-0 flex-1 truncate py-2 pr-1 text-left text-[14px] leading-snug",
-                    active ? "font-semibold text-foreground" : "text-[var(--muted-fg)] hover:text-foreground"
+                    "min-w-0 flex-1 truncate px-2 py-2 text-left text-[15px] leading-snug",
+                    active ? "font-semibold text-foreground" : "font-medium text-[var(--muted-fg)] hover:text-foreground"
                   )}
                   onClick={() => openProject(p.id)}
                 >
@@ -402,32 +433,65 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius)] text-muted hover:bg-[var(--surface)] hover:text-foreground"
-                  aria-label={`Настройки «${p.name}»`}
-                  title="Настройки проекта"
+                  aria-label={`Действия «${p.name}»`}
+                  title="Ещё"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSettingsProjectId(p.id);
+                    setMenuProjectId(menuOpen ? null : p.id);
                   }}
                 >
-                  <AppIcon name="settings" size={16} />
+                  <AppIcon name="more" size={16} />
                 </button>
               </div>
-              {open && (
-                <ProjectMembersPanel
-                  project={p}
-                  userId={user?.id}
-                  isOwner={isOwner}
-                  adminCount={adminCount}
-                  onInvite={() => {
-                    setInviteOpen(p.id);
-                    setInviteEmail("");
-                    setInviteNote("");
-                    setCopiedHint("");
-                  }}
-                  onRemove={(m) => removeMember(p.id, m)}
-                  onLeave={() => requestLeave(p.id, p.name)}
-                  onDecideLeave={(reqId, approve) => decideLeave(p.id, reqId, approve)}
-                />
+              {menuOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 cursor-default"
+                    aria-label="Закрыть меню"
+                    onClick={() => setMenuProjectId(null)}
+                  />
+                  <div className="absolute right-1 top-9 z-50 w-[17.5rem] rounded-[var(--radius)] border border-hairline bg-[var(--surface-2)] py-1.5 shadow-md">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-[15px] font-medium hover:bg-[var(--surface)]"
+                      onClick={() => {
+                        setMenuProjectId(null);
+                        setMembersProjectId(p.id);
+                      }}
+                    >
+                      <AppIcon name="profile" size={18} className="shrink-0 text-muted" />
+                      <span className="min-w-0 flex-1">Участники</span>
+                      <MemberAvatarStack members={p.members} />
+                    </button>
+                    {isOwner && (
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-[15px] font-medium hover:bg-[var(--surface)]"
+                        onClick={() => {
+                          setMenuProjectId(null);
+                          setRenameValue(p.name);
+                          setRenameProjectId(p.id);
+                        }}
+                      >
+                        <AppIcon name="edit" size={18} className="shrink-0 text-muted" />
+                        Переименовать
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-[15px] font-medium text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+                      onClick={() => {
+                        setMenuProjectId(null);
+                        if (isOwner) void deleteProject(p);
+                        else void leaveProject(p.id, p.name);
+                      }}
+                    >
+                      <AppIcon name="delete" size={18} className="shrink-0" />
+                      Удалить
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           );
@@ -560,33 +624,61 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </form>
       </Dialog>
 
-      <ProjectSettingsDialog
-        project={settingsProject}
-        userId={user?.id}
-        open={!!settingsProject}
-        onClose={() => setSettingsProjectId(null)}
-        onInvite={() => {
-          if (!settingsProject) return;
-          const id = settingsProject.id;
-          setSettingsProjectId(null);
-          setInviteOpen(id);
-          setInviteEmail("");
-          setInviteNote("");
-          setCopiedHint("");
-        }}
-        onRemove={(m) => settingsProject && removeMember(settingsProject.id, m)}
-        onLeave={() => {
-          if (!settingsProject) return;
-          void requestLeave(settingsProject.id, settingsProject.name);
-        }}
-        onDecideLeave={(reqId, approve) =>
-          settingsProject && void decideLeave(settingsProject.id, reqId, approve)
-        }
-        onSaved={() => {
-          qc.invalidateQueries({ queryKey: ["projects"] });
-          qc.invalidateQueries({ queryKey: ["project", settingsProjectId] });
-        }}
-      />
+      <Dialog
+        open={!!membersProject}
+        onOpenChange={(v) => !v && setMembersProjectId(null)}
+        title={membersProject ? `Проект «${membersProject.name}»` : "Участники"}
+        centerTitle
+      >
+        {membersProject && (
+          <ProjectMembersDialog
+            project={membersProject}
+            userId={user?.id}
+            onInvite={() => {
+              const id = membersProject.id;
+              setMembersProjectId(null);
+              setInviteOpen(id);
+              setInviteEmail("");
+              setInviteNote("");
+              setCopiedHint("");
+            }}
+            onRemove={(m) => removeMember(membersProject.id, m)}
+            onDecideLeave={(reqId, approve) => void decideLeave(membersProject.id, reqId, approve)}
+          />
+        )}
+      </Dialog>
+
+      <Dialog
+        open={!!renameProject}
+        onOpenChange={(v) => !v && setRenameProjectId(null)}
+        title="Название проекта"
+        centerTitle
+      >
+        {renameProject && (
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveRename();
+            }}
+          >
+            <div>
+              <label className="label-text" htmlFor="rename-project">
+                Название
+              </label>
+              <Input
+                id="rename-project"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={!renameValue.trim()}>
+              Сохранить
+            </Button>
+          </form>
+        )}
+      </Dialog>
 
       <Dialog
         open={!!inviteOpen}
@@ -685,27 +777,60 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const PROJECT_COLORS = ["#315F72", "#607FA4", "#347FA4", "#9062B8", "#398A62", "#C47A3A", "#B85C5C"];
+function MemberAvatarStack({ members }: { members: Project["members"] }) {
+  if (!members.length) return null;
+  const maxShown = 3;
+  const shown = members.slice(0, maxShown);
+  const extra = members.length - shown.length;
+  const size = 28;
+  const overlap = 10;
+  const count = shown.length + (extra > 0 ? 1 : 0);
+  const width = size + (count - 1) * (size - overlap);
 
-function ProjectMembersPanel({
+  return (
+    <span className="relative inline-block shrink-0" style={{ width, height: size }} aria-hidden>
+      {shown.map((m, i) => (
+        <span
+          key={m.user_id}
+          className="absolute top-0 overflow-hidden rounded-full"
+          style={{ left: i * (size - overlap), width: size, height: size, zIndex: i + 1 }}
+        >
+          <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={7} className="!h-full !w-full border-0" />
+        </span>
+      ))}
+      {extra > 0 && (
+        <span
+          className="absolute top-0 flex items-center justify-center rounded-full bg-[#D5DBE2] text-[10px] font-bold text-[var(--graphite,#202938)] dark:bg-[#5A6570] dark:text-[var(--foreground)]"
+          style={{
+            left: shown.length * (size - overlap),
+            width: size,
+            height: size,
+            zIndex: shown.length + 1,
+          }}
+        >
+          +{extra}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ProjectMembersDialog({
   project,
   userId,
-  isOwner,
-  adminCount,
   onInvite,
   onRemove,
-  onLeave,
   onDecideLeave,
 }: {
   project: Project;
   userId?: string;
-  isOwner: boolean;
-  adminCount: number;
   onInvite: () => void;
   onRemove: (m: Project["members"][number]) => void;
-  onLeave: () => void;
   onDecideLeave: (requestId: string, approve: boolean) => void;
 }) {
+  const [memberMenuId, setMemberMenuId] = useState<string | null>(null);
+  const isOwner = project.members.some((m) => m.user_id === userId && m.role === "admin");
+  const count = project.members.length;
   const { data: leaveData } = useQuery({
     queryKey: ["leave-requests", project.id],
     enabled: isOwner,
@@ -715,284 +840,100 @@ function ProjectMembersPanel({
   const pending = (leaveData?.items ?? []).filter((r) => r.status === "pending");
 
   return (
-    <ul className="mb-1 ml-7 space-y-0.5 border-l border-hairline pl-2">
-      {project.members.map((m) => {
-        const isSelf = m.user_id === userId;
-        const canRemove = isOwner && !isSelf;
-        const canLeave = !!isSelf && !(m.role === "admin" && adminCount <= 1);
-        return (
-          <li key={m.user_id} className="flex items-center gap-1.5 py-1.5 text-[13px] text-muted">
-            <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={6} />
-            <span className="min-w-0 flex-1 truncate text-foreground">{m.name}</span>
-            {m.role === "admin" && <span className="shrink-0 text-[11px]">владелец</span>}
-            {canRemove && (
-              <button
-                type="button"
-                className="shrink-0 rounded p-0.5 text-muted hover:text-[var(--danger)]"
-                title="Удалить из проекта"
-                onClick={() => onRemove(m)}
-              >
-                <AppIcon name="delete" size={16} />
-              </button>
-            )}
-            {canLeave && (
-              <button
-                type="button"
-                className="shrink-0 text-[12px] font-medium text-[var(--accent)]"
-                onClick={onLeave}
-              >
-                Выйти
-              </button>
-            )}
-          </li>
-        );
-      })}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] font-semibold text-muted">
+          {count === 1 ? "1 участник" : `${count} участников`}
+        </p>
+        {isOwner && (
+          <button
+            type="button"
+            className="text-[14px] font-semibold text-[var(--accent)] hover:opacity-80"
+            onClick={onInvite}
+          >
+            Добавить
+          </button>
+        )}
+      </div>
+      <ul className="-mx-1 space-y-0.5">
+        {project.members.map((m) => {
+          const canRemove = isOwner && m.user_id !== userId;
+          const open = memberMenuId === m.user_id;
+          return (
+            <li
+              key={m.user_id}
+              className="relative flex items-center gap-2.5 rounded-[var(--radius)] px-1 py-1.5 text-[14px]"
+            >
+              <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={7} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold leading-tight">{m.name}</span>
+                {m.role === "admin" && (
+                  <span className="text-[12px] text-muted">Владелец</span>
+                )}
+              </span>
+              {canRemove && (
+                <button
+                  type="button"
+                  className="shrink-0 rounded p-1 text-muted hover:bg-[var(--surface-2)] hover:text-foreground"
+                  aria-label="Ещё"
+                  onClick={() => setMemberMenuId(open ? null : m.user_id)}
+                >
+                  <AppIcon name="more" size={16} />
+                </button>
+              )}
+              {open && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 cursor-default"
+                    aria-label="Закрыть"
+                    onClick={() => setMemberMenuId(null)}
+                  />
+                  <div className="absolute right-0 top-9 z-50 w-48 rounded-[var(--radius)] border border-hairline bg-[var(--surface)] py-1 shadow-md">
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+                      onClick={() => {
+                        setMemberMenuId(null);
+                        onRemove(m);
+                      }}
+                    >
+                      Удалить из проекта
+                    </button>
+                  </div>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
       {isOwner && pending.length > 0 && (
-        <li className="space-y-1 pt-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Заявки на выход</p>
+        <div className="space-y-1.5 border-t border-hairline pt-3">
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">
+            Заявки на выход
+          </p>
           {pending.map((req) => (
-            <div key={req.id} className="flex items-center gap-1.5 text-[13px]">
-              <UserAvatar name={req.user_name} avatarUrl={req.avatar_url} size={5} />
+            <div key={req.id} className="flex items-center gap-2 text-[13px]">
+              <UserAvatar name={req.user_name} avatarUrl={req.avatar_url} size={6} />
               <span className="min-w-0 flex-1 truncate">{req.user_name}</span>
               <button
                 type="button"
-                className="text-[12px] text-muted hover:text-foreground"
+                className="text-muted hover:text-foreground"
                 onClick={() => onDecideLeave(req.id, false)}
               >
                 Нет
               </button>
               <button
                 type="button"
-                className="text-[12px] font-medium text-[var(--accent)]"
+                className="font-medium text-[var(--accent)]"
                 onClick={() => onDecideLeave(req.id, true)}
               >
                 Удалить
               </button>
             </div>
           ))}
-        </li>
-      )}
-      {isOwner && (
-        <li>
-          <button
-            type="button"
-            className="py-1.5 text-[13px] font-medium text-[var(--accent)]"
-            onClick={onInvite}
-          >
-            + Добавить участника
-          </button>
-        </li>
-      )}
-    </ul>
-  );
-}
-
-function ProjectSettingsDialog({
-  project,
-  userId,
-  open,
-  onClose,
-  onInvite,
-  onRemove,
-  onLeave,
-  onDecideLeave,
-  onSaved,
-}: {
-  project: Project | null;
-  userId?: string;
-  open: boolean;
-  onClose: () => void;
-  onInvite: () => void;
-  onRemove: (m: Project["members"][number]) => void;
-  onLeave: () => void;
-  onDecideLeave: (requestId: string, approve: boolean) => void;
-  onSaved: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [color, setColor] = useState("#315F72");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!project) return;
-    setName(project.name);
-    setDescription(project.description ?? "");
-    setColor(project.color || "#315F72");
-    setError("");
-  }, [project]);
-
-  const isOwner = !!project?.members.some((m) => m.user_id === userId && m.role === "admin");
-  const adminCount = project?.members.filter((m) => m.role === "admin").length ?? 0;
-
-  const { data: leaveData } = useQuery({
-    queryKey: ["leave-requests", project?.id],
-    enabled: open && isOwner && !!project,
-    queryFn: () => api<{ items: LeaveRequest[] }>(`/api/v1/projects/${project!.id}/leave-requests`),
-    staleTime: 15_000,
-  });
-  const pending = (leaveData?.items ?? []).filter((r) => r.status === "pending");
-
-  async function save() {
-    if (!project || !isOwner) return;
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError("Укажите название");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await api(`/api/v1/projects/${project.id}`, {
-        method: "PATCH",
-        json: {
-          name: trimmed,
-          description: description.trim() || null,
-          color,
-        },
-      });
-      onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось сохранить");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()} title="Настройки проекта">
-      {project && (
-        <div className="space-y-4">
-          {isOwner ? (
-            <div className="space-y-3">
-              <div>
-                <label className="label-text" htmlFor="ps-name">
-                  Название
-                </label>
-                <Input id="ps-name" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div>
-                <label className="label-text" htmlFor="ps-desc">
-                  Описание
-                </label>
-                <textarea
-                  id="ps-desc"
-                  className="field min-h-[4rem] py-2 text-[14px]"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Необязательно"
-                />
-              </div>
-              <div>
-                <p className="label-text mb-1.5">Цвет</p>
-                <div className="flex flex-wrap gap-2">
-                  {PROJECT_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={`Цвет ${c}`}
-                      className={cn(
-                        "h-8 w-8 rounded-full border-2",
-                        color === c ? "border-foreground" : "border-transparent"
-                      )}
-                      style={{ background: c }}
-                      onClick={() => setColor(c)}
-                    />
-                  ))}
-                </div>
-              </div>
-              <Button type="button" className="w-full" disabled={saving} onClick={() => void save()}>
-                {saving ? "Сохраняем…" : "Сохранить"}
-              </Button>
-              {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
-            </div>
-          ) : (
-            <div className="rounded-[var(--radius)] border border-hairline bg-[var(--surface-2)] px-3 py-2.5">
-              <p className="text-[15px] font-semibold">{project.name}</p>
-              {project.description && (
-                <p className="mt-1 text-[13px] text-muted">{project.description}</p>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2 border-t border-hairline pt-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[13px] font-semibold">Участники</p>
-              {isOwner && (
-                <Button type="button" size="sm" variant="secondary" onClick={onInvite}>
-                  <AppIcon name="invite" size={16} /> Пригласить
-                </Button>
-              )}
-            </div>
-            <ul className="space-y-1">
-              {project.members.map((m) => {
-                const isSelf = m.user_id === userId;
-                const canRemove = isOwner && !isSelf;
-                const canLeave = !!isSelf && !(m.role === "admin" && adminCount <= 1);
-                return (
-                  <li
-                    key={m.user_id}
-                    className="flex items-center gap-2 rounded-[var(--radius)] px-1.5 py-1.5 text-[14px]"
-                  >
-                    <UserAvatar name={m.name} avatarUrl={m.avatar_url} size={7} />
-                    <span className="min-w-0 flex-1 truncate">{m.name}</span>
-                    {m.role === "admin" && (
-                      <span className="shrink-0 text-[12px] text-muted">владелец</span>
-                    )}
-                    {canRemove && (
-                      <button
-                        type="button"
-                        className="shrink-0 rounded p-1 text-muted hover:text-[var(--danger)]"
-                        title="Удалить из проекта"
-                        onClick={() => onRemove(m)}
-                      >
-                        <AppIcon name="delete" size={16} />
-                      </button>
-                    )}
-                    {canLeave && (
-                      <button
-                        type="button"
-                        className="shrink-0 text-[13px] font-medium text-[var(--accent)]"
-                        onClick={onLeave}
-                      >
-                        Выйти
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {isOwner && pending.length > 0 && (
-              <div className="space-y-1.5 pt-1">
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">
-                  Заявки на выход
-                </p>
-                {pending.map((req) => (
-                  <div key={req.id} className="flex items-center gap-2 text-[13px]">
-                    <UserAvatar name={req.user_name} avatarUrl={req.avatar_url} size={6} />
-                    <span className="min-w-0 flex-1 truncate">{req.user_name}</span>
-                    <button
-                      type="button"
-                      className="text-muted hover:text-foreground"
-                      onClick={() => onDecideLeave(req.id, false)}
-                    >
-                      Нет
-                    </button>
-                    <button
-                      type="button"
-                      className="font-medium text-[var(--accent)]"
-                      onClick={() => onDecideLeave(req.id, true)}
-                    >
-                      Удалить
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
-    </Dialog>
+    </div>
   );
 }

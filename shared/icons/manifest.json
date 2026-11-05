@@ -24,7 +24,7 @@
     },
     "more": {
       "file": "more.svg",
-      "lucide": "ellipsis"
+      "lucide": "ellipsis-vertical"
     },
     "add": {
       "file": "add.svg",

@@ -17,7 +17,7 @@ const MAP = {
   profile: "user",
   back: "arrow-left",
   close: "x",
-  more: "ellipsis",
+  more: "ellipsis-vertical",
   add: "plus",
   edit: "pencil",
   delete: "trash-2",

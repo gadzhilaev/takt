@@ -72,6 +72,7 @@ class Project extends Equatable {
     this.description,
     this.color,
     this.isDemo = false,
+    this.isDefault = false,
     this.members = const [],
   });
 
@@ -80,6 +81,7 @@ class Project extends Equatable {
   final String? description;
   final String? color;
   final bool isDemo;
+  final bool isDefault;
   final List<ProjectMember> members;
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -88,6 +90,7 @@ class Project extends Equatable {
         description: json['description'] as String?,
         color: json['color'] as String?,
         isDemo: json['is_demo'] as bool? ?? false,
+        isDefault: json['is_default'] as bool? ?? false,
         members: (json['members'] as List<dynamic>? ?? [])
             .map((e) => ProjectMember.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -99,11 +102,12 @@ class Project extends Equatable {
         'description': description,
         'color': color,
         'is_demo': isDemo,
+        'is_default': isDefault,
         'members': members.map((m) => m.toJson()).toList(),
       };
 
   @override
-  List<Object?> get props => [id, name, description, color, isDemo, members];
+  List<Object?> get props => [id, name, description, color, isDemo, isDefault, members];
 }
 
 class StatusColumn extends Equatable {
