@@ -2,7 +2,7 @@
 
 ## Принципы
 
-1. Источник истины — код и актуальные docs (`docs/README.md`).
+1. Источник истины — код (`backend/`, `frontend/`, `mobile/`) и актуальные файлы в `docs/`.
 2. Не ломать API-контракты и уже применённые миграции.
 3. Не возвращать сложные UI (отчёты/фильтры) без запроса.
 4. Не коммитить секреты.
@@ -18,7 +18,7 @@ docker compose up db -d
 
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-alembic upgrade head
+alembic upgrade head   # 001–016
 uvicorn app.main:app --reload --port 8000
 
 cd frontend && npm ci && npm run dev
@@ -31,7 +31,10 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 
 Полный стек: `docker compose up --build -d` → http://localhost.
 
-Демо: `SEED_DEMO_DATA=true`; скрипты `setup_demo_workspace.py`, `seed_college_demo.py`; учётка `DEMO_USER_*` (не в git).
+Демо: `SEED_DEMO_DATA=true`; скрипты `backend/scripts/setup_demo_workspace.py`, `seed_college_demo.py`; учётка `DEMO_USER_*` (не в git).
+
+OAuth: [oauth.md](oauth.md). Mobile (Firebase, виджеты, deep links): [`../mobile/docs/MOBILE_SETUP.md`](../mobile/docs/MOBILE_SETUP.md).  
+Production: [`../deploy/DEPLOY.md`](../deploy/DEPLOY.md).
 
 ## Стиль кода
 
@@ -49,7 +52,7 @@ alembic revision -m "short_description"
 alembic upgrade head
 ```
 
-Не переписывать выкатанные revision на production.
+Не переписывать выкатанные revision на production. Head: **016**.
 
 ## Тесты
 
@@ -60,17 +63,16 @@ docker compose up db -d
 docker compose exec db psql -U track -c "CREATE DATABASE track_test;"  # при первом прогоне
 cd backend && ./.venv/bin/pytest -q
 ./.venv/bin/ruff check app tests
-# CI: --select F821,F822,E9
 ```
 
-`conftest.py` жёстко использует `track_test`. Схема из ORM `create_all`, не Alembic.
+`conftest.py` использует БД `track_test`. Схема из ORM `create_all`, не Alembic.
 
 ### Frontend
 
 ```bash
 cd frontend
 npm test && npm run lint && npm run build
-PW_CHANNEL=chrome npm run test:e2e   # нужен live стек; пишет в demo / [E2E]
+PW_CHANNEL=chrome npm run test:e2e   # live стек; пишет в demo / [E2E]
 ```
 
 ### Flutter
@@ -78,6 +80,8 @@ PW_CHANNEL=chrome npm run test:e2e   # нужен live стек; пишет в d
 ```bash
 cd mobile && flutter analyze && flutter test
 ```
+
+Не запускайте `flutter run` за пользователя и не убивайте его сессию.
 
 ### CI
 

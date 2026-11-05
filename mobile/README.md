@@ -1,17 +1,28 @@
-# takt_mobile
+# Takt Mobile
 
-A new Flutter project.
+Flutter-клиент продукта **Takt**: проекты, Kanban-доска, мои задачи, уведомления, профиль, home widgets.
 
-## Getting Started
+| | |
+| --- | --- |
+| Package / Bundle | `ru.gadzhilaev.takt` |
+| API (release) | `https://taktapp.ru` |
+| Auth | Bearer JWT; OAuth VK / Яндекс / Apple |
 
-This project is a starting point for a Flutter application.
+## Запуск
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+cd mobile
+flutter pub get
+flutter run --dart-define=API_BASE=http://127.0.0.1:8000
+# Android emulator: API_BASE=http://10.0.2.2:8000
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Без `API_BASE` клиент ходит на production.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Документация
+
+- Настройка Firebase, виджетов, deep links: [docs/MOBILE_SETUP.md](docs/MOBILE_SETUP.md)
+- Локальная разработка монорепо: [../docs/development.md](../docs/development.md)
+- Релиз / подпись Play + RuStore / App Store: [../docs/release.md](../docs/release.md)
+- Тексты сторов: [store/metadata.md](store/metadata.md)
+- Архитектура и API: [../docs/architecture.md](../docs/architecture.md)

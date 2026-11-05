@@ -12,4 +12,4 @@ PW_CHANNEL=chrome npm run test:e2e
 
 Прокси API в dev: `next.config.mjs` → backend (`BACKEND_INTERNAL_URL`, по умолчанию `http://127.0.0.1:8000`).
 
-Документация репозитория: [`../docs/README.md`](../docs/README.md).
+Документация: [../docs/architecture.md](../docs/architecture.md), [../docs/development.md](../docs/development.md).

@@ -14,7 +14,7 @@
 <p align="center">
   <a href="https://taktapp.ru">taktapp.ru</a>
   ·
-  <a href="docs/README.md">Документация</a>
+  <a href="docs/architecture.md">Архитектура</a>
   ·
   <a href=".github/workflows/ci.yml">CI</a>
 </p>
@@ -29,21 +29,19 @@ Takt помогает небольшим командам вести проек�
 
 ## Возможности
 
-- Регистрация по email (OTP), вход по паролю, сброс забытого пароля кодом из письма
-- OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только в мобильном приложении (см. [`docs/oauth.md`](docs/oauth.md))
-- Проекты с ролями `admin` / `member` / `viewer` и приглашениями in-app
+- Регистрация по email (OTP), вход по паролю, сброс пароля кодом из письма
+- OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только в мобильном приложении ([docs/oauth.md](docs/oauth.md))
+- Проекты с ролями `admin` / `member` / `viewer` и приглашениями in-app (email или ссылка)
 - Kanban: 4 стартовых столбца, drag-and-drop; новая задача всегда в начало столбца
-- Задача: название, описание, исполнители (≥1), приоритет, комментарии, чеклист
+- Задача: название, описание, исполнители (**≥1**), приоритет, комментарии, чеклист
 - Удаление аккаунта: в профиле (web/mobile) и страница `/account-delete`
 - Уведомления: in-app, Web Push (VAPID), FCM на mobile
-- Платформенная админка `/admin` (пользователи, модерация, настройки OAuth)
+- Платформенная админка `/admin` (`platform_role`)
 - Home screen widgets (iOS / Android) без JWT в виджете
 
 ## Интерфейс
 
 ### Web
-
-Актуальная Kanban-доска проекта: столбцы, приоритеты, исполнители; вкладки «Мои задачи» / «Доска».
 
 <p align="center">
   <img src="docs/screenshots/readme/web-kanban-light.png" alt="Takt — Kanban на web" width="920" />
@@ -51,21 +49,15 @@ Takt помогает небольшим командам вести проек�
 
 <p align="center"><em>Светлая тема · доска проекта</em></p>
 
-Публичный лендинг:
-
 <p align="center">
   <img src="docs/screenshots/readme/web-landing.png" alt="Takt — лендинг" width="920" />
 </p>
-
-Тёмная тема доски:
 
 <p align="center">
   <img src="docs/screenshots/readme/web-kanban-dark.png" alt="Takt — Kanban, тёмная тема" width="720" />
 </p>
 
 ### Mobile
-
-Flutter-клиент: вход (email + VK / Яндекс / Apple), доска, мои задачи, профиль.
 
 <p align="center">
   <img src="docs/screenshots/readme/mobile-login.png" alt="Вход" width="230" />
@@ -74,17 +66,9 @@ Flutter-клиент: вход (email + VK / Яндекс / Apple), доска, 
 </p>
 
 <p align="center">
-  <sub>Вход · Доска</sub>
-</p>
-
-<p align="center">
   <img src="docs/screenshots/readme/mobile-my-tasks.png" alt="Мои задачи" width="230" />
   &nbsp;&nbsp;
   <img src="docs/screenshots/readme/mobile-profile.png" alt="Профиль" width="230" />
-</p>
-
-<p align="center">
-  <sub>Мои задачи · Профиль</sub>
 </p>
 
 ## Стек
@@ -93,7 +77,7 @@ Flutter-клиент: вход (email + VK / Яндекс / Apple), доска, 
 |------|------------|
 | Frontend | Next.js 14 (App Router), React 18, TanStack Query, dnd-kit, Tailwind CSS, Playwright, Vitest |
 | Mobile | Flutter, Dio, go_router, flutter_bloc, home_widget, flutter_secure_storage, Firebase Messaging |
-| Backend | FastAPI, SQLAlchemy 2 (async), Alembic, Pydantic v2, SlowAPI, pywebpush, firebase-admin |
+| Backend | FastAPI, SQLAlchemy 2 (async), Alembic **001–016**, Pydantic v2, SlowAPI, pywebpush, firebase-admin |
 | Infra | PostgreSQL 16, Docker Compose, Caddy / nginx |
 | Auth | JWT (httpOnly cookies + CSRF на web; Bearer на mobile), OAuth PKCE |
 
@@ -127,7 +111,7 @@ flowchart LR
 ```
 
 Три оси прав: project RBAC · legacy `UserRole.admin` · `platform_role` для `/admin`.  
-Подробнее: [`docs/architecture.md`](docs/architecture.md), [`docs/security.md`](docs/security.md).
+Workspace `/projects` — только членство. Подробнее: [docs/architecture.md](docs/architecture.md), [docs/security.md](docs/security.md).
 
 ```text
 takt/
@@ -135,7 +119,7 @@ takt/
 ├── frontend/    # Next.js: / лендинг, /app workspace, /admin
 ├── mobile/      # Flutter
 ├── deploy/      # Prod Compose и server-deploy.sh
-├── docs/        # Архитектура, API, security, deployment
+├── docs/        # architecture, development, security, oauth, release
 └── docker-compose.yml
 ```
 
@@ -169,13 +153,13 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 # Android emulator: API_BASE=http://10.0.2.2:8000
 ```
 
-Переменные: [`.env.example`](.env.example). OAuth: [`docs/oauth.md`](docs/oauth.md).  
-Mobile: [`mobile/docs/MOBILE_SETUP.md`](mobile/docs/MOBILE_SETUP.md).  
-Prod: [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
+Переменные: [`.env.example`](.env.example). OAuth: [docs/oauth.md](docs/oauth.md).  
+Mobile: [mobile/docs/MOBILE_SETUP.md](mobile/docs/MOBILE_SETUP.md).  
+Prod: [deploy/DEPLOY.md](deploy/DEPLOY.md).
 
 Миграции Alembic **001–016** (head `016_task_status_entered_at`). При старте backend выполняет `alembic upgrade head`.
 
-Демо-воркспейс изолирован (`projects.is_demo` / `users.is_demo`). Учётка `DEMO_USER_EMAIL` + `DEMO_USER_PASSWORD` только в локальном `.env` / private-файле — **не** в git и не на лендинге. Скрипты: `backend/scripts/setup_demo_workspace.py`, `backend/scripts/seed_college_demo.py`.
+Демо изолировано (`projects.is_demo` / `users.is_demo`). Учётка `DEMO_USER_*` только в локальном `.env` / private — **не** в git.
 
 ## Тестирование
 
@@ -186,22 +170,18 @@ cd mobile   && flutter analyze && flutter test
 ```
 
 E2E (нужны живые frontend + backend): `cd frontend && PW_CHANNEL=chrome npm run test:e2e`.  
-CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: [`docs/development.md`](docs/development.md).
+CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Подробнее: [docs/development.md](docs/development.md).
 
 ## Документация
 
-Индекс: **[`docs/README.md`](docs/README.md)**
-
-| Раздел | Содержание |
-|--------|------------|
-| [`docs/architecture.md`](docs/architecture.md) | Web, Backend, Flutter, БД |
-| [`docs/api.md`](docs/api.md) | API v1, auth, ошибки |
-| [`docs/features.md`](docs/features.md) | Возможности продукта |
-| [`docs/security.md`](docs/security.md) | RBAC, CSRF, секреты |
-| [`docs/development.md`](docs/development.md) | Локальная разработка и тесты |
-| [`docs/deployment.md`](docs/deployment.md) | Docker и production |
-| [`docs/oauth.md`](docs/oauth.md) | Настройка OAuth |
-| [`docs/release.md`](docs/release.md) | Mobile / магазины (кратко) |
+| Документ | Содержание |
+|----------|------------|
+| [docs/architecture.md](docs/architecture.md) | Компоненты, API v1, БД, продуктовая модель |
+| [docs/development.md](docs/development.md) | Локальная разработка и тесты |
+| [docs/security.md](docs/security.md) | RBAC, CSRF, секреты, удаление аккаунта |
+| [docs/oauth.md](docs/oauth.md) | Apple / VK ID / Яндекс ID |
+| [docs/release.md](docs/release.md) | Mobile / Play / RuStore / App Store |
+| [deploy/DEPLOY.md](deploy/DEPLOY.md) | Production Docker, backup, выкат |
 
 ## Лицензия
 
