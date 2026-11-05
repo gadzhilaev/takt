@@ -22,16 +22,20 @@ class NotificationToastHost extends StatefulWidget {
   State<NotificationToastHost> createState() => _NotificationToastHostState();
 }
 
-class _NotificationToastHostState extends State<NotificationToastHost> {
+class _NotificationToastHostState extends State<NotificationToastHost> with WidgetsBindingObserver {
   final _toasts = <_ToastData>[];
   Set<String>? _seenIds;
   Timer? _poll;
+  bool _pollInFlight = false;
   VoidCallback? _fcmListener;
   FcmBootstrap? _fcm;
+
+  static const _pollInterval = Duration(seconds: 45);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
@@ -45,12 +49,29 @@ class _NotificationToastHostState extends State<NotificationToastHost> {
       _pushFcm(msg);
     };
     _fcm!.foregroundMessage.addListener(_fcmListener!);
-    _poll = Timer.periodic(const Duration(seconds: 20), (_) => _pollApi());
+    _schedulePoll();
     unawaited(_pollApi());
+  }
+
+  void _schedulePoll() {
+    _poll?.cancel();
+    _poll = Timer.periodic(_pollInterval, (_) => unawaited(_pollApi()));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _schedulePoll();
+      unawaited(_pollApi());
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _poll?.cancel();
+      _poll = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     if (_fcmListener != null) {
       _fcm?.foregroundMessage.removeListener(_fcmListener!);
@@ -59,11 +80,16 @@ class _NotificationToastHostState extends State<NotificationToastHost> {
   }
 
   Future<void> _pollApi() async {
-    if (!mounted) return;
+    if (!mounted || _pollInFlight) return;
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthAuthenticated) return;
+    _pollInFlight = true;
     try {
-      final items = await context.read<NotificationsRepository>().list(unreadOnly: true);
+      // Toast needs only newest unread — keep payload small.
+      final items = await context.read<NotificationsRepository>().list(
+            unreadOnly: true,
+            pageSize: 15,
+          );
       if (!mounted) return;
       if (_seenIds == null) {
         _seenIds = items.map((e) => e.id).toSet();
@@ -87,7 +113,9 @@ class _NotificationToastHostState extends State<NotificationToastHost> {
         );
       }
     } catch (_) {
-      /* ignore poll errors */
+      /* ignore poll errors — next tick or FCM will retry */
+    } finally {
+      _pollInFlight = false;
     }
   }
 

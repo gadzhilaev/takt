@@ -5,10 +5,16 @@ class NotificationsRepository {
   NotificationsRepository(this._api);
   final ApiClient _api;
 
-  Future<List<AppNotification>> list({bool unreadOnly = false}) async {
+  Future<List<AppNotification>> list({
+    bool unreadOnly = false,
+    int pageSize = 50,
+  }) async {
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/api/v1/notifications',
-      queryParameters: {'unread_only': unreadOnly, 'page_size': 50},
+      queryParameters: {
+        'unread_only': unreadOnly,
+        'page_size': pageSize.clamp(1, 100),
+      },
     );
     return (res.data?['items'] as List<dynamic>? ?? [])
         .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
