@@ -63,3 +63,7 @@ AGENTS.md
 
 # Ephemeral e2e screenshot dumps
 docs/screenshots/.e2e-capture/
+
+# Store materials — only local, never commit
+mobile/store/
+/store/
