@@ -33,29 +33,35 @@ Takt помогает небольшим командам вести проек�
 - OAuth: VK ID и Яндекс ID (web + mobile); Sign in with Apple — только в мобильном приложении ([docs/oauth.md](docs/oauth.md))
 - Проекты с ролями `admin` / `member` / `viewer` и приглашениями in-app (email или ссылка)
 - Kanban: 4 стартовых столбца, drag-and-drop; новая задача всегда в начало столбца
-- Задача: название, описание, исполнители (**≥1**), приоритет, комментарии, чеклист
+- Задача: название, описание, исполнители (**≥1**), приоритет, вложения, история, комментарии, чеклист
 - Удаление аккаунта: в профиле (web/mobile) и страница `/account-delete`
-- Уведомления: in-app, Web Push (VAPID), FCM на mobile
+- Уведомления: короткий in-app copy, Web Push (VAPID), FCM на mobile
 - Платформенная админка `/admin` (`platform_role`)
 - Home screen widgets (iOS / Android) без JWT в виджете
 
 ## Интерфейс
 
+Скриншоты только здесь (`docs/screenshots/readme/`). Демо-данные: проект «Запуск продукта», команда из 5 участников — `backend/scripts/seed_readme_demo.py`.
+
 ### Web
-
-<p align="center">
-  <img src="docs/screenshots/readme/web-kanban-light.png" alt="Takt — Kanban на web" width="920" />
-</p>
-
-<p align="center"><em>Светлая тема · доска проекта</em></p>
 
 <p align="center">
   <img src="docs/screenshots/readme/web-landing.png" alt="Takt — лендинг" width="920" />
 </p>
 
+<p align="center"><em>Лендинг · вход и регистрация</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/readme/web-kanban-light.png" alt="Takt — Kanban на web" width="920" />
+</p>
+
+<p align="center"><em>Светлая тема · доска «Запуск продукта»</em></p>
+
 <p align="center">
   <img src="docs/screenshots/readme/web-kanban-dark.png" alt="Takt — Kanban, тёмная тема" width="720" />
 </p>
+
+<p align="center"><em>Тёмная тема · те же столбцы и задачи</em></p>
 
 ### Mobile
 
@@ -65,11 +71,15 @@ Takt помогает небольшим командам вести проек�
   <img src="docs/screenshots/readme/mobile-kanban.png" alt="Доска" width="230" />
 </p>
 
+<p align="center"><em>Вход (Apple / VK / Яндекс) · доска проекта</em></p>
+
 <p align="center">
   <img src="docs/screenshots/readme/mobile-my-tasks.png" alt="Мои задачи" width="230" />
   &nbsp;&nbsp;
   <img src="docs/screenshots/readme/mobile-profile.png" alt="Профиль" width="230" />
 </p>
+
+<p align="center"><em>Мои задачи · профиль</em></p>
 
 ## Стек
 
@@ -77,7 +87,7 @@ Takt помогает небольшим командам вести проек�
 |------|------------|
 | Frontend | Next.js 14 (App Router), React 18, TanStack Query, dnd-kit, Tailwind CSS, Playwright, Vitest |
 | Mobile | Flutter, Dio, go_router, flutter_bloc, home_widget, flutter_secure_storage, Firebase Messaging |
-| Backend | FastAPI, SQLAlchemy 2 (async), Alembic **001–016**, Pydantic v2, SlowAPI, pywebpush, firebase-admin |
+| Backend | FastAPI, SQLAlchemy 2 (async), Alembic **001–018**, Pydantic v2, SlowAPI, pywebpush, firebase-admin |
 | Infra | PostgreSQL 16, Docker Compose, Caddy / nginx |
 | Auth | JWT (httpOnly cookies + CSRF на web; Bearer на mobile), OAuth PKCE |
 
@@ -157,9 +167,10 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 Mobile: [mobile/docs/MOBILE_SETUP.md](mobile/docs/MOBILE_SETUP.md).  
 Prod: [deploy/DEPLOY.md](deploy/DEPLOY.md).
 
-Миграции Alembic **001–016** (head `016_task_status_entered_at`). При старте backend выполняет `alembic upgrade head`.
+Миграции Alembic **001–018** (head `018_rewrite_notification_copy`). При старте backend выполняет `alembic upgrade head`.
 
-Демо изолировано (`projects.is_demo` / `users.is_demo`). Учётка `DEMO_USER_*` только в локальном `.env` / private — **не** в git.
+Демо изолировано (`projects.is_demo` / `users.is_demo`). Учётка `DEMO_USER_*` только в локальном `.env` / private — **не** в git.  
+Сиды: `setup_demo_workspace.py`, `seed_college_demo.py`, `seed_readme_demo.py`.
 
 ## Тестирование
 

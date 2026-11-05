@@ -43,6 +43,12 @@ mobile/android/*.jks
 mobile/android/*.keystore
 *.jks
 *.keystore
+# Play / RuStore app signing export (PEPK) — never commit
+pepk.jar
+**/pepk.jar
+pepk_out.zip
+**/pepk_out.zip
+**/pepk*.zip
 mobile/.dart_tool/
 mobile/build/
 mobile/android/build/

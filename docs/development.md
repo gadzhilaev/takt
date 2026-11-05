@@ -31,7 +31,8 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 
 Полный стек: `docker compose up --build -d` → http://localhost.
 
-Демо: `SEED_DEMO_DATA=true`; скрипты `backend/scripts/setup_demo_workspace.py`, `seed_college_demo.py`; учётка `DEMO_USER_*` (не в git).
+Демо: `SEED_DEMO_DATA=true`; скрипты `backend/scripts/setup_demo_workspace.py`, `seed_college_demo.py`, `seed_readme_demo.py` (проект «Запуск продукта» для скринов README); учётка `DEMO_USER_*` (не в git).  
+Скриншоты продукта — только `docs/screenshots/readme/` (web: `frontend/scripts/_readme_shots.mjs`; mobile: `flutter test test/readme_ui_screenshots_test.dart --update-goldens`).
 
 OAuth: [oauth.md](oauth.md). Mobile (Firebase, виджеты, deep links): [`../mobile/docs/MOBILE_SETUP.md`](../mobile/docs/MOBILE_SETUP.md).  
 Production: [`../deploy/DEPLOY.md`](../deploy/DEPLOY.md).
