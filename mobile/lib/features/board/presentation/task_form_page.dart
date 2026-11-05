@@ -33,6 +33,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
   late String _priority;
   late String _statusId;
   late Set<String> _assigneeIds;
+  DateTime? _dueAt;
   bool _saving = false;
   TaskItem? _existing;
   List<PendingLocalFile> _pendingFiles = [];
@@ -46,6 +47,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
         board.currentColumn?.id ??
         (board.columns.isNotEmpty ? board.columns.first.id : '');
     _assigneeIds = {};
+    _dueAt = null;
 
     if (widget.taskId != null) {
       for (final t in board.tasks) {
@@ -56,6 +58,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
           _priority = t.priority == 'low' ? 'medium' : t.priority;
           _statusId = t.statusId;
           _assigneeIds = t.assignees.map((a) => a.id).toSet();
+          _dueAt = t.dueDate != null ? DateTime.tryParse(t.dueDate!)?.toLocal() : null;
           break;
         }
       }
@@ -85,11 +88,13 @@ class _TaskFormPageState extends State<TaskFormPage> {
     final members = board.project?.members ?? const <ProjectMember>[];
 
     try {
+      final dueIso = _dueAt?.toUtc().toIso8601String();
       if (widget.isCreate) {
         await cubit.createTask(
           title: title,
           description: _description.text.trim().isEmpty ? null : _description.text.trim(),
           priority: _priority,
+          dueDate: dueIso,
           assigneeIds: _assigneeIds.toList(),
           statusId: _statusId,
           files: [
@@ -114,6 +119,7 @@ class _TaskFormPageState extends State<TaskFormPage> {
                 .map((m) => TaskAssignee(id: m.userId, name: m.name, avatarUrl: m.avatarUrl))
                 .toList(),
             attachments: _existing!.attachments,
+            dueDate: dueIso,
             closedAt: _existing!.closedAt,
             statusEnteredAt: _existing!.statusEnteredAt,
             updatedAt: _existing!.updatedAt,
@@ -148,6 +154,38 @@ class _TaskFormPageState extends State<TaskFormPage> {
       initiallySelected: _assigneeIds,
     );
     if (result != null && mounted) setState(() => _assigneeIds = result);
+  }
+
+  Future<void> _pickDue() async {
+    final now = DateTime.now();
+    final initial = _dueAt ?? now.add(const Duration(days: 1));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 10),
+      useRootNavigator: true,
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+      useRootNavigator: true,
+    );
+    if (time == null || !mounted) return;
+    setState(() {
+      _dueAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    });
+  }
+
+  String? get _dueLabel {
+    final d = _dueAt;
+    if (d == null) return null;
+    final dd = d.day.toString().padLeft(2, '0');
+    final mo = d.month.toString().padLeft(2, '0');
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mi = d.minute.toString().padLeft(2, '0');
+    return '$dd.$mo.${d.year} $hh:$mi';
   }
 
   @override
@@ -266,6 +304,27 @@ class _TaskFormPageState extends State<TaskFormPage> {
                   TaktSelectOption(value: 'medium', label: 'Обычная'),
                 ],
                 onChanged: (v) => setState(() => _priority = v),
+              ),
+            ),
+            TaktFormField(
+              label: 'Срок',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TaktFieldTrigger(
+                      valueText: _dueLabel,
+                      placeholder: 'Дата и время',
+                      onTap: _pickDue,
+                    ),
+                  ),
+                  if (_dueAt != null) ...[
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => setState(() => _dueAt = null),
+                      child: const Text('Убрать'),
+                    ),
+                  ],
+                ],
               ),
             ),
             if (widget.isCreate)

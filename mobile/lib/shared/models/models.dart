@@ -73,6 +73,7 @@ class Project extends Equatable {
     this.color,
     this.isDemo = false,
     this.isDefault = false,
+    this.autoUrgencyFromDue = true,
     this.members = const [],
   });
 
@@ -82,6 +83,7 @@ class Project extends Equatable {
   final String? color;
   final bool isDemo;
   final bool isDefault;
+  final bool autoUrgencyFromDue;
   final List<ProjectMember> members;
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -91,6 +93,7 @@ class Project extends Equatable {
         color: json['color'] as String?,
         isDemo: json['is_demo'] as bool? ?? false,
         isDefault: json['is_default'] as bool? ?? false,
+        autoUrgencyFromDue: json['auto_urgency_from_due'] as bool? ?? true,
         members: (json['members'] as List<dynamic>? ?? [])
             .map((e) => ProjectMember.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -103,11 +106,13 @@ class Project extends Equatable {
         'color': color,
         'is_demo': isDemo,
         'is_default': isDefault,
+        'auto_urgency_from_due': autoUrgencyFromDue,
         'members': members.map((m) => m.toJson()).toList(),
       };
 
   @override
-  List<Object?> get props => [id, name, description, color, isDemo, isDefault, members];
+  List<Object?> get props =>
+      [id, name, description, color, isDemo, isDefault, autoUrgencyFromDue, members];
 }
 
 class StatusColumn extends Equatable {
@@ -271,6 +276,7 @@ class TaskItem extends Equatable {
     this.description,
     this.assignees = const [],
     this.attachments = const [],
+    this.dueDate,
     this.closedAt,
     this.statusEnteredAt,
     this.updatedAt,
@@ -291,6 +297,7 @@ class TaskItem extends Equatable {
   final String? description;
   final List<TaskAssignee> assignees;
   final List<TaskAttachment> attachments;
+  final String? dueDate;
   final String? closedAt;
   final String? statusEnteredAt;
   final String? updatedAt;
@@ -320,6 +327,7 @@ class TaskItem extends Equatable {
       assignees: (json['assignees'] as List<dynamic>? ?? [])
           .map((e) => TaskAssignee.fromJson(e as Map<String, dynamic>))
           .toList(),
+      dueDate: json['due_date'] as String?,
       closedAt: json['closed_at'] as String?,
       statusEnteredAt: json['status_entered_at'] as String?,
       updatedAt: json['updated_at'] as String?,
@@ -345,6 +353,7 @@ class TaskItem extends Equatable {
     String? projectId,
     List<TaskAssignee>? assignees,
     List<TaskAttachment>? attachments,
+    Object? dueDate = _unset,
     Object? closedAt = _unset,
     Object? statusEnteredAt = _unset,
     String? updatedAt,
@@ -363,6 +372,7 @@ class TaskItem extends Equatable {
         description: description ?? this.description,
         assignees: assignees ?? this.assignees,
         attachments: attachments ?? this.attachments,
+        dueDate: identical(dueDate, _unset) ? this.dueDate : dueDate as String?,
         closedAt: identical(closedAt, _unset) ? this.closedAt : closedAt as String?,
         statusEnteredAt:
             identical(statusEnteredAt, _unset) ? this.statusEnteredAt : statusEnteredAt as String?,
@@ -385,6 +395,7 @@ class TaskItem extends Equatable {
         'description': description,
         'assignees': assignees.map((a) => a.toJson()).toList(),
         'attachments': attachments.map((a) => a.toJson()).toList(),
+        'due_date': dueDate,
         'closed_at': closedAt,
         'status_entered_at': statusEnteredAt,
         'updated_at': updatedAt,
@@ -420,6 +431,7 @@ class TaskItem extends Equatable {
         description,
         assignees,
         attachments,
+        dueDate,
         closedAt,
         statusEnteredAt,
         commentCount,

@@ -71,6 +71,10 @@ class AppIcon extends StatelessWidget {
         return AppIcons.invite;
       case 'task_completed':
         return AppIcons.circleCheck;
+      case 'task_due_soon':
+        return AppIcons.notifications;
+      case 'task_overdue':
+        return AppIcons.alert;
       case 'status_changed':
         return AppIcons.status;
       case 'comment':

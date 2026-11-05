@@ -54,7 +54,7 @@ Future<void> showProjectActionsMenu(
               if (owner)
                 _ActionRow(
                   icon: AppIcons.edit,
-                  label: 'Переименовать',
+                  label: 'Настройки',
                   color: fg,
                   onTap: () => Navigator.pop(ctx, 'rename'),
                 ),
@@ -102,6 +102,7 @@ Future<void> renameProjectFlow(
     baseOffset: 0,
     extentOffset: controller.text.length,
   );
+  var autoUrgency = project.autoUrgencyFromDue;
   final ok = await showModalBottomSheet<bool>(
     context: context,
     useRootNavigator: true,
@@ -125,95 +126,128 @@ Future<void> renameProjectFlow(
         Navigator.pop(ctx, true);
       }
 
-      return Padding(
-        padding: EdgeInsets.only(bottom: inset),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Отмена',
-                      onPressed: () => Navigator.pop(ctx, false),
-                      icon: AppIcon(AppIcons.close, color: muted),
+      return StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: inset),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Отмена',
+                          onPressed: () => Navigator.pop(ctx, false),
+                          icon: AppIcon(AppIcons.close, color: muted),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Настройки проекта',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.2,
+                              color: fg,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Сохранить',
+                          onPressed: submit,
+                          icon: AppIcon(AppIcons.check, color: accent),
+                        ),
+                      ],
                     ),
-                    Expanded(
-                      child: Text(
-                        'Название проекта',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.2,
-                          color: fg,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: TextField(
+                      controller: controller,
+                      autofocus: true,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => submit(),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w500,
+                        color: fg,
+                      ),
+                      cursorColor: accent,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: fieldBg,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: accent.withValues(alpha: 0.45)),
+                        ),
+                      ),
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(120),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    child: Material(
+                      color: fieldBg,
+                      borderRadius: BorderRadius.circular(10),
+                      child: CheckboxListTile(
+                        value: autoUrgency,
+                        onChanged: (v) => setModalState(() => autoUrgency = v ?? true),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        activeColor: accent,
+                        title: Text(
+                          'Автосрочность по дедлайну',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg),
+                        ),
+                        subtitle: Text(
+                          '≤35% — Важно, ≤10% или просрочка — Срочно. Только повышает.',
+                          style: TextStyle(fontSize: 12, height: 1.3, color: muted),
                         ),
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Сохранить',
-                      onPressed: submit,
-                      icon: AppIcon(AppIcons.check, color: accent),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                child: TextField(
-                  controller: controller,
-                  autofocus: true,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => submit(),
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w500,
-                    color: fg,
                   ),
-                  cursorColor: accent,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: fieldBg,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: accent.withValues(alpha: 0.45)),
-                    ),
-                  ),
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(120),
-                  ],
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       );
     },
   );
   final name = controller.text.trim();
   controller.dispose();
   if (ok != true || !context.mounted) return;
-  if (name.isEmpty || name == project.name) return;
+  if (name.isEmpty) return;
+  final unchangedName = name == project.name;
+  final unchangedFlag = autoUrgency == project.autoUrgencyFromDue;
+  if (unchangedName && unchangedFlag) return;
   final repo = context.read<ProjectsRepository>();
   final board = context.read<BoardCubit>();
   final messenger = ScaffoldMessenger.of(context);
   try {
-    await repo.renameProject(projectId: project.id, name: name);
+    await repo.renameProject(
+      projectId: project.id,
+      name: name,
+      autoUrgencyFromDue: autoUrgency,
+    );
     await board.refreshProjects(forceLoading: true);
     onChanged?.call();
   } catch (e) {

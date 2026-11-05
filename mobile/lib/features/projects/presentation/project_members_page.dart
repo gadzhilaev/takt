@@ -77,12 +77,19 @@ class _ProjectMembersPageState extends State<ProjectMembersPage> {
     }
   }
 
-  bool get _isOwner {
+  String? get _myRole {
     final uid = context.read<BoardCubit>().currentUserId;
     final p = _project;
-    if (uid == null || p == null) return false;
-    return p.members.any((m) => m.userId == uid && m.role == 'admin');
+    if (uid == null || p == null) return null;
+    for (final m in p.members) {
+      if (m.userId == uid) return m.role;
+    }
+    return null;
   }
+
+  bool get _isOwner => _myRole == 'admin';
+
+  bool get _canManageMembers => _myRole == 'admin' || _myRole == 'member';
 
   Future<void> _invite() async {
     final project = _project;
@@ -245,7 +252,9 @@ class _ProjectMembersPageState extends State<ProjectMembersPage> {
     final project = _project;
     final uid = context.read<BoardCubit>().currentUserId;
     if (project == null || uid == null) return;
-    if (member.userId == uid || !_isOwner) return;
+    if (member.userId == uid || !_canManageMembers) return;
+    // Regular members cannot remove an owner.
+    if (member.role == 'admin' && !_isOwner) return;
 
     final action = await showModalBottomSheet<String>(
       context: context,
@@ -397,6 +406,10 @@ class _ProjectMembersPageState extends State<ProjectMembersPage> {
                         itemBuilder: (context, i) {
                           if (i < project.members.length) {
                             final m = project.members[i];
+                            final isTargetOwner = m.role == 'admin';
+                            final canRemove = _canManageMembers &&
+                                m.userId != uid &&
+                                (_isOwner || !isTargetOwner);
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 6),
                               child: Row(
@@ -409,28 +422,23 @@ class _ProjectMembersPageState extends State<ProjectMembersPage> {
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          m.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: fg,
-                                          ),
-                                        ),
-                                        if (m.role == 'admin')
-                                          Text(
-                                            'Владелец',
-                                            style: TextStyle(fontSize: 12, color: muted),
-                                          ),
-                                      ],
+                                    child: Text(
+                                      m.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: fg,
+                                      ),
                                     ),
                                   ),
-                                  if (_isOwner && m.userId != uid)
+                                  if (isTargetOwner)
+                                    Text(
+                                      'Владелец',
+                                      style: TextStyle(fontSize: 12, color: muted),
+                                    )
+                                  else if (canRemove)
                                     IconButton(
                                       tooltip: 'Ещё',
                                       visualDensity: VisualDensity.compact,

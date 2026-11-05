@@ -77,6 +77,7 @@ class BoardRepository {
     required String title,
     String? description,
     String priority = 'medium',
+    String? dueDate,
     List<String> assigneeIds = const [],
   }) async {
     final res = await _api.dio.post<Map<String, dynamic>>(
@@ -87,12 +88,15 @@ class BoardRepository {
         'status_id': statusId,
         'project_id': projectId,
         'priority': priority,
+        'due_date': dueDate,
         'assignee_ids': assigneeIds,
         'label_names': <String>[],
       },
     );
     return TaskItem.fromJson(res.data!['task'] as Map<String, dynamic>);
   }
+
+  static const Object _dueUnset = Object();
 
   Future<TaskItem> updateTask({
     required String taskId,
@@ -101,6 +105,7 @@ class BoardRepository {
     String? priority,
     String? statusId,
     List<String>? assigneeIds,
+    Object? dueDate = _dueUnset,
   }) async {
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title.trim();
@@ -108,6 +113,7 @@ class BoardRepository {
     if (priority != null) body['priority'] = priority;
     if (statusId != null) body['status_id'] = statusId;
     if (assigneeIds != null) body['assignee_ids'] = assigneeIds;
+    if (!identical(dueDate, _dueUnset)) body['due_date'] = dueDate;
     final res = await _api.dio.patch<Map<String, dynamic>>('/api/v1/tasks/$taskId', data: body);
     return TaskItem.fromJson(res.data!['task'] as Map<String, dynamic>);
   }

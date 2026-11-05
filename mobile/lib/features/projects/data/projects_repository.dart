@@ -31,10 +31,18 @@ class ProjectsRepository {
     return Project.fromJson(res.data!['project'] as Map<String, dynamic>);
   }
 
-  Future<Project> renameProject({required String projectId, required String name}) async {
+  Future<Project> renameProject({
+    required String projectId,
+    required String name,
+    bool? autoUrgencyFromDue,
+  }) async {
+    final data = <String, dynamic>{'name': name.trim()};
+    if (autoUrgencyFromDue != null) {
+      data['auto_urgency_from_due'] = autoUrgencyFromDue;
+    }
     final res = await _api.dio.patch<Map<String, dynamic>>(
       '/api/v1/projects/$projectId',
-      data: {'name': name.trim()},
+      data: data,
     );
     return Project.fromJson(res.data!['project'] as Map<String, dynamic>);
   }

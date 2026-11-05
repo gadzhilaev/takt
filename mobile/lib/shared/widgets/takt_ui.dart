@@ -458,6 +458,10 @@ String taktNotificationKindLabel(String kind) {
       return 'Новая задача';
     case 'task_completed':
       return 'Задача выполнена';
+    case 'task_due_soon':
+      return 'Скоро срок';
+    case 'task_overdue':
+      return 'Срок просрочен';
     case 'status_changed':
     case 'task_moved':
       return 'Изменение задачи';

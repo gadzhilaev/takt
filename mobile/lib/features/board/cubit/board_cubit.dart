@@ -489,6 +489,7 @@ class BoardCubit extends Cubit<BoardState> {
     required String title,
     String? description,
     String priority = 'medium',
+    String? dueDate,
     List<String> assigneeIds = const [],
     String? statusId,
     List<({String path, String filename})> files = const [],
@@ -508,6 +509,7 @@ class BoardCubit extends Cubit<BoardState> {
         title: title,
         description: description,
         priority: priority,
+        dueDate: dueDate,
         assigneeIds: assigneeIds,
       );
       for (final f in files) {
@@ -593,6 +595,7 @@ class BoardCubit extends Cubit<BoardState> {
         priority: updated.priority,
         statusId: updated.statusId,
         assigneeIds: updated.assignees.map((a) => a.id).toList(),
+        dueDate: updated.dueDate,
       );
       final next = state.tasks.map((t) => t.id == saved.id ? saved : t).toList();
       emit(state.copyWith(tasks: next, clearError: true));

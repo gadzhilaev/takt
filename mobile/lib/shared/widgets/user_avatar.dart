@@ -141,6 +141,10 @@ class _Initials extends StatelessWidget {
           height: 1,
           letterSpacing: -0.2,
         ),
+        textHeightBehavior: const TextHeightBehavior(
+          applyHeightToFirstAscent: false,
+          applyHeightToLastDescent: false,
+        ),
       ),
     );
   }

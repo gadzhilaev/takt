@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/format_created_at.dart';
+import '../../../core/format_due_date.dart';
 import '../../../core/kanban_colors.dart';
 import '../../../core/theme.dart';
 import '../../../shared/models/models.dart';
@@ -306,6 +307,43 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                                 ],
                                               ),
                                             ),
+                                            if (formatDueChip(task.dueDate, isDone: task.isDone) !=
+                                                null) ...[
+                                              const SizedBox(height: 6),
+                                              Text.rich(
+                                                TextSpan(
+                                                  style: TextStyle(fontSize: 14, height: 1.4, color: fg),
+                                                  children: [
+                                                    TextSpan(
+                                                      text: task.isDone
+                                                          ? 'Срок: '
+                                                          : (isDueOverdue(task.dueDate)
+                                                              ? 'Просрочено: '
+                                                              : 'До сдачи: '),
+                                                      style: TextStyle(color: muted),
+                                                    ),
+                                                    TextSpan(
+                                                      text: [
+                                                        formatDueChip(
+                                                          task.dueDate,
+                                                          isDone: task.isDone,
+                                                        )!,
+                                                        if (!task.isDone &&
+                                                            formatDueAbsolute(task.dueDate) != null)
+                                                          ' · ${formatDueAbsolute(task.dueDate)}',
+                                                      ].join(),
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w500,
+                                                        color: (!task.isDone &&
+                                                                isDueOverdue(task.dueDate))
+                                                            ? TaktColors.danger
+                                                            : fg,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                             const SizedBox(height: 8),
                                             Row(
                                               children: [

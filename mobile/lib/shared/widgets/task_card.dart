@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/format_due_date.dart';
 import '../../core/kanban_colors.dart';
 import '../../core/theme.dart';
 import '../../core/time_in_status.dart';
@@ -86,6 +87,7 @@ class TaktTaskCard extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           UrgencyBadge(priority: task.priority),
+                          _TaskDueChip(task: task, isDone: done, dark: dark),
                           _TaskTimeChip(task: task, isDone: done, dark: dark),
                         ],
                       ),
@@ -128,6 +130,61 @@ class TaktTaskCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskDueChip extends StatelessWidget {
+  const _TaskDueChip({
+    required this.task,
+    required this.isDone,
+    required this.dark,
+  });
+
+  final TaskItem task;
+  final bool isDone;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = formatDueChip(task.dueDate, isDone: isDone);
+    if (label == null) return const SizedBox.shrink();
+    final overdue = !isDone && isDueOverdue(task.dueDate);
+    final fg = overdue ? TaktColors.danger : (dark ? TaktColors.mutedDark : TaktColors.muted);
+    final bg = overdue
+        ? TaktColors.danger.withValues(alpha: dark ? 0.22 : 0.12)
+        : (dark ? TaktColors.surface2Dark : TaktColors.surface2);
+    final text = overdue ? 'просрочено $label' : label;
+    return Tooltip(
+      message: dueChipTitle(task.dueDate, isDone: isDone),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(TaktRadii.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              overdue ? Icons.warning_amber_rounded : Icons.timer_outlined,
+              size: 12,
+              color: fg.withValues(alpha: 0.9),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              text,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                height: 1.2,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: fg,
+              ),
+            ),
+          ],
         ),
       ),
     );
