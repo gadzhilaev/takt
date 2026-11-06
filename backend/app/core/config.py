@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     FIREBASE_CREDENTIALS_FILE: str = ""
     FCM_ENABLED: bool = False
 
-    # Email OTP: classic SMTP (connect.smtp.bz) and/or SMTP.BZ HTTP API.
+    # Email OTP: SMTP.BZ HTTP API preferred; classic SMTP (connect.smtp.bz) as fallback.
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""

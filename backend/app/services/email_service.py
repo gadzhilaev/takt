@@ -1,4 +1,4 @@
-"""Email transport: classic SMTP (smtp.bz) or SMTP.BZ HTTP API."""
+"""Email transport: SMTP.BZ HTTP API (preferred) or classic SMTP fallback."""
 
 from __future__ import annotations
 
@@ -35,9 +35,9 @@ def _parse_from_header(raw: str) -> tuple[str, str]:
 
 def is_email_configured() -> bool:
     settings = get_settings()
-    if settings.SMTP_HOST.strip() and settings.SMTP_USER.strip():
+    if settings.SMTP_BZ_API_KEY.strip():
         return True
-    return bool(settings.SMTP_BZ_API_KEY.strip())
+    return bool(settings.SMTP_HOST.strip() and settings.SMTP_USER.strip())
 
 
 def _otp_copy(purpose: str) -> tuple[str, str, str]:
@@ -193,18 +193,18 @@ async def send_otp_email(*, to: str, code: str, purpose: str) -> str | None:
         logger.info("Email dry-run: to=%s purpose=%s", destination, purpose)
         return None
 
-    # Prefer classic SMTP when host is set (works with connect.smtp.bz login).
-    if settings.SMTP_HOST.strip() and settings.SMTP_USER.strip():
-        return _send_via_smtp(
+    # Prefer SMTP.BZ HTTP API (works when VPS blocks outbound SMTP ports).
+    if settings.SMTP_BZ_API_KEY.strip():
+        return await _send_via_smtp_bz_api(
             to=destination,
             subject=subject,
-            text_body=text_body,
             html_body=html_body,
+            text_body=text_body,
         )
 
-    return await _send_via_smtp_bz_api(
+    return _send_via_smtp(
         to=destination,
         subject=subject,
-        html_body=html_body,
         text_body=text_body,
+        html_body=html_body,
     )
