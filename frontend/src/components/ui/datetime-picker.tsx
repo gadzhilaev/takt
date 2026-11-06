@@ -3,7 +3,6 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Select } from "@/components/ui/select";
 import {
   addMonths,
   eachDayOfInterval,
@@ -16,7 +15,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import { ru } from "date-fns/locale";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
@@ -31,6 +30,51 @@ function roundMinutes(m: number, step = 5) {
 
 function formatDisplay(d: Date) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Compact scrollable list for hour/minute — no portal, so no click-through onto «Готово». */
+function TimeColumn({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  options: number[];
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="label-text mb-1.5">{label}</p>
+      <div
+        className="h-[9.5rem] overflow-y-auto rounded-[var(--radius)] border border-hairline bg-[var(--surface-2)] p-1"
+        role="listbox"
+        aria-label={label}
+      >
+        {options.map((opt) => {
+          const selected = opt === value;
+          return (
+            <button
+              key={opt}
+              type="button"
+              role="option"
+              aria-selected={selected}
+              onClick={() => onChange(opt)}
+              className={cn(
+                "flex h-8 w-full items-center justify-center rounded-[var(--radius-sm)] text-sm tabular-nums",
+                selected
+                  ? "bg-[var(--accent)] font-semibold text-[var(--accent-fg)]"
+                  : "text-foreground hover:bg-[var(--surface)]"
+              )}
+            >
+              {pad(opt)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function DateTimePickerField({
@@ -53,6 +97,8 @@ export function DateTimePickerField({
   const [day, setDay] = useState<Date>(() => valid ?? new Date());
   const [hour, setHour] = useState(() => valid?.getHours() ?? 18);
   const [minute, setMinute] = useState(() => roundMinutes(valid?.getMinutes() ?? 0));
+  /** Ignore accidental «Готово» right after a list tap (ghost clicks). */
+  const ignoreApplyUntil = useRef(0);
 
   function openPicker() {
     const base = valid ?? new Date();
@@ -74,20 +120,15 @@ export function DateTimePickerField({
     return eachDayOfInterval({ start, end });
   }, [month]);
 
-  const hourOpts = useMemo(
-    () => Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: pad(h) })),
-    []
-  );
-  const minuteOpts = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => {
-        const m = i * 5;
-        return { value: String(m), label: pad(m) };
-      }),
-    []
-  );
+  const hourOpts = useMemo(() => Array.from({ length: 24 }, (_, h) => h), []);
+  const minuteOpts = useMemo(() => Array.from({ length: 12 }, (_, i) => i * 5), []);
+
+  function touchGuard() {
+    ignoreApplyUntil.current = Date.now() + 350;
+  }
 
   function apply() {
+    if (Date.now() < ignoreApplyUntil.current) return;
     const next = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute, 0, 0);
     onChange(next.toISOString());
     setOpen(false);
@@ -96,6 +137,11 @@ export function DateTimePickerField({
   function clear() {
     onChange(null);
     setOpen(false);
+  }
+
+  function handleOpenChange(next: boolean) {
+    // Closing via overlay / Esc discards draft — never auto-apply.
+    setOpen(next);
   }
 
   return (
@@ -121,7 +167,13 @@ export function DateTimePickerField({
         ) : null}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen} title="Срок выполнения" centerTitle className="w-[min(100%-1.5rem,22rem)]">
+      <Dialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        title="Срок выполнения"
+        centerTitle
+        className="w-[min(100%-1.5rem,22rem)]"
+      >
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <button
@@ -162,6 +214,7 @@ export function DateTimePickerField({
                   key={d.toISOString()}
                   type="button"
                   onClick={() => {
+                    touchGuard();
                     setDay(d);
                     if (!isSameMonth(d, month)) setMonth(d);
                   }}
@@ -180,30 +233,24 @@ export function DateTimePickerField({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="label-text" htmlFor={`${id ?? "due"}-hour`}>
-                Часы
-              </label>
-              <Select
-                id={`${id ?? "due"}-hour`}
-                aria-label="Часы"
-                value={String(hour)}
-                onValueChange={(v) => setHour(Number(v))}
-                options={hourOpts}
-              />
-            </div>
-            <div>
-              <label className="label-text" htmlFor={`${id ?? "due"}-minute`}>
-                Минуты
-              </label>
-              <Select
-                id={`${id ?? "due"}-minute`}
-                aria-label="Минуты"
-                value={String(minute)}
-                onValueChange={(v) => setMinute(Number(v))}
-                options={minuteOpts}
-              />
-            </div>
+            <TimeColumn
+              label="Часы"
+              value={hour}
+              options={hourOpts}
+              onChange={(v) => {
+                touchGuard();
+                setHour(v);
+              }}
+            />
+            <TimeColumn
+              label="Минуты"
+              value={minute}
+              options={minuteOpts}
+              onChange={(v) => {
+                touchGuard();
+                setMinute(v);
+              }}
+            />
           </div>
 
           <div className="flex gap-2 pt-1">

@@ -22,6 +22,7 @@ const _monthNames = [
 const _weekdays = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
 /// In-app date+time picker (Takt UI — not OS Material/Cupertino chrome).
+/// Selection is draft-only until «Готово»; «Отмена» / dismiss discards.
 Future<DateTime?> showTaktDateTimePicker({
   required BuildContext context,
   DateTime? initial,
@@ -51,6 +52,10 @@ class _TaktDateTimePickerDialogState extends State<_TaktDateTimePickerDialog> {
   late DateTime _day;
   late int _hour;
   late int _minute;
+  late final ScrollController _hourScroll;
+  late final ScrollController _minuteScroll;
+
+  static const _rowExtent = 36.0;
 
   @override
   void initState() {
@@ -60,6 +65,15 @@ class _TaktDateTimePickerDialogState extends State<_TaktDateTimePickerDialog> {
     _day = DateTime(i.year, i.month, i.day);
     _hour = i.hour;
     _minute = ((i.minute / 5).round() * 5).clamp(0, 55);
+    _hourScroll = ScrollController(initialScrollOffset: _hour * _rowExtent);
+    _minuteScroll = ScrollController(initialScrollOffset: (_minute ~/ 5) * _rowExtent);
+  }
+
+  @override
+  void dispose() {
+    _hourScroll.dispose();
+    _minuteScroll.dispose();
+    super.dispose();
   }
 
   List<DateTime?> _daysInGrid() {
@@ -204,30 +218,36 @@ class _TaktDateTimePickerDialogState extends State<_TaktDateTimePickerDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: _TimeDropdown(
+                    child: _TimeList(
                       label: 'Часы',
-                      value: _hour,
-                      items: [for (var h = 0; h < 24; h++) h],
-                      labelFor: (h) => h.toString().padLeft(2, '0'),
-                      onChanged: (v) => setState(() => _hour = v),
+                      controller: _hourScroll,
+                      itemCount: 24,
+                      selectedIndex: _hour,
+                      labelFor: (i) => i.toString().padLeft(2, '0'),
+                      onSelect: (i) => setState(() => _hour = i),
                       fg: fg,
                       muted: muted,
-                      border: border,
+                      accent: accent,
                       surface2: surface2,
+                      border: border,
+                      rowExtent: _rowExtent,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _TimeDropdown(
+                    child: _TimeList(
                       label: 'Минуты',
-                      value: _minute,
-                      items: [for (var m = 0; m < 60; m += 5) m],
-                      labelFor: (m) => m.toString().padLeft(2, '0'),
-                      onChanged: (v) => setState(() => _minute = v),
+                      controller: _minuteScroll,
+                      itemCount: 12,
+                      selectedIndex: _minute ~/ 5,
+                      labelFor: (i) => (i * 5).toString().padLeft(2, '0'),
+                      onSelect: (i) => setState(() => _minute = i * 5),
                       fg: fg,
                       muted: muted,
-                      border: border,
+                      accent: accent,
                       surface2: surface2,
+                      border: border,
+                      rowExtent: _rowExtent,
                     ),
                   ),
                 ],
@@ -266,28 +286,34 @@ class _TaktDateTimePickerDialogState extends State<_TaktDateTimePickerDialog> {
   }
 }
 
-class _TimeDropdown extends StatelessWidget {
-  const _TimeDropdown({
+class _TimeList extends StatelessWidget {
+  const _TimeList({
     required this.label,
-    required this.value,
-    required this.items,
+    required this.controller,
+    required this.itemCount,
+    required this.selectedIndex,
     required this.labelFor,
-    required this.onChanged,
+    required this.onSelect,
     required this.fg,
     required this.muted,
-    required this.border,
+    required this.accent,
     required this.surface2,
+    required this.border,
+    required this.rowExtent,
   });
 
   final String label;
-  final int value;
-  final List<int> items;
+  final ScrollController controller;
+  final int itemCount;
+  final int selectedIndex;
   final String Function(int) labelFor;
-  final ValueChanged<int> onChanged;
+  final ValueChanged<int> onSelect;
   final Color fg;
   final Color muted;
-  final Color border;
+  final Color accent;
   final Color surface2;
+  final Color border;
+  final double rowExtent;
 
   @override
   Widget build(BuildContext context) {
@@ -297,33 +323,32 @@ class _TimeDropdown extends StatelessWidget {
         Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: muted)),
         const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: rowExtent * 4,
           decoration: BoxDecoration(
             color: surface2,
             borderRadius: BorderRadius.circular(TaktRadii.md),
             border: Border.all(color: border),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<int>(
-              value: value,
-              isExpanded: true,
-              borderRadius: BorderRadius.circular(TaktRadii.md),
-              icon: Icon(Icons.expand_more, color: muted, size: 20),
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: fg),
-              dropdownColor: Theme.of(context).brightness == Brightness.dark
-                  ? TaktColors.surfaceDark
-                  : TaktColors.surface,
-              items: [
-                for (final item in items)
-                  DropdownMenuItem(
-                    value: item,
-                    child: Text(labelFor(item)),
+          child: ListView.builder(
+            controller: controller,
+            itemExtent: rowExtent,
+            itemCount: itemCount,
+            itemBuilder: (context, index) {
+              final selected = index == selectedIndex;
+              return InkWell(
+                onTap: () => onSelect(index),
+                child: Center(
+                  child: Text(
+                    labelFor(index),
+                    style: TextStyle(
+                      fontSize: selected ? 17 : 15,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      color: selected ? accent : fg,
+                    ),
                   ),
-              ],
-              onChanged: (v) {
-                if (v != null) onChanged(v);
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
       ],
