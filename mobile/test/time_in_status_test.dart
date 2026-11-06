@@ -42,7 +42,7 @@ void main() {
     );
   });
 
-  test('active task uses time in column', () {
+  test('active task uses time since creation (not column)', () {
     expect(
       formatTaskTimeLabel(
         isDone: false,
@@ -50,7 +50,7 @@ void main() {
         statusEnteredAt: base.subtract(const Duration(hours: 3)).toIso8601String(),
         now: base,
       ),
-      '3 ч.',
+      '5 д.',
     );
   });
 }

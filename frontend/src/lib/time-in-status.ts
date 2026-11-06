@@ -46,7 +46,7 @@ export type TaskTimeFields = {
 };
 
 /**
- * Active task: time in current column (ticks with `now`).
+ * Active task: how long since creation (ticks with `now`) — column moves do not reset.
  * Done task: how long solving took (created → closed).
  */
 export function formatTaskTimeLabel(
@@ -64,9 +64,9 @@ export function formatTaskTimeLabel(
     if (Number.isNaN(start) || Number.isNaN(end)) return null;
     return formatDurationMs(end - start);
   }
-  return formatTimeInStatus(task.status_entered_at ?? task.updated_at ?? task.created_at, now);
+  return formatTimeInStatus(task.created_at ?? task.status_entered_at ?? task.updated_at, now);
 }
 
 export function taskTimeTitle(isDone: boolean): string {
-  return isDone ? "Сколько заняло решение" : "Сколько задача в этом столбце";
+  return isDone ? "Сколько заняло решение" : "Сколько выполняется задача";
 }

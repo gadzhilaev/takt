@@ -32,7 +32,7 @@ describe("formatTaskTimeLabel", () => {
   const closed = "2026-11-03T12:00:00.000Z";
   const now = Date.parse(closed);
 
-  it("active task uses time in column", () => {
+  it("active task uses time since creation (not column)", () => {
     expect(
       formatTaskTimeLabel(
         {
@@ -41,7 +41,7 @@ describe("formatTaskTimeLabel", () => {
         },
         { now }
       )
-    ).toBe("3 ч.");
+    ).toBe("2 д., 2 ч.");
   });
 
   it("done task uses created → closed duration", () => {

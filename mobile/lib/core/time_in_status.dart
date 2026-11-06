@@ -31,7 +31,7 @@ String? formatDuration(Duration duration) {
   return '$w нед.';
 }
 
-/// Human-readable time since [iso] until [now] (time in column).
+/// Human-readable elapsed time since [iso] until [now].
 String? formatTimeInStatus(String? iso, {DateTime? now}) {
   if (iso == null || iso.isEmpty) return null;
   final start = DateTime.tryParse(iso)?.toLocal();
@@ -40,7 +40,7 @@ String? formatTimeInStatus(String? iso, {DateTime? now}) {
   return formatDuration(end.difference(start));
 }
 
-/// Active: time in column. Done: created → closed (how long solving took).
+/// Active: since creation (column moves do not reset). Done: created → closed.
 String? formatTaskTimeLabel({
   required bool isDone,
   String? createdAt,
@@ -57,10 +57,10 @@ String? formatTaskTimeLabel({
     return formatDuration(end.difference(start));
   }
   return formatTimeInStatus(
-    statusEnteredAt ?? updatedAt ?? createdAt,
+    createdAt ?? statusEnteredAt ?? updatedAt,
     now: now,
   );
 }
 
 String taskTimeTitle(bool isDone) =>
-    isDone ? 'Сколько заняло решение' : 'Сколько задача в этом столбце';
+    isDone ? 'Сколько заняло решение' : 'Сколько выполняется задача';
