@@ -125,6 +125,9 @@ async def register_confirm(
     await invite_service.link_pending_invites_to_user(db, user)
 
     access, refresh, _ = await auth_service.create_token_pair(db, user)
+    from app.services.activity_service import record_activity
+
+    await record_activity(db, user.id, "register")
     await db.commit()
     set_auth_cookies(response, access, refresh)
     return {
@@ -179,6 +182,9 @@ async def login(
             detail={"error": {"code": e.code, "message": e.message}},
         )
     access, refresh, _ = await auth_service.create_token_pair(db, user)
+    from app.services.activity_service import record_activity
+
+    await record_activity(db, user.id, "login_email")
     await db.commit()
     set_auth_cookies(response, access, refresh)
     return {

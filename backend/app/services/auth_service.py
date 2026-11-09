@@ -81,12 +81,25 @@ async def authenticate_user(
     if getattr(user, "is_demo", False) and user.email.lower() != demo_email:
         raise AuthError("demo_profile", "Демонстрационный профиль недоступен для входа")
     clear_login_attempts(email, ip)
-    user.last_login_at = datetime.now(UTC)
+    # last_login_at is also set in create_token_pair; set early so callers that
+    # only authenticate still see a fresh stamp.
+    touch_last_login(user)
     await db.flush()
     return user
 
 
+def touch_last_login(user: User) -> None:
+    """Mark user as active for admin «Активность» (last_login_at)."""
+    user.last_login_at = datetime.now(UTC)
+
+
 async def create_token_pair(db: AsyncSession, user: User) -> tuple[str, str, str]:
+    """Issue access+refresh and record login activity time.
+
+    Called on password login, register/confirm, and OAuth — so «Активность»
+    is never left empty after a successful entry.
+    """
+    touch_last_login(user)
     jti = secrets.token_urlsafe(32)
     access = create_access_token(str(user.id), {"role": user.role.value})
     refresh = create_refresh_token(str(user.id), jti)
@@ -141,6 +154,10 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, st
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise AuthError("inactive", "Учётная запись отключена")
+
+    # Backfill empty activity for sessions opened before register/confirm stamped login.
+    if getattr(user, "last_login_at", False) is None:
+        touch_last_login(user)
 
     exp_ts = payload.get("exp")
     if isinstance(exp_ts, (int, float)):

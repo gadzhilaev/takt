@@ -28,6 +28,16 @@ async def test_register_requires_email_code(client: AsyncClient):
     )
     assert ok.status_code == 200, ok.text
     assert ok.json()["user"]["email"] == "otp-reg@example.com"
+    # Admin «Активность» reads last_login_at — must be set on first entry (register).
+    from sqlalchemy import select
+
+    from app.models.user import User
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        user = await db.scalar(select(User).where(User.email == "otp-reg@example.com"))
+        assert user is not None
+        assert user.last_login_at is not None
 
 
 @pytest.mark.asyncio

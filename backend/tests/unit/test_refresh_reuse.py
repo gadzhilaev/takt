@@ -22,7 +22,12 @@ class _ScalarResult:
 async def test_refresh_reuses_refresh_token(monkeypatch):
     user_id = uuid4()
     jti = "jti-stable"
-    user = SimpleNamespace(id=user_id, role=SimpleNamespace(value="member"), is_active=True)
+    user = SimpleNamespace(
+        id=user_id,
+        role=SimpleNamespace(value="member"),
+        is_active=True,
+        last_login_at=datetime.now(UTC),
+    )
     stored = SimpleNamespace(
         jti=jti,
         user_id=user_id,
