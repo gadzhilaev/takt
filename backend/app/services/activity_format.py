@@ -100,6 +100,17 @@ def activity_summary(
         return "вернул(а) задачу из архива"
     if key == "restored":
         return "восстановил(а) задачу"
+    if key == "checkin":
+        answer = (field or "").strip().lower()
+        if answer == "done":
+            return "отметил(а) в чек-ине: сделано"
+        if answer == "in_progress":
+            return "отметил(а) в чек-ине: в работе"
+        if answer == "blocked":
+            if new_label:
+                return f"отметил(а) в чек-ине: застряла — «{new_label}»"
+            return "отметил(а) в чек-ине: застряла"
+        return "ответил(а) на чек-ин"
     if key in ("attachment_added", "attachment_uploaded"):
         if new_label:
             return f"прикрепил(а) файл «{new_label}»"

@@ -123,6 +123,8 @@ async def create_project(
         is_default=False,
         is_archived=False,
         is_demo=is_demo,
+        # New projects start with the daily check-in on (existing ones were migrated off).
+        rhythm_enabled=True,
     )
     db.add(project)
     await db.flush()

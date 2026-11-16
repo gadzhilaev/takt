@@ -50,6 +50,10 @@ async def apply_status_change(db: AsyncSession, task: Task, new_status: TaskStat
     was_done = bool(task.status.is_done) if task.status is not None else False
     if task.status_id != new_status.id:
         task.status_entered_at = datetime.now(UTC)
+        # «Застряла» снимается при следующем движении задачи.
+        task.blocked_at = None
+        task.blocked_reason = None
+        task.blocked_by_id = None
     task.status_id = new_status.id
     # Keep loaded relationship in sync — otherwise serializers return a stale nested status
     # until the identity map is expired/refetched.
@@ -69,6 +73,7 @@ def task_query_base():
         selectinload(Task.labels).selectinload(TaskLabel.label),
         selectinload(Task.checklist_items),
         selectinload(Task.attachments),
+        selectinload(Task.blocked_by),
     ).where(Task.deleted_at.is_(None))
 
 

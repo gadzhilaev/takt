@@ -109,6 +109,14 @@ class Settings(BaseSettings):
     DUE_REMINDER_INTERVAL_SECONDS: int = 300
     DUE_REMINDER_ENABLED: bool = True
 
+    # Rhythm: daily check-in loop. Interval 0 or RHYTHM_ENABLED=false disables the loop.
+    RHYTHM_ENABLED: bool = True
+    RHYTHM_INTERVAL_SECONDS: int = 60
+    # Check-ins are created only within this many hours after the project's check-in time
+    # (no late-night pushes after a long outage).
+    RHYTHM_WINDOW_HOURS: int = 3
+    RHYTHM_MAX_TASKS: int = 5
+
     # Logging level for app.* loggers (background loop passes are logged at INFO).
     APP_LOG_LEVEL: str = "INFO"
 

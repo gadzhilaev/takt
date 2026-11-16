@@ -73,9 +73,16 @@ class Task(Base, TimestampMixin):
     position: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # «Застряла»: set by a rhythm check-in answer, cleared on the next move / in_progress / done.
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    blocked_reason: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    blocked_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
     status: Mapped["TaskStatus"] = relationship()
     author: Mapped["User"] = relationship(back_populates="created_tasks", foreign_keys=[author_id])
+    blocked_by: Mapped["User | None"] = relationship(foreign_keys=[blocked_by_id])
     assignees: Mapped[list["TaskAssignee"]] = relationship(
         back_populates="task", cascade="all, delete-orphan"
     )

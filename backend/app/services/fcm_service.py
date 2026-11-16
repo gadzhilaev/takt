@@ -102,6 +102,39 @@ async def delete_all_for_user(db: AsyncSession, *, user_id: uuid.UUID) -> None:
         await db.delete(row)
 
 
+def build_message(
+    messaging,
+    *,
+    platform: str,
+    token: str,
+    title: str,
+    body: str | None,
+    data: dict[str, str] | None,
+    apns_category: str | None = None,
+    android_data_only: bool = False,
+):
+    payload = dict(data or {})
+    if android_data_only and (platform or "").lower() == "android":
+        payload.setdefault("title", title)
+        payload.setdefault("body", body or "")
+        return messaging.Message(
+            data=payload,
+            token=token,
+            android=messaging.AndroidConfig(priority="high"),
+        )
+    apns = None
+    if apns_category:
+        apns = messaging.APNSConfig(
+            payload=messaging.APNSPayload(aps=messaging.Aps(category=apns_category))
+        )
+    return messaging.Message(
+        notification=messaging.Notification(title=title, body=body or ""),
+        data=payload,
+        token=token,
+        apns=apns,
+    )
+
+
 async def send_fcm_to_users(
     db: AsyncSession,
     settings: Settings,
@@ -110,7 +143,15 @@ async def send_fcm_to_users(
     title: str,
     body: str | None,
     data: dict[str, str] | None = None,
+    apns_category: str | None = None,
+    android_data_only: bool = False,
 ) -> None:
+    """Send to every device of ``user_ids``.
+
+    ``apns_category`` — iOS notification category (action buttons registered by the app).
+    ``android_data_only`` — Android gets a high-priority data message (title/body in data);
+    the app shows the notification itself with action buttons.
+    """
     if not user_ids or not _ensure_firebase(settings):
         return
     try:
@@ -127,10 +168,15 @@ async def send_fcm_to_users(
 
     dead: list[DevicePushToken] = []
     for row in rows:
-        message = messaging.Message(
-            notification=messaging.Notification(title=title, body=body or ""),
-            data=data or {},
+        message = build_message(
+            messaging,
+            platform=row.platform,
             token=row.token,
+            title=title,
+            body=body,
+            data=data,
+            apns_category=apns_category,
+            android_data_only=android_data_only,
         )
         try:
             messaging.send(message)

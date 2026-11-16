@@ -10,6 +10,7 @@ from app.api.v1 import (
     platform,
     projects,
     reports,
+    rhythm,
     settings,
     tasks,
     users,
@@ -28,3 +29,4 @@ api_router.include_router(tasks.router)
 api_router.include_router(reports.router)
 api_router.include_router(files.router)
 api_router.include_router(notifications.router)
+api_router.include_router(rhythm.router)

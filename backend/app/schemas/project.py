@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.project import ProjectMemberRole
 
@@ -14,6 +14,13 @@ class ProjectMemberOut(BaseModel):
     avatar_url: str | None = None
 
 
+class RhythmSettingsOut(BaseModel):
+    enabled: bool
+    time: str  # HH:MM, local
+    timezone: str
+    days: list[int]  # ISO weekdays 1..7
+
+
 class ProjectOut(BaseModel):
     id: str
     name: str
@@ -24,6 +31,7 @@ class ProjectOut(BaseModel):
     is_archived: bool
     is_demo: bool = False
     auto_urgency_from_due: bool = True
+    rhythm: RhythmSettingsOut | None = None
     created_at: datetime
     updated_at: datetime
     members: list[ProjectMemberOut] = []
@@ -46,6 +54,20 @@ class ProjectUpdate(BaseModel):
     icon: str | None = None
     is_archived: bool | None = None
     auto_urgency_from_due: bool | None = None
+    rhythm_enabled: bool | None = None
+    rhythm_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    rhythm_timezone: str | None = Field(default=None, max_length=64)
+    rhythm_days: list[int] | None = None
+
+    @field_validator("rhythm_days")
+    @classmethod
+    def _days(cls, v: list[int] | None) -> list[int] | None:
+        if v is None:
+            return v
+        days = sorted(set(v))
+        if not days or any(d < 1 or d > 7 for d in days):
+            raise ValueError("Выберите хотя бы один день недели")
+        return days
 
 
 class ProjectMemberUpdate(BaseModel):

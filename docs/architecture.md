@@ -104,6 +104,7 @@ Depends: `get_db`, `get_current_user` (cookie или Bearer), `verify_csrf` (п�
 | `tasks` | CRUD, move, comments, checklist (+ project ACL) |
 | `settings` | столбцы проекта |
 | `notifications` | in-app + device tokens / Web Push |
+| `rhythm` | ежедневный чек-ин: текущий, ответ, история, ответ из push по токену |
 | `admin` | legacy workspace admin users |
 | `platform` | platform console API |
 | `reports` | агрегаты / Excel (API есть; web UI упрощён) |
@@ -171,12 +172,14 @@ mobile/lib/
 - **Задача:** title, description, priority, **исполнители ≥1**, labels, due date, checklist, comments. Создание: `position = min(column) − 1024`. Soft-delete только автором.
 - **Приглашения:** in-app (email или открытая ссылка); SMTP не имитировать, если не настроен.
 - **Уведомления:** assignment / completion / invites; Web Push (VAPID), FCM.
+- **Ритм (чек-ин):** настройки на проекте (`rhythm_enabled`, время, часовой пояс, дни; существующие проекты — выкл., новые — вкл.; меняет только admin). Фоновый цикл `rhythm_loop` → `run_rhythm_pass` (своя сессия на проект) в окне `RHYTHM_WINDOW_HOURS` после времени чек-ина создаёт один чек-ин в день на человека и проект (unique `user+project+date`), до 5 задач: просроченные → ближайший срок → срочность. Ответ: `done` → столбец «Готово» (`is_done`), `in_progress` → из первого во второй, `blocked` → флаг «Застряла» + причина (снимается при движении / `in_progress` / `done`). Всё пишется в историю (`action=checkin`) и шлёт обычные уведомления/WS.
+- **Кнопки в push чек-ина:** iOS — категории `TAKT_CHECKIN_ONE/MANY`, ответ шлёт `AppDelegate.swift`; Android — data-сообщение, уведомление с кнопками рисует `flutter_local_notifications`. Авторизация ответа — одноразовый `action_token` из push (sha256 в `rhythm_checkins.push_token_hash`), только этот чек-ин и только сегодня → `POST /rhythm/push-answer`.
 - **Админки:** platform `/admin` ≠ project admin ≠ `/app/admin`.
 
 ## База данных
 
 PostgreSQL 16. Технические имена по умолчанию: `track` / `track`. Хост-порт Docker: **5433**.  
-Миграции `backend/alembic/versions/` — **001–020** (head `020_due_basis_auto_urgency`). Runtime: `alembic upgrade head` в lifespan.
+Миграции `backend/alembic/versions/` — **001–021** (head `021_rhythm_checkins`). Runtime: `alembic upgrade head` в lifespan.
 
 | Rev | Суть |
 |-----|------|

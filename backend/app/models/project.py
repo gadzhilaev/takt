@@ -1,8 +1,18 @@
 import enum
 import uuid
+from datetime import time
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    Boolean,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Time,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -27,6 +37,16 @@ class Project(Base, TimestampMixin):
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     # Escalate task priority as due_date approaches (see due_urgency_service).
     auto_urgency_from_due: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Rhythm (daily check-in). Existing projects: off; new projects: on (project_service).
+    rhythm_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    rhythm_time: Mapped[time] = mapped_column(Time, default=time(10, 0), nullable=False)
+    rhythm_timezone: Mapped[str] = mapped_column(
+        String(64), default="Europe/Moscow", nullable=False
+    )
+    # ISO weekdays: 1 = Monday … 7 = Sunday.
+    rhythm_days: Mapped[list[int]] = mapped_column(
+        ARRAY(Integer), default=lambda: [1, 2, 3, 4, 5], nullable=False
+    )
 
     members: Mapped[list["ProjectMember"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"

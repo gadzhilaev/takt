@@ -19,6 +19,7 @@ from app.core.limiter import limiter
 from app.db.session import AsyncSessionLocal
 from app.services.bootstrap import bootstrap_db
 from app.services.due_reminder_service import due_reminder_loop
+from app.services.rhythm_service import rhythm_loop
 
 
 def configure_app_logging(level: str) -> None:
@@ -81,14 +82,19 @@ async def lifespan(app: FastAPI):
     reminder_task: asyncio.Task | None = None
     if settings.DUE_REMINDER_ENABLED and settings.DUE_REMINDER_INTERVAL_SECONDS > 0:
         reminder_task = asyncio.create_task(due_reminder_loop(stop))
+    rhythm_task: asyncio.Task | None = None
+    if settings.RHYTHM_ENABLED and settings.RHYTHM_INTERVAL_SECONDS > 0:
+        rhythm_task = asyncio.create_task(rhythm_loop(stop))
     try:
         yield
     finally:
         stop.set()
-        if reminder_task is not None:
-            reminder_task.cancel()
+        for task in (reminder_task, rhythm_task):
+            if task is None:
+                continue
+            task.cancel()
             try:
-                await reminder_task
+                await task
             except asyncio.CancelledError:
                 pass
 

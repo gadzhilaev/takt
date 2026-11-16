@@ -20,6 +20,7 @@ from app.models.platform import (
 )
 from app.models.push_subscription import PushSubscription
 from app.models.project import Project, ProjectMember, ProjectMemberRole
+from app.models.rhythm import CheckinAnswer, CheckinStatus, RhythmCheckin, RhythmCheckinItem
 from app.models.task import (
     ActivityLog,
     AdminAuditLog,
@@ -75,4 +76,8 @@ __all__ = [
     "PlatformSetting",
     "UserActivityEvent",
     "AdminMfaSecret",
+    "RhythmCheckin",
+    "RhythmCheckinItem",
+    "CheckinStatus",
+    "CheckinAnswer",
 ]

@@ -1,4 +1,5 @@
 import uuid
+from datetime import time as dt_time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,7 +11,13 @@ from app.api.serializers import avatar_url
 from app.db.session import get_db
 from app.models.project import ProjectMember, ProjectMemberRole
 from app.models.user import User
-from app.schemas.project import ProjectCreate, ProjectMemberUpdate, ProjectOut, ProjectUpdate
+from app.schemas.project import (
+    ProjectCreate,
+    ProjectMemberUpdate,
+    ProjectOut,
+    ProjectUpdate,
+    RhythmSettingsOut,
+)
 from app.services import leave_request_service, project_service
 from app.services.attachment_service import remove_dirs
 from app.services.leave_request_service import LeaveRequestError
@@ -43,10 +50,21 @@ def _project_out(project, members_users: dict[uuid.UUID, User], progress: dict |
         is_archived=project.is_archived,
         is_demo=bool(getattr(project, "is_demo", False)),
         auto_urgency_from_due=bool(getattr(project, "auto_urgency_from_due", True)),
+        rhythm=_rhythm_out(project),
         created_at=project.created_at,
         updated_at=project.updated_at,
         members=members,
         progress=progress,
+    )
+
+
+def _rhythm_out(project) -> RhythmSettingsOut:
+    t = getattr(project, "rhythm_time", None)
+    return RhythmSettingsOut(
+        enabled=bool(getattr(project, "rhythm_enabled", False)),
+        time=t.strftime("%H:%M") if t else "10:00",
+        timezone=getattr(project, "rhythm_timezone", None) or "Europe/Moscow",
+        days=list(getattr(project, "rhythm_days", None) or [1, 2, 3, 4, 5]),
     )
 
 
@@ -160,6 +178,25 @@ async def update_project(
         project.is_archived = body.is_archived
     if body.auto_urgency_from_due is not None:
         project.auto_urgency_from_due = body.auto_urgency_from_due
+    # Rhythm settings: admin only (the whole PATCH already requires project admin).
+    if body.rhythm_enabled is not None:
+        project.rhythm_enabled = body.rhythm_enabled
+    if body.rhythm_time is not None:
+        hh, mm = body.rhythm_time.split(":")
+        project.rhythm_time = dt_time(int(hh), int(mm))
+    if body.rhythm_timezone is not None:
+        from app.services.rhythm_service import is_valid_timezone
+
+        if not is_valid_timezone(body.rhythm_timezone):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": {"code": "invalid_timezone", "message": "Неизвестный часовой пояс"}
+                },
+            )
+        project.rhythm_timezone = body.rhythm_timezone
+    if body.rhythm_days is not None:
+        project.rhythm_days = body.rhythm_days
     await db.commit()
     project = await project_service.get_project(db, project_id)
     umap = await _users_map(db, [m.user_id for m in project.members])  # type: ignore[union-attr]

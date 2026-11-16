@@ -93,4 +93,18 @@ def task_to_out(task: Task, *, comment_count: int = 0, subtask_total: int = 0, s
         subtask_total=subtask_total,
         subtask_done=subtask_done,
         attachments=attachments,
+        blocked_at=getattr(task, "blocked_at", None),
+        blocked_reason=getattr(task, "blocked_reason", None),
+        blocked_by=_blocked_by(task),
     )
+
+
+def _blocked_by(task: Task):
+    if getattr(task, "blocked_at", None) is None:
+        return None
+    from sqlalchemy import inspect as sa_inspect
+
+    # Only use an already-loaded relationship (no lazy IO in async serializers).
+    if "blocked_by" in sa_inspect(task).unloaded:
+        return None
+    return user_brief(task.blocked_by) if task.blocked_by else None

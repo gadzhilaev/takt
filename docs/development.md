@@ -38,6 +38,10 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 OAuth: [oauth.md](oauth.md). Mobile (Firebase, виджеты, deep links): [`../mobile/docs/MOBILE_SETUP.md`](../mobile/docs/MOBILE_SETUP.md).  
 Production: [`../deploy/DEPLOY.md`](../deploy/DEPLOY.md).
 
+Фоновые циклы (в `lifespan`): напоминания о сроках (`DUE_REMINDER_*`) и ритм (`RHYTHM_ENABLED`, `RHYTHM_INTERVAL_SECONDS`, `RHYTHM_WINDOW_HOURS`, `RHYTHM_MAX_TASKS`). Каждый проход пишет INFO-строку в `docker logs` (`due pass ok`, `rhythm pass ok`) — уровень `APP_LOG_LEVEL` (по умолчанию `INFO`), без персональных данных. В pytest оба цикла выключены (`conftest.py`).
+
+Push чек-ина на симуляторе iOS: `xcrun simctl push <device> ru.gadzhilaev.takt payload.apns` с `aps.category=TAKT_CHECKIN_ONE` и полями `kind=rhythm_checkin`, `checkin_id`, `task_id`, `action_token` (долгое нажатие на баннер → кнопки).
+
 ## Стиль кода
 
 - Python: Ruff; async SQLAlchemy 2; Pydantic v2

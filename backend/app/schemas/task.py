@@ -107,6 +107,10 @@ class TaskOut(BaseModel):
     subtask_total: int = 0
     subtask_done: int = 0
     attachments: list[AttachmentOut] = []
+    # «Застряла» (rhythm check-in). None when the task is not blocked.
+    blocked_at: datetime | None = None
+    blocked_reason: str | None = None
+    blocked_by: UserBrief | None = None
 
 
 class TaskCreate(BaseModel):
