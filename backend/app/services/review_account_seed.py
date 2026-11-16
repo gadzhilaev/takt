@@ -10,6 +10,10 @@ re-anchored to the current time, comments/attachments/history are not duplicated
 review notifications are replaced. No Web Push / FCM / email is sent.
 
 Credentials are never stored in code: email/password come from the caller (CLI/ENV).
+
+Safety: ``plan_review_seed`` is read-only (the CLI runs it by default as a dry-run).
+``seed_review_account`` refuses to touch an existing account that shares projects with
+other real (non-demo) users unless ``force_foreign_projects=True``.
 """
 
 from __future__ import annotations
@@ -31,7 +35,7 @@ from app.models.task import ActivityLog, Attachment, Comment, Task, TaskAssignee
 from app.models.team import TaskStatus
 from app.models.user import User, UserRole
 from app.services.account_service import exit_projects, plan_project_exits
-from app.services.attachment_service import attachments_dir
+from app.services.attachment_service import attachments_dir, remove_dirs
 from app.services.project_service import DEFAULT_STATUS_TEMPLATE
 from app.services.ru_names import format_assignment_line, format_completed_line
 
@@ -423,12 +427,12 @@ async def _ensure_member(
         m.role = role
 
 
-async def _exit_foreign_projects(db: AsyncSession, me: User) -> list[dict]:
-    """Leave every project outside the seed set (App Review must see only seed data).
+class ReviewSeedRefused(RuntimeError):
+    """Seed would affect projects shared with real users; needs explicit consent."""
 
-    Same rules as account deletion: no real teammates → project is deleted;
-    sole admin with real teammates → admin goes to the earliest real member; else leave.
-    """
+
+async def _foreign_plans(db: AsyncSession, me: User) -> list[dict]:
+    """Projects outside the seed set, with the same exit rules as account deletion."""
     seed_names = {p.name for p in REVIEW_PROJECTS}
     admin_of = set(
         (
@@ -440,14 +444,56 @@ async def _exit_foreign_projects(db: AsyncSession, me: User) -> list[dict]:
             )
         ).all()
     )
-    plans = [
+    return [
         p
         for p in await plan_project_exits(db, me)
         if not (p["name"] in seed_names and uuid.UUID(p["id"]) in admin_of)
     ]
+
+
+async def _projects_shared_with_real_users(db: AsyncSession, me: User) -> list[str]:
+    """Names of the account's projects that have other real (non-demo) members."""
+    my_projects = select(ProjectMember.project_id).where(ProjectMember.user_id == me.id)
+    rows = (
+        await db.execute(
+            select(Project.name)
+            .join(ProjectMember, ProjectMember.project_id == Project.id)
+            .join(User, User.id == ProjectMember.user_id)
+            .where(
+                Project.id.in_(my_projects),
+                ProjectMember.user_id != me.id,
+                User.is_demo.is_(False),
+            )
+            .distinct()
+            .order_by(Project.name)
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def plan_review_seed(db: AsyncSession, *, email: str) -> dict:
+    """Read-only preview of what ``seed_review_account`` would do to an account."""
+    email = email.strip().lower()
+    me = await db.scalar(select(User).where(User.email == email))
+    if me is None:
+        return {"user_exists": False, "foreign": [], "shared_with_real": []}
+    return {
+        "user_exists": True,
+        "is_demo": bool(me.is_demo),
+        "foreign": await _foreign_plans(db, me),
+        "shared_with_real": await _projects_shared_with_real_users(db, me),
+    }
+
+
+async def _exit_foreign_projects(db: AsyncSession, me: User) -> tuple[list[dict], list]:
+    """Leave every project outside the seed set (App Review must see only seed data).
+
+    Returns (report rows, attachment folders to remove after commit).
+    """
+    plans = await _foreign_plans(db, me)
     if not plans:
-        return []
-    await exit_projects(
+        return [], []
+    file_dirs = await exit_projects(
         db,
         me,
         plans,
@@ -462,7 +508,11 @@ async def _exit_foreign_projects(db: AsyncSession, me: User) -> list[dict]:
             )
         )
     await db.flush()
-    return [{"name": p["name"], "action": p["action"]} for p in plans]
+    rows = [
+        {"name": p["name"], "action": p["action"], "new_admin": p.get("new_admin")}
+        for p in plans
+    ]
+    return rows, file_dirs
 
 
 def _log(task_id, user_id, action, at, field=None, old=None, new=None) -> ActivityLog:
@@ -484,9 +534,21 @@ async def seed_review_account(
     password: str | None = None,
     name: str | None = None,
     now: datetime | None = None,
+    force_foreign_projects: bool = False,
 ) -> dict:
     now = now or datetime.now(UTC)
     email = email.strip().lower()
+
+    existing = await db.scalar(select(User).where(User.email == email))
+    if existing is not None and not force_foreign_projects:
+        shared = await _projects_shared_with_real_users(db, existing)
+        if shared:
+            raise ReviewSeedRefused(
+                "Аккаунт состоит в проектах с другими реальными участниками: "
+                + ", ".join(f"«{n}»" for n in shared)
+                + ". Похоже, это не аккаунт ревьюера. Если всё верно, "
+                "запустите с --force-foreign-projects."
+            )
     report: dict = {
         "user_created": False,
         "projects": [],
@@ -499,7 +561,7 @@ async def seed_review_account(
     }
 
     me, report["user_created"] = await _ensure_review_user(db, email, password, name)
-    report["removed_projects"] = await _exit_foreign_projects(db, me)
+    report["removed_projects"], file_dirs = await _exit_foreign_projects(db, me)
     staff = await _ensure_staff(db)
     people: dict[str, User] = {ME: me, **staff}
 
@@ -694,4 +756,5 @@ async def seed_review_account(
         report["notifications"] += 1
 
     await db.commit()
+    remove_dirs(file_dirs)  # only after a successful commit
     return report

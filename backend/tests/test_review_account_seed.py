@@ -12,7 +12,12 @@ from app.models.project import Project, ProjectMember
 from app.models.task import ActivityLog, Attachment, Comment, Task, TaskAssignee
 from app.models.user import User
 from app.services.attachment_service import attachment_path
-from app.services.review_account_seed import REVIEW_PROJECTS, seed_review_account
+from app.services.review_account_seed import (
+    REVIEW_PROJECTS,
+    ReviewSeedRefused,
+    plan_review_seed,
+    seed_review_account,
+)
 from tests.conftest import TestSession
 
 EMAIL = "reviewer@example.com"
@@ -149,8 +154,18 @@ async def test_seed_removes_reviewer_from_foreign_projects(client: AsyncClient):
         await db.commit()
         solo_id, shared_id, colleague_id = solo.id, shared.id, colleague.id
 
+    # Без явного согласия трогать проекты с реальными людьми нельзя — ничего не меняется.
     async with TestSession() as db:
-        report = await seed_review_account(db, email=email)
+        with pytest.raises(ReviewSeedRefused, match="Чужой рабочий проект"):
+            await seed_review_account(db, email=email)
+    async with TestSession() as db:
+        assert await db.get(Project, solo_id) is not None
+        assert await db.scalar(
+            select(func.count()).select_from(Project).where(Project.name == REVIEW_PROJECTS[0].name)
+        ) == 0
+
+    async with TestSession() as db:
+        report = await seed_review_account(db, email=email, force_foreign_projects=True)
     assert {r["name"]: r["action"] for r in report["removed_projects"]} == {
         "Проверка магазина": "delete",
         "Чужой рабочий проект": "transfer",
@@ -180,3 +195,49 @@ async def test_seed_removes_reviewer_from_foreign_projects(client: AsyncClient):
     async with TestSession() as db:
         again = await seed_review_account(db, email=email)
     assert again["removed_projects"] == []
+
+
+@pytest.mark.asyncio
+async def test_plan_and_cli_dry_run_change_nothing():
+    """plan_review_seed и CLI без --apply только печатают план."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from app.core.security import hash_password
+    from app.models.project import ProjectMemberRole
+
+    email = "reviewer-dry@example.com"
+    async with TestSession() as db:
+        me = User(email=email, name="Ревьюер", password_hash=hash_password("x" * 12))
+        db.add(me)
+        await db.flush()
+        old = Project(name="Проверка магазина", is_demo=False)
+        db.add(old)
+        await db.flush()
+        db.add(ProjectMember(project_id=old.id, user_id=me.id, role=ProjectMemberRole.admin))
+        await db.commit()
+        old_id = old.id
+
+    async with TestSession() as db:
+        plan = await plan_review_seed(db, email=email)
+    assert plan["user_exists"] is True
+    assert [(p["name"], p["action"]) for p in plan["foreign"]] == [("Проверка магазина", "delete")]
+    assert plan["shared_with_real"] == []
+
+    backend = Path(__file__).resolve().parents[1]
+    out = subprocess.run(
+        [sys.executable, "scripts/seed_review_account.py", "--email", email],
+        cwd=backend, env=os.environ.copy(), capture_output=True, text=True, timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    assert "DRY-RUN" in out.stdout
+    assert "«Проверка магазина»: проект будет удалён" in out.stdout
+
+    async with TestSession() as db:
+        assert await db.get(Project, old_id) is not None
+        n = await db.scalar(
+            select(func.count()).select_from(Project).where(Project.name == REVIEW_PROJECTS[0].name)
+        )
+        assert n == 0
