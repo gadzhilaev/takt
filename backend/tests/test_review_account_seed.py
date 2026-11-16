@@ -286,13 +286,17 @@ async def test_seed_turns_on_rhythm_and_creates_today_checkin():
                 t.due_date and 0 < (t.due_date - now).total_seconds() < 72 * 3600 for t in open_mine
             ), p.name
         checkins = (
-            await db.scalars(select(RhythmCheckin).where(RhythmCheckin.user_id == me.id))
+            await db.scalars(
+                select(RhythmCheckin).where(
+                    RhythmCheckin.user_id == me.id, RhythmCheckin.status == "pending"
+                )
+            )
         ).all()
-        assert len(checkins) == 1
+        assert len(checkins) == 1  # past ones are answered/skipped
         c = checkins[0]
         project = await db.get(Project, c.project_id)
         assert project.name == "Цифровые сервисы колледжа"
-        assert c.status == "pending" and c.date == local_today(project)
+        assert c.date == local_today(project)
         blocked = await db.scalar(
             select(Task).where(Task.title == "Настроить проектор в актовом зале")
         )
@@ -303,3 +307,50 @@ async def test_seed_turns_on_rhythm_and_creates_today_checkin():
     async with TestSession() as db:
         r2 = await seed_review_account(db, email=email)
     assert r2["checkin"]["id"] == r1["checkin"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_seed_gives_reviewer_non_empty_weekly_digest():
+    from app.services.digest_service import build_digest
+
+    email = "reviewer-digest@example.com"
+    async with TestSession() as db:
+        r1 = await seed_review_account(db, email=email, password="Review-Pass-123!")
+    s = r1["digest"]
+    assert s["done"] >= 2 and s["stuck"] >= 1 and s["overdue"] >= 1
+    assert s["participation"] is not None and 50 <= s["participation"] < 100
+    assert r1["past_checkins"] > 0
+
+    async with TestSession() as db:
+        me = await db.scalar(select(User).where(User.email == email))
+        roles = (
+            await db.scalars(select(ProjectMember.role).where(ProjectMember.user_id == me.id))
+        ).all()
+        assert len(roles) == 3 and all(r.value == "admin" for r in roles)
+        digests = (
+            await db.scalars(
+                select(Notification.title).where(
+                    Notification.user_id == me.id, Notification.kind == "digest"
+                )
+            )
+        ).all()
+        assert len(digests) == 3 and all(t.startswith("Сводка за неделю:") for t in digests)
+        project = await db.scalar(
+            select(Project).where(Project.name == "Цифровые сервисы колледжа")
+        )
+        d = await build_digest(db, project, kind="week", include_members=True)
+        assert d["bottleneck"] is not None
+        assert d["rhythm"]["members_without_answer"]  # demo staff with skipped check-ins
+
+    # Повторный запуск: без дублей прошлых чек-инов и сводок.
+    async with TestSession() as db:
+        r2 = await seed_review_account(db, email=email)
+    assert r2["past_checkins"] == 0
+    async with TestSession() as db:
+        me = await db.scalar(select(User).where(User.email == email))
+        n = await db.scalar(
+            select(func.count()).select_from(Notification).where(
+                Notification.user_id == me.id, Notification.kind == "digest"
+            )
+        )
+        assert n == 3

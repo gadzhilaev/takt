@@ -48,6 +48,9 @@ CHECKIN_PROJECT = "Цифровые сервисы колледжа"
 BLOCKED_TASK = ("Цифровые сервисы колледжа", "Настроить проектор в актовом зале")
 BLOCKED_BY = "kuznetsov"
 BLOCKED_REASON = "Ждём переходник HDMI от завхоза"
+# Прошлые чек-ины демо-сотрудников (для «участия в ритме» в сводке): дней назад → ответил?
+PAST_CHECKIN_DAYS = 6
+MISSED = {("orlov", 2), ("lebedeva", 4), ("morozov", 5)}
 
 P = TaskPriority
 
@@ -242,7 +245,7 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Провести семинар для молодых преподавателей",
                 "Тема: оценивание практических работ. Материалы разосланы.",
-                P.medium, 3, ("sokolova", "belova"), ME, 14, in_status_days=7,
+                P.medium, 3, ("sokolova", "belova"), ME, 14, in_status_days=3,
             ),
         ),
     ),
@@ -574,6 +577,8 @@ async def seed_review_account(
         "removed_projects": [],
         "blocked_task": None,
         "checkin": None,
+        "past_checkins": 0,
+        "digest": None,
     }
 
     me, report["user_created"] = await _ensure_review_user(db, email, password, name)
@@ -764,7 +769,10 @@ async def seed_review_account(
     project_ids = [p.id for p in projects_by_name.values()]
     await db.execute(
         delete(Notification).where(
-            Notification.user_id == me.id, Notification.project_id.in_(project_ids)
+            Notification.user_id == me.id,
+            Notification.project_id.in_(project_ids),
+            # Сводки не трогаем: они идемпотентны по периоду и не пересоздаются.
+            Notification.kind != "digest",
         )
     )
     for i, (kind, pname, title, actor_key) in enumerate(REVIEW_NOTIFICATIONS):
@@ -792,6 +800,43 @@ async def seed_review_account(
         )
         report["notifications"] += 1
 
+    # Прошлые чек-ины команды (и ревьюера) — чтобы сводка сразу показывала участие в ритме.
+    from app.models.rhythm import CheckinStatus, RhythmCheckin
+    from app.services.rhythm_service import local_today
+
+    for pname, project in projects_by_name.items():
+        today = local_today(project, now)
+        members = {
+            k for t in next(p for p in REVIEW_PROJECTS if p.name == pname).tasks
+            for k in t.assignees
+        }
+        for key in sorted(members):
+            person = people[key]
+            for days_ago in range(1, PAST_CHECKIN_DAYS + 1):
+                day = today - timedelta(days=days_ago)
+                exists = await db.scalar(
+                    select(RhythmCheckin.id).where(
+                        RhythmCheckin.user_id == person.id,
+                        RhythmCheckin.project_id == project.id,
+                        RhythmCheckin.date == day,
+                    )
+                )
+                if exists:
+                    continue
+                missed = (key == ME and days_ago == 3) or (key, days_ago) in MISSED
+                created = datetime.combine(day, time(9, 0), UTC)
+                db.add(
+                    RhythmCheckin(
+                        user_id=person.id,
+                        project_id=project.id,
+                        date=day,
+                        status=(CheckinStatus.skipped if missed else CheckinStatus.answered).value,
+                        created_at=created,
+                        answered_at=None if missed else created + timedelta(minutes=12),
+                    )
+                )
+                report["past_checkins"] += 1
+
     await db.flush()
     # Сегодняшний чек-ин ревьюера — тем же кодом, что «Пройти чек-ин сейчас» (без push).
     from app.services.rhythm_service import start_checkin_now
@@ -804,6 +849,22 @@ async def seed_review_account(
         "status": checkin.status,
         "tasks": len(checkin.items),
     }
+
+    # Сводка за неделю — сразу в уведомлениях ревьюера (без push/email), по каждому проекту.
+    from app.core.config import get_settings
+    from app.services.digest_service import build_digest, deliver_digest, period_window
+
+    settings = get_settings()
+    for project in projects_by_name.values():
+        end_day = period_window(project, "week", now=now).end_day
+        await deliver_digest(
+            db, project, kind="week", end_day=end_day, settings=settings, now=now,
+            push=False, only_user_ids={me.id},
+        )
+    digest = await build_digest(
+        db, projects_by_name[CHECKIN_PROJECT], kind="week", now=now, include_members=True
+    )
+    report["digest"] = digest["summary"]
 
     await db.commit()
     remove_dirs(file_dirs)  # only after a successful commit
