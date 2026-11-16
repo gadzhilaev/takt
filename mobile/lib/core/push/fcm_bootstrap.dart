@@ -9,12 +9,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../firebase_options.dart';
 import '../../features/notifications/data/notifications_repository.dart';
+import 'checkin_push.dart';
 
 /// Background isolate handler — must be top-level.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  debugPrint('FCM background: ${message.messageId} ${message.data}');
+  debugPrint('FCM background: ${message.messageId}');
+  // Android: чек-ин приходит data-сообщением — показываем сами, с кнопками ответа.
+  if (Platform.isAndroid && isCheckinPush(message.data)) {
+    await CheckinPush.show(message.data);
+  }
 }
 
 class FcmBootstrap {
@@ -171,8 +176,14 @@ class FcmBootstrap {
   }
 
   /// Deep-link path from notification data (`url` or project/task ids).
-  static String? routeFromMessage(RemoteMessage message) {
-    final data = message.data;
+  static String? routeFromMessage(RemoteMessage message) => routeFromData(message.data);
+
+  /// Same as [routeFromMessage] for a raw data map (also used by local notifications).
+  static String? routeFromData(Map<String, dynamic> data) {
+    if (data['kind'] == 'rhythm_checkin') {
+      final id = data['checkin_id'];
+      return id is String && id.isNotEmpty ? '/checkin/$id' : '/checkin';
+    }
     final url = data['url'] ?? data['path'];
     if (url is String && url.isNotEmpty) {
       return url.startsWith('/') ? url : '/$url';

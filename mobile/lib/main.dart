@@ -9,6 +9,7 @@ import 'package:home_widget/home_widget.dart';
 import 'app.dart';
 import 'core/api_client.dart';
 import 'core/config.dart';
+import 'core/push/checkin_push.dart';
 import 'core/push/fcm_bootstrap.dart';
 import 'core/token_storage.dart';
 import 'features/notifications/data/notifications_repository.dart';
@@ -21,6 +22,14 @@ Future<void> main() async {
   // Только портрет на телефонах (iOS и Android); Info.plist — тот же набор.
   await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
   await HomeWidget.setAppGroupId(AppConfig.appGroupId);
+  // Адрес API для ответа на чек-ин из уведомления на iOS (AppDelegate.swift читает App Group).
+  await HomeWidget.saveWidgetData<String>('takt_api_base', AppConfig.apiBase);
+  await CheckinPush.init(
+    onOpen: (route) {
+      TaktApp.pendingDeepLink = route;
+      TaktApp.onWidgetDeepLink?.call();
+    },
+  );
 
   final tokens = TokenStorage();
   final api = ApiClient(tokens: tokens);
@@ -38,6 +47,8 @@ Future<void> main() async {
       final route = FcmBootstrap.routeFromMessage(message);
       debugPrint('FCM opened: $route');
       TaktApp.pendingDeepLink = route;
+      // Приложение уже запущено — переходим сразу (чек-ин, задача).
+      TaktApp.onWidgetDeepLink?.call();
     });
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) {

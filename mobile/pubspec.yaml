@@ -51,6 +51,7 @@ dependencies:
   flutter_native_splash: ^2.4.8
   file_picker: ^13.3.2
   open_filex: ^4.7.0
+  flutter_local_notifications: ^22.3.3
 
 dev_dependencies:
   flutter_test:
