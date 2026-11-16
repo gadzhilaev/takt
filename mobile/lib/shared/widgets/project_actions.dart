@@ -11,6 +11,7 @@ import '../models/models.dart';
 import 'app_icon.dart';
 import 'takt_sheet.dart';
 import 'user_avatar.dart';
+import '../../features/rhythm/presentation/rhythm_settings_card.dart';
 
 bool isProjectOwner(Project project, String? userId) {
   if (userId == null) return false;
@@ -103,6 +104,7 @@ Future<void> renameProjectFlow(
     extentOffset: controller.text.length,
   );
   var autoUrgency = project.autoUrgencyFromDue;
+  var rhythm = project.rhythm;
   final ok = await showModalBottomSheet<bool>(
     context: context,
     useRootNavigator: true,
@@ -224,6 +226,13 @@ Future<void> renameProjectFlow(
                       ),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    child: RhythmSettingsCard(
+                      value: rhythm,
+                      onChanged: (v) => setModalState(() => rhythm = v),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -238,7 +247,8 @@ Future<void> renameProjectFlow(
   if (name.isEmpty) return;
   final unchangedName = name == project.name;
   final unchangedFlag = autoUrgency == project.autoUrgencyFromDue;
-  if (unchangedName && unchangedFlag) return;
+  final unchangedRhythm = rhythm == project.rhythm;
+  if (unchangedName && unchangedFlag && unchangedRhythm) return;
   final repo = context.read<ProjectsRepository>();
   final board = context.read<BoardCubit>();
   final messenger = ScaffoldMessenger.of(context);
@@ -247,6 +257,7 @@ Future<void> renameProjectFlow(
       projectId: project.id,
       name: name,
       autoUrgencyFromDue: autoUrgency,
+      rhythm: unchangedRhythm ? null : rhythm,
     );
     await board.refreshProjects(forceLoading: true);
     onChanged?.call();

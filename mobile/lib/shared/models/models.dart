@@ -74,6 +74,7 @@ class Project extends Equatable {
     this.isDemo = false,
     this.isDefault = false,
     this.autoUrgencyFromDue = true,
+    this.rhythm = const RhythmSettings(),
     this.members = const [],
   });
 
@@ -84,6 +85,7 @@ class Project extends Equatable {
   final bool isDemo;
   final bool isDefault;
   final bool autoUrgencyFromDue;
+  final RhythmSettings rhythm;
   final List<ProjectMember> members;
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -94,6 +96,9 @@ class Project extends Equatable {
         isDemo: json['is_demo'] as bool? ?? false,
         isDefault: json['is_default'] as bool? ?? false,
         autoUrgencyFromDue: json['auto_urgency_from_due'] as bool? ?? true,
+        rhythm: json['rhythm'] is Map<String, dynamic>
+            ? RhythmSettings.fromJson(json['rhythm'] as Map<String, dynamic>)
+            : const RhythmSettings(enabled: false),
         members: (json['members'] as List<dynamic>? ?? [])
             .map((e) => ProjectMember.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -107,12 +112,51 @@ class Project extends Equatable {
         'is_demo': isDemo,
         'is_default': isDefault,
         'auto_urgency_from_due': autoUrgencyFromDue,
+        'rhythm': rhythm.toJson(),
         'members': members.map((m) => m.toJson()).toList(),
       };
 
   @override
   List<Object?> get props =>
-      [id, name, description, color, isDemo, isDefault, autoUrgencyFromDue, members];
+      [id, name, description, color, isDemo, isDefault, autoUrgencyFromDue, rhythm, members];
+}
+
+/// Ритм проекта: ежедневный чек-ин (время локальное в [timezone], дни ISO 1–7).
+class RhythmSettings extends Equatable {
+  const RhythmSettings({
+    this.enabled = true,
+    this.time = '10:00',
+    this.timezone = 'Europe/Moscow',
+    this.days = const [1, 2, 3, 4, 5],
+  });
+
+  final bool enabled;
+  final String time;
+  final String timezone;
+  final List<int> days;
+
+  factory RhythmSettings.fromJson(Map<String, dynamic> json) => RhythmSettings(
+        enabled: json['enabled'] as bool? ?? false,
+        time: json['time'] as String? ?? '10:00',
+        timezone: json['timezone'] as String? ?? 'Europe/Moscow',
+        days: (json['days'] as List<dynamic>? ?? const [1, 2, 3, 4, 5])
+            .map((e) => (e as num).toInt())
+            .toList(),
+      );
+
+  Map<String, dynamic> toJson() =>
+      {'enabled': enabled, 'time': time, 'timezone': timezone, 'days': days};
+
+  RhythmSettings copyWith({bool? enabled, String? time, String? timezone, List<int>? days}) =>
+      RhythmSettings(
+        enabled: enabled ?? this.enabled,
+        time: time ?? this.time,
+        timezone: timezone ?? this.timezone,
+        days: days ?? this.days,
+      );
+
+  @override
+  List<Object?> get props => [enabled, time, timezone, days];
 }
 
 class StatusColumn extends Equatable {
@@ -286,6 +330,9 @@ class TaskItem extends Equatable {
     this.authorName,
     this.authorAvatarUrl,
     this.commentCount = 0,
+    this.blockedAt,
+    this.blockedReason,
+    this.blockedByName,
   });
 
   final String id;
@@ -308,7 +355,13 @@ class TaskItem extends Equatable {
   final String? authorAvatarUrl;
   final int commentCount;
 
+  /// «Застряла» — из ответа на чек-ин; снимается при следующем движении задачи.
+  final String? blockedAt;
+  final String? blockedReason;
+  final String? blockedByName;
+
   bool get isDone => closedAt != null;
+  bool get isBlocked => blockedAt != null && !isDone;
 
   /// ISO for time-in-column badge (status enter → updated → created).
   String? get timeInStatusIso => statusEnteredAt ?? updatedAt ?? createdAt;
@@ -340,6 +393,9 @@ class TaskItem extends Equatable {
       attachments: (json['attachments'] as List<dynamic>? ?? [])
           .map((e) => TaskAttachment.fromJson(e as Map<String, dynamic>))
           .toList(),
+      blockedAt: json['blocked_at'] as String?,
+      blockedReason: json['blocked_reason'] as String?,
+      blockedByName: (json['blocked_by'] as Map<String, dynamic>?)?['name'] as String?,
     );
   }
 
@@ -383,7 +439,13 @@ class TaskItem extends Equatable {
         authorName: authorName,
         authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
         commentCount: commentCount,
+        // Перенос в другой столбец снимает «Застряла» (как на сервере).
+        blockedAt: _movedTo(statusId) ? null : blockedAt,
+        blockedReason: _movedTo(statusId) ? null : blockedReason,
+        blockedByName: _movedTo(statusId) ? null : blockedByName,
       );
+
+  bool _movedTo(String? nextStatusId) => nextStatusId != null && nextStatusId != statusId;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -410,6 +472,9 @@ class TaskItem extends Equatable {
                 'avatar_url': authorAvatarUrl,
               },
         'comment_count': commentCount,
+        'blocked_at': blockedAt,
+        'blocked_reason': blockedReason,
+        'blocked_by': blockedByName == null ? null : {'name': blockedByName},
       };
 
   Map<String, dynamic> toWidgetJson() => {
@@ -435,6 +500,8 @@ class TaskItem extends Equatable {
         closedAt,
         statusEnteredAt,
         commentCount,
+        blockedAt,
+        blockedReason,
       ];
 }
 

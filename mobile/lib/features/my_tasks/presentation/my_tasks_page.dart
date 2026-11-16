@@ -9,6 +9,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/widgets/kanban_column.dart';
 import '../../../shared/widgets/kanban_drag_edge_scroll.dart';
 import '../../../shared/widgets/kanban_page_physics.dart';
+import '../../rhythm/presentation/checkin_banner.dart';
 
 /// «Мои задачи» только для открытого проекта (Kanban с назначенными на меня).
 class MyTasksPage extends StatefulWidget {
@@ -145,6 +146,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const CheckinBanner(padding: EdgeInsets.fromLTRB(16, 0, 16, 8)),
               if (userId == null || userId.isEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),

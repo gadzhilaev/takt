@@ -109,6 +109,7 @@ class _NotificationToastHostState extends State<NotificationToastHost> with Widg
             body: body.isEmpty ? null : body,
             taskId: n.taskId,
             projectId: n.projectId,
+            route: n.kind == 'rhythm_checkin' ? '/checkin' : null,
           ),
         );
       }
@@ -158,7 +159,11 @@ class _NotificationToastHostState extends State<NotificationToastHost> with Widg
   void _open(_ToastData t) {
     setState(() => _toasts.removeWhere((x) => x.id == t.id));
     if (t.route != null && t.route!.isNotEmpty) {
-      context.go(t.route!);
+      if (t.route!.startsWith('/checkin') || t.route!.startsWith('/task/')) {
+        context.push(t.route!);
+      } else {
+        context.go(t.route!);
+      }
       return;
     }
     if (t.taskId != null && t.taskId!.isNotEmpty) {

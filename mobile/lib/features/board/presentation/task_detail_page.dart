@@ -17,6 +17,7 @@ import '../../../shared/widgets/task_attachments_section.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../cubit/board_cubit.dart';
 import '../data/board_repository.dart';
+import '../../../shared/widgets/blocked_badge.dart';
 
 class TaskDetailPage extends StatefulWidget {
   const TaskDetailPage({super.key, required this.taskId});
@@ -272,6 +273,15 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                                 child: ColoredBox(
                                                   color: colAccent,
                                                   child: const SizedBox(height: 3, width: double.infinity),
+                                                ),
+                                              ),
+                                            if (task.isBlocked)
+                                              Padding(
+                                                padding: const EdgeInsets.only(bottom: 8),
+                                                child: BlockedNotice(
+                                                  dark: dark,
+                                                  reason: task.blockedReason,
+                                                  byName: task.blockedByName,
                                                 ),
                                               ),
                                             Text.rich(

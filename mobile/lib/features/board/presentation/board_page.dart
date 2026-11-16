@@ -9,6 +9,7 @@ import '../../../shared/widgets/kanban_column.dart';
 import '../../../shared/widgets/kanban_drag_edge_scroll.dart';
 import '../../../shared/widgets/kanban_page_physics.dart';
 import '../cubit/board_cubit.dart';
+import '../../rhythm/presentation/checkin_banner.dart';
 
 class BoardPage extends StatefulWidget {
   const BoardPage({super.key, this.deepTaskId, this.deepProjectId});
@@ -270,11 +271,9 @@ class _BoardPageState extends State<BoardPage> {
           _syncPageController(state.columnIndex, pages);
         }
 
-        return ColoredBox(
-          color: boardBg,
-          child: _pageController == null
-              ? const SizedBox.shrink()
-              : RefreshIndicator(
+        final board = _pageController == null
+            ? const SizedBox.shrink()
+            : RefreshIndicator(
                   notificationPredicate: (n) => n.depth == 0 || n.depth == 1,
                   onRefresh: () => context.read<BoardCubit>().refreshBoard(),
                   child: Builder(
@@ -340,7 +339,16 @@ class _BoardPageState extends State<BoardPage> {
                       );
                     },
                   ),
-                ),
+                );
+        return ColoredBox(
+          color: boardBg,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const CheckinBanner(padding: EdgeInsets.fromLTRB(16, 0, 16, 8)),
+              Expanded(child: board),
+            ],
+          ),
         );
       },
     );

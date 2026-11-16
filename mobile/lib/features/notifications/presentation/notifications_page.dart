@@ -63,7 +63,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
       });
     }
     if (!mounted) return;
-    if (n.taskId != null && n.taskId!.isNotEmpty) {
+    if (n.kind == 'rhythm_checkin') {
+      context.push('/checkin');
+    } else if (n.taskId != null && n.taskId!.isNotEmpty) {
       context.push('/task/${n.taskId}');
     } else if (n.projectId != null && n.projectId!.isNotEmpty) {
       context.go('/board?project=${n.projectId}');

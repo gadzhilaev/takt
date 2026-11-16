@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../project_visibility.dart';
 import 'app_icon.dart';
 import 'project_actions.dart';
+import '../../features/rhythm/presentation/checkin_banner.dart';
 
 /// Project list: tap opens board; ⋮ opens actions (members / rename / delete|leave).
 class ProjectHub extends StatefulWidget {
@@ -40,6 +41,7 @@ class _ProjectHubState extends State<ProjectHub> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const CheckinBanner(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
           child: Row(

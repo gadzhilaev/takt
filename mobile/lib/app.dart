@@ -13,6 +13,7 @@ import 'core/theme.dart';
 import 'core/theme_controller.dart';
 import 'core/theme_scope.dart';
 import 'core/token_storage.dart';
+import 'features/rhythm/data/rhythm_repository.dart';
 import 'features/auth/cubit/auth_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/data/oauth_repository.dart';
@@ -56,6 +57,7 @@ class _TaktAppState extends State<TaktApp> {
   late final AuthCubit _authCubit;
   late final BoardCubit _boardCubit;
   late final NotificationsRepository _notifications;
+  late final RhythmRepository _rhythm;
   late final ThemeController _themeController;
   late final GoRouter _router;
   late final BoardRealtime _boardRealtime;
@@ -70,6 +72,7 @@ class _TaktAppState extends State<TaktApp> {
     _board = BoardRepository(widget.api);
     _oauth = OAuthRepository(widget.api);
     _notifications = NotificationsRepository(widget.api);
+    _rhythm = RhythmRepository(widget.api);
     _authCubit = AuthCubit(
       auth: _authRepo,
       api: widget.api,
@@ -132,6 +135,7 @@ class _TaktAppState extends State<TaktApp> {
         RepositoryProvider.value(value: _board),
         RepositoryProvider.value(value: _oauth),
         RepositoryProvider.value(value: _notifications),
+        RepositoryProvider.value(value: _rhythm),
         RepositoryProvider.value(value: ProfileRepository(widget.api)),
         RepositoryProvider.value(value: _widgetSync),
         RepositoryProvider.value(value: widget.fcm),

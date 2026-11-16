@@ -16,6 +16,7 @@ import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/projects/presentation/project_members_page.dart';
 import '../features/projects/presentation/projects_welcome_page.dart';
+import '../features/rhythm/presentation/checkin_page.dart';
 import '../features/shell/app_shell.dart';
 import '../features/shell/sliding_branch_stack.dart';
 import '../features/widget_sync/widget_sync.dart';
@@ -171,6 +172,22 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
         pageBuilder: (_, state) => CupertinoPage<void>(
           key: state.pageKey,
           child: const NotificationsPage(),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/checkin',
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: const CheckinPage(),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/checkin/:checkinId',
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: CheckinPage(checkinId: state.pathParameters['checkinId']),
         ),
       ),
       GoRoute(

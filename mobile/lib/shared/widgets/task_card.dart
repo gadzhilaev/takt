@@ -10,6 +10,7 @@ import '../../shared/widgets/app_icon.dart';
 import '../models/models.dart';
 import 'urgency_badge.dart';
 import 'user_avatar.dart';
+import 'blocked_badge.dart';
 
 class TaktTaskCard extends StatelessWidget {
   const TaktTaskCard({
@@ -87,10 +88,26 @@ class TaktTaskCard extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           UrgencyBadge(priority: task.priority),
+                          if (task.isBlocked && !done) BlockedChip(dark: dark),
                           _TaskDueChip(task: task, isDone: done, dark: dark),
                           _TaskTimeChip(task: task, isDone: done, dark: dark),
                         ],
                       ),
+                      if (task.isBlocked && !done && (task.blockedReason ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.only(left: 6),
+                          decoration: BoxDecoration(
+                            border: Border(left: BorderSide(color: blockedColor(dark), width: 2)),
+                          ),
+                          child: Text(
+                            task.blockedReason!.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: taktDescStyle(dark: dark, done: false),
+                          ),
+                        ),
+                      ],
                       if (hasDesc) ...[
                         const SizedBox(height: 4),
                         Text(

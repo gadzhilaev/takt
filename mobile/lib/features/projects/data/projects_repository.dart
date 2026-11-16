@@ -35,10 +35,17 @@ class ProjectsRepository {
     required String projectId,
     required String name,
     bool? autoUrgencyFromDue,
+    RhythmSettings? rhythm,
   }) async {
     final data = <String, dynamic>{'name': name.trim()};
     if (autoUrgencyFromDue != null) {
       data['auto_urgency_from_due'] = autoUrgencyFromDue;
+    }
+    if (rhythm != null) {
+      data['rhythm_enabled'] = rhythm.enabled;
+      data['rhythm_time'] = rhythm.time;
+      data['rhythm_timezone'] = rhythm.timezone;
+      data['rhythm_days'] = rhythm.days;
     }
     final res = await _api.dio.patch<Map<String, dynamic>>(
       '/api/v1/projects/$projectId',
