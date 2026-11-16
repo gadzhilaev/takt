@@ -30,6 +30,7 @@ from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.task import ActivityLog, Attachment, Comment, Task, TaskAssignee, TaskPriority
 from app.models.team import TaskStatus
 from app.models.user import User, UserRole
+from app.services.account_service import exit_projects, plan_project_exits
 from app.services.attachment_service import attachments_dir
 from app.services.project_service import DEFAULT_STATUS_TEMPLATE
 from app.services.ru_names import format_assignment_line, format_completed_line
@@ -422,6 +423,48 @@ async def _ensure_member(
         m.role = role
 
 
+async def _exit_foreign_projects(db: AsyncSession, me: User) -> list[dict]:
+    """Leave every project outside the seed set (App Review must see only seed data).
+
+    Same rules as account deletion: no real teammates → project is deleted;
+    sole admin with real teammates → admin goes to the earliest real member; else leave.
+    """
+    seed_names = {p.name for p in REVIEW_PROJECTS}
+    admin_of = set(
+        (
+            await db.scalars(
+                select(ProjectMember.project_id).where(
+                    ProjectMember.user_id == me.id,
+                    ProjectMember.role == ProjectMemberRole.admin,
+                )
+            )
+        ).all()
+    )
+    plans = [
+        p
+        for p in await plan_project_exits(db, me)
+        if not (p["name"] in seed_names and uuid.UUID(p["id"]) in admin_of)
+    ]
+    if not plans:
+        return []
+    await exit_projects(
+        db,
+        me,
+        plans,
+        notify_reason="Прежний администратор вышел из проекта, права перешли к вам.",
+    )
+    left_ids = [uuid.UUID(p["id"]) for p in plans if p["action"] != "delete"]
+    if left_ids:
+        task_ids = select(Task.id).where(Task.project_id.in_(left_ids))
+        await db.execute(
+            delete(TaskAssignee).where(
+                TaskAssignee.user_id == me.id, TaskAssignee.task_id.in_(task_ids)
+            )
+        )
+    await db.flush()
+    return [{"name": p["name"], "action": p["action"]} for p in plans]
+
+
 def _log(task_id, user_id, action, at, field=None, old=None, new=None) -> ActivityLog:
     return ActivityLog(
         task_id=task_id,
@@ -452,9 +495,11 @@ async def seed_review_account(
         "comments": 0,
         "attachments": 0,
         "notifications": 0,
+        "removed_projects": [],
     }
 
     me, report["user_created"] = await _ensure_review_user(db, email, password, name)
+    report["removed_projects"] = await _exit_foreign_projects(db, me)
     staff = await _ensure_staff(db)
     people: dict[str, User] = {ME: me, **staff}
 

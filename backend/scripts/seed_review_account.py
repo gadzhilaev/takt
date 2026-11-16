@@ -53,6 +53,8 @@ async def main() -> int:
         report = await seed_review_account(db, email=a.email, password=a.password, name=a.name)
     print("Review account seed OK")
     print(f"  user_created: {report['user_created']}")
+    for p in report["removed_projects"]:
+        print(f"  removed from: {p['name']} ({p['action']})")
     for p in report["projects"]:
         print(f"  project: {p['name']} ({p['id']})")
     for key in ("tasks_created", "tasks_updated", "comments", "attachments", "notifications"):

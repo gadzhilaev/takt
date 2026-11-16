@@ -121,3 +121,62 @@ async def test_seed_requires_password_for_new_account():
     async with TestSession() as db:
         with pytest.raises(RuntimeError):
             await seed_review_account(db, email="nobody@example.com")
+
+
+@pytest.mark.asyncio
+async def test_seed_removes_reviewer_from_foreign_projects(client: AsyncClient):
+    """Старый проект «Проверка магазина» исчезает; из общего проекта ревьюер выходит."""
+    from app.core.security import hash_password
+    from app.models.project import ProjectMemberRole
+
+    email = "reviewer-old@example.com"
+    async with TestSession() as db:
+        me = User(email=email, name="Ревьюер", password_hash=hash_password("x" * 12))
+        colleague = User(email="real-colleague@example.com", name="Коллега Реальный",
+                         password_hash=hash_password("y" * 12))
+        db.add_all([me, colleague])
+        await db.flush()
+        solo = Project(name="Проверка магазина", is_demo=False)
+        shared = Project(name="Чужой рабочий проект", is_demo=False)
+        db.add_all([solo, shared])
+        await db.flush()
+        db.add_all([
+            ProjectMember(project_id=solo.id, user_id=me.id, role=ProjectMemberRole.admin),
+            ProjectMember(project_id=shared.id, user_id=me.id, role=ProjectMemberRole.admin),
+            ProjectMember(project_id=shared.id, user_id=colleague.id,
+                          role=ProjectMemberRole.member),
+        ])
+        await db.commit()
+        solo_id, shared_id, colleague_id = solo.id, shared.id, colleague.id
+
+    async with TestSession() as db:
+        report = await seed_review_account(db, email=email)
+    assert {r["name"]: r["action"] for r in report["removed_projects"]} == {
+        "Проверка магазина": "delete",
+        "Чужой рабочий проект": "transfer",
+    }
+
+    async with TestSession() as db:
+        me = await db.scalar(select(User).where(User.email == email))
+        assert await db.get(Project, solo_id) is None
+        assert await db.get(Project, shared_id) is not None
+        names = set(
+            (
+                await db.scalars(
+                    select(Project.name).join(ProjectMember)
+                    .where(ProjectMember.user_id == me.id)
+                )
+            ).all()
+        )
+        assert names == {p.name for p in REVIEW_PROJECTS}
+        heir_role = await db.scalar(
+            select(ProjectMember.role).where(
+                ProjectMember.project_id == shared_id, ProjectMember.user_id == colleague_id
+            )
+        )
+        assert heir_role == ProjectMemberRole.admin
+
+    # Повторный запуск ничего больше не трогает.
+    async with TestSession() as db:
+        again = await seed_review_account(db, email=email)
+    assert again["removed_projects"] == []
