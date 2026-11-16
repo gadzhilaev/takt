@@ -19,6 +19,7 @@ from app.services.account_service import (
     delete_own_account,
     plan_account_deletion,
 )
+from app.services.attachment_service import remove_dirs
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -162,6 +163,8 @@ async def delete_me(
     try:
         result = await delete_own_account(db, user)
         await db.commit()
+        # Files only after a successful commit — a failed commit leaves them intact.
+        remove_dirs(result["file_dirs"])
     except AccountError as e:
         await db.rollback()
         detail: dict = {"error": {"code": e.code, "message": e.message}}

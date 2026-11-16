@@ -157,19 +157,22 @@ async def create_project(
     return await get_project(db, project.id)  # type: ignore[return-value]
 
 
-async def delete_project(db: AsyncSession, *, project_id: uuid.UUID, actor: User) -> None:
-    """Hard-delete project and cascaded tasks/columns. Admin only; not default inbox."""
+async def delete_project(db: AsyncSession, *, project_id: uuid.UUID, actor: User) -> list:
+    """Hard-delete project and cascaded tasks/columns. Admin only; not default inbox.
+
+    Returns attachment folders to remove **after** the caller commits.
+    """
     await ensure_project_access(db, actor, project_id, min_role=ProjectMemberRole.admin)
     project = await get_project(db, project_id)
     if not project:
         raise LookupError("not_found")
     if project.is_default:
         raise PermissionError("default_project")
-    from app.services.attachment_service import project_attachment_dirs, remove_dirs
+    from app.services.attachment_service import project_attachment_dirs
 
     file_dirs = await project_attachment_dirs(db, project_id)
     await db.execute(delete(Project).where(Project.id == project_id))
-    remove_dirs(file_dirs)
+    return file_dirs
 
 
 async def project_progress(db: AsyncSession, project_id: uuid.UUID) -> dict:

@@ -30,7 +30,7 @@ from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.push_subscription import PushSubscription
 from app.models.task import TaskAssignee
 from app.models.user import PlatformRole, User
-from app.services.attachment_service import project_attachment_dirs, remove_dirs
+from app.services.attachment_service import project_attachment_dirs
 from app.services.auth_service import revoke_all_user_tokens
 from app.services.notify_service import create_in_app
 
@@ -166,8 +166,12 @@ async def exit_projects(
     plans: list[dict],
     *,
     notify_reason: str = "Прежний администратор удалил аккаунт, права перешли к вам.",
-) -> None:
-    """Apply plans from ``plan_project_exits``: transfer admin, delete or leave projects."""
+) -> list[Path]:
+    """Apply plans from ``plan_project_exits``: transfer admin, delete or leave projects.
+
+    Returns attachment folders of deleted projects. The caller removes them with
+    ``attachment_service.remove_dirs`` **only after a successful commit**.
+    """
     for p in plans:
         if p["action"] != ACTION_TRANSFER:
             continue
@@ -189,14 +193,13 @@ async def exit_projects(
         )
 
     # Hard-delete projects with no one left (only member / demo-only teammates).
-    # Files of deleted projects' tasks are removed from disk as well.
-    file_dirs = []
+    # Folders of deleted projects' files: removed by the caller after commit.
+    file_dirs: list[Path] = []
     for p in plans:
         if p["action"] == ACTION_DELETE:
             project_id = uuid.UUID(p["id"])
             file_dirs += await project_attachment_dirs(db, project_id)
             await db.execute(delete(Project).where(Project.id == project_id))
-    remove_dirs(file_dirs)
 
     leave_ids = [uuid.UUID(p["id"]) for p in plans if p["action"] != ACTION_DELETE]
     if leave_ids:
@@ -206,6 +209,7 @@ async def exit_projects(
                 ProjectMember.project_id.in_(leave_ids),
             )
         )
+    return file_dirs
 
 
 async def delete_own_account(db: AsyncSession, user: User) -> dict:
@@ -213,7 +217,7 @@ async def delete_own_account(db: AsyncSession, user: User) -> dict:
     await _ensure_not_last_super_admin(db, user)
 
     plans = await plan_project_exits(db, user)
-    await exit_projects(db, user, plans)
+    file_dirs = await exit_projects(db, user, plans)
     await db.execute(delete(TaskAssignee).where(TaskAssignee.user_id == user.id))
 
     # Cancel pending invites created by this user; drop memberships leftovers.
@@ -251,4 +255,5 @@ async def delete_own_account(db: AsyncSession, user: User) -> dict:
     user.last_login_at = None
 
     await db.flush()
-    return {"projects": plans}
+    # file_dirs: remove after commit (see attachment_service.remove_dirs).
+    return {"projects": plans, "file_dirs": file_dirs}

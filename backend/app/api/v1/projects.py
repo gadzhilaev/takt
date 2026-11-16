@@ -12,6 +12,7 @@ from app.models.project import ProjectMember, ProjectMemberRole
 from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectMemberUpdate, ProjectOut, ProjectUpdate
 from app.services import leave_request_service, project_service
+from app.services.attachment_service import remove_dirs
 from app.services.leave_request_service import LeaveRequestError
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -173,7 +174,7 @@ async def delete_project(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     try:
-        await project_service.delete_project(db, project_id=project_id, actor=user)
+        file_dirs = await project_service.delete_project(db, project_id=project_id, actor=user)
     except PermissionError as e:
         code = str(e) if str(e) in {"default_project", "forbidden"} else "forbidden"
         messages = {
@@ -190,6 +191,8 @@ async def delete_project(
             detail={"error": {"code": "not_found", "message": "Проект не найден"}},
         )
     await db.commit()
+    # Files only after a successful commit — a failed commit leaves them intact.
+    remove_dirs(file_dirs)
     return {"ok": True}
 
 

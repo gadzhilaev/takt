@@ -231,3 +231,60 @@ async def test_review_account_can_be_deleted_after_seed(client: AsyncClient):
         )
         assert left == 0
     assert not any(f.exists() for f in files), "файлы удалённых проектов остались на диске"
+
+
+@pytest.mark.asyncio
+async def test_files_survive_rollback_and_go_after_commit(client: AsyncClient):
+    """Файлы вложений удаляются только после успешного commit."""
+    from sqlalchemy import select
+
+    from app.models.project import Project
+    from app.models.task import Attachment, Task
+    from app.models.user import User
+    from app.services import project_service
+    from app.services.account_service import delete_own_account
+    from app.services.attachment_service import attachment_path
+    from app.services.review_account_seed import seed_review_account
+
+    email, password = "reviewer-rollback@example.com", "Review-Pass-123!"
+    async with TestSession() as db:
+        report = await seed_review_account(db, email=email, password=password)
+    async with TestSession() as db:
+        files = [attachment_path(a) for a in (await db.scalars(select(Attachment))).all()]
+    assert files and all(f.exists() for f in files)
+
+    # Удаление аккаунта: сервис только возвращает папки; откат — файлы на месте.
+    async with TestSession() as db:
+        me = await db.scalar(select(User).where(User.email == email))
+        result = await delete_own_account(db, me)
+        assert result["file_dirs"]
+        await db.rollback()
+    assert all(f.exists() for f in files)
+
+    # Удаление проекта: то же самое при откате.
+    project_id = uuid.UUID(report["projects"][0]["id"])
+    async with TestSession() as db:
+        me = await db.scalar(select(User).where(User.email == email))
+        dirs = await project_service.delete_project(db, project_id=project_id, actor=me)
+        assert dirs
+        await db.rollback()  # роутер удаляет папки только после commit
+    assert all(f.exists() for f in files)
+    async with TestSession() as db:
+        assert await db.get(Project, project_id) is not None
+
+    # Через API (commit успешен) — файлы проекта удаляются.
+    login = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert login.status_code == 200, login.text
+    async with TestSession() as db:
+        project_files = [
+            attachment_path(a)
+            for a in (await db.scalars(
+                select(Attachment).join(Attachment.task).where(
+                    Task.project_id == project_id
+                )
+            )).all()
+        ]
+    assert project_files
+    r = await client.delete(f"/api/v1/projects/{project_id}")
+    assert r.status_code == 200, r.text
+    assert not any(f.exists() for f in project_files)
