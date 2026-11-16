@@ -165,7 +165,11 @@ async def delete_project(db: AsyncSession, *, project_id: uuid.UUID, actor: User
         raise LookupError("not_found")
     if project.is_default:
         raise PermissionError("default_project")
+    from app.services.attachment_service import project_attachment_dirs, remove_dirs
+
+    file_dirs = await project_attachment_dirs(db, project_id)
     await db.execute(delete(Project).where(Project.id == project_id))
+    remove_dirs(file_dirs)
 
 
 async def project_progress(db: AsyncSession, project_id: uuid.UUID) -> dict:
