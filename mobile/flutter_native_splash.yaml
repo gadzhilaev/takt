@@ -7,7 +7,8 @@ flutter_native_splash:
   android: true
   ios: true
   web: false
-  fullscreen: true
+  # Статус-бар должен быть виден в приложении (App Review): не скрываем его.
+  fullscreen: false
   android_12:
     color: "#E4EEF1"
     color_dark: "#152028"
