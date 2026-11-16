@@ -14,7 +14,11 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import UserPublic
 from app.schemas.user import ProfileUpdate
-from app.services.account_service import AccountError, delete_own_account
+from app.services.account_service import (
+    AccountError,
+    delete_own_account,
+    plan_account_deletion,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -139,6 +143,15 @@ async def delete_avatar(
     return {"avatar_url": None}
 
 
+@router.get("/me/delete-preview")
+async def delete_me_preview(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Что произойдёт с проектами при удалении аккаунта (для экрана подтверждения)."""
+    return await plan_account_deletion(db, user)
+
+
 @router.delete("/me", dependencies=[Depends(verify_csrf)])
 async def delete_me(
     response: Response,
@@ -147,7 +160,7 @@ async def delete_me(
 ):
     """Self-service account deletion / de-identification for store compliance."""
     try:
-        await delete_own_account(db, user)
+        result = await delete_own_account(db, user)
         await db.commit()
     except AccountError as e:
         await db.rollback()
@@ -163,4 +176,4 @@ async def delete_me(
     response.delete_cookie(ACCESS_COOKIE, **cookie_opts)
     response.delete_cookie(REFRESH_COOKIE, **cookie_opts)
     response.delete_cookie(CSRF_COOKIE, **cookie_opts)
-    return {"ok": True, "message": "Аккаунт удалён"}
+    return {"ok": True, "message": "Аккаунт удалён", "projects": result["projects"]}

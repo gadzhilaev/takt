@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
 import uuid
 from pathlib import Path
 
@@ -73,6 +74,18 @@ def attachments_dir(task_id: uuid.UUID) -> Path:
 
 def attachment_path(att: Attachment) -> Path:
     return attachments_dir(att.task_id) / att.stored_name
+
+
+async def project_attachment_dirs(db: AsyncSession, project_id: uuid.UUID) -> list[Path]:
+    """Folders with attachment files of a project's tasks (collect before hard delete)."""
+    base = Path(get_settings().UPLOAD_DIR) / "attachments"
+    task_ids = (await db.scalars(select(Task.id).where(Task.project_id == project_id))).all()
+    return [base / str(tid) for tid in task_ids]
+
+
+def remove_dirs(paths: list[Path]) -> None:
+    for path in paths:
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def preview_path(att: Attachment) -> Path | None:
