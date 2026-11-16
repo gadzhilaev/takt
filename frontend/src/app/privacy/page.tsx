@@ -95,6 +95,10 @@ export default function PrivacyPage() {
               случаями, когда это требует закон.
             </p>
             <p>
+              Для доставки push-уведомлений push-токен устройства передаётся Google (Firebase Cloud
+              Messaging) и Apple (Apple Push Notification service).
+            </p>
+            <p>
               При входе через Apple, VK или Яндекс соответствующие провайдеры обрабатывают данные
               по своим политикам. Takt получает только то, что нужно для входа и профиля:
               идентификатор, email и имя.
