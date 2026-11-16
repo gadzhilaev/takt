@@ -376,7 +376,8 @@ async def notify_checkin(
         actor_id=None,
         kind=KIND_CHECKIN,
         title=title,
-        body=f"{body}\nПроект {project.name}" if n == 1 else body,
+        # Клиенты сами добавляют строку «Проект …» — без повтора названия.
+        body=body if n == 1 else f"{n} {_tasks_word(n)}",
         task_id=items[0][1].id if n == 1 else None,
         project_id=project.id,
     )
