@@ -25,6 +25,7 @@ os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="takt-test-uploads-")
 # Background due-reminder loop must not run during tests.
 os.environ["DUE_REMINDER_ENABLED"] = "false"
 os.environ["RHYTHM_ENABLED"] = "false"
+os.environ["DIGEST_ENABLED"] = "false"
 
 from app.core.config import get_settings
 

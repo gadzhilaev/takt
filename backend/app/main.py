@@ -18,6 +18,7 @@ from app.core.config import get_settings
 from app.core.limiter import limiter
 from app.db.session import AsyncSessionLocal
 from app.services.bootstrap import bootstrap_db
+from app.services.digest_service import digest_loop
 from app.services.due_reminder_service import due_reminder_loop
 from app.services.rhythm_service import rhythm_loop
 
@@ -85,11 +86,14 @@ async def lifespan(app: FastAPI):
     rhythm_task: asyncio.Task | None = None
     if settings.RHYTHM_ENABLED and settings.RHYTHM_INTERVAL_SECONDS > 0:
         rhythm_task = asyncio.create_task(rhythm_loop(stop))
+    digest_task: asyncio.Task | None = None
+    if settings.DIGEST_ENABLED and settings.DIGEST_INTERVAL_SECONDS > 0:
+        digest_task = asyncio.create_task(digest_loop(stop))
     try:
         yield
     finally:
         stop.set()
-        for task in (reminder_task, rhythm_task):
+        for task in (reminder_task, rhythm_task, digest_task):
             if task is None:
                 continue
             task.cancel()

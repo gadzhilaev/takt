@@ -47,6 +47,10 @@ class Project(Base, TimestampMixin):
     rhythm_days: Mapped[list[int]] = mapped_column(
         ARRAY(Integer), default=lambda: [1, 2, 3, 4, 5], nullable=False
     )
+    # Digest («Сводка»): daily at digest_time, weekly on Friday at digest_time (project tz).
+    digest_daily: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    digest_weekly: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    digest_time: Mapped[time] = mapped_column(Time, default=time(18, 0), nullable=False)
 
     members: Mapped[list["ProjectMember"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
@@ -67,5 +71,7 @@ class ProjectMember(Base, TimestampMixin):
     role: Mapped[ProjectMemberRole] = mapped_column(
         Enum(ProjectMemberRole), default=ProjectMemberRole.member, nullable=False
     )
+    # Non-admins may subscribe to the project digest; admins always receive it.
+    digest_subscribed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     project: Mapped[Project] = relationship(back_populates="members")

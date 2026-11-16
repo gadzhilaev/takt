@@ -21,6 +21,12 @@ class RhythmSettingsOut(BaseModel):
     days: list[int]  # ISO weekdays 1..7
 
 
+class DigestSettingsOut(BaseModel):
+    daily: bool
+    weekly: bool  # Friday
+    time: str  # HH:MM, project timezone
+
+
 class ProjectOut(BaseModel):
     id: str
     name: str
@@ -32,6 +38,7 @@ class ProjectOut(BaseModel):
     is_demo: bool = False
     auto_urgency_from_due: bool = True
     rhythm: RhythmSettingsOut | None = None
+    digest: DigestSettingsOut | None = None
     created_at: datetime
     updated_at: datetime
     members: list[ProjectMemberOut] = []
@@ -58,6 +65,9 @@ class ProjectUpdate(BaseModel):
     rhythm_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     rhythm_timezone: str | None = Field(default=None, max_length=64)
     rhythm_days: list[int] | None = None
+    digest_daily: bool | None = None
+    digest_weekly: bool | None = None
+    digest_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
 
     @field_validator("rhythm_days")
     @classmethod

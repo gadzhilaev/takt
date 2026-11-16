@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models.project import ProjectMember, ProjectMemberRole
 from app.models.user import User
 from app.schemas.project import (
+    DigestSettingsOut,
     ProjectCreate,
     ProjectMemberUpdate,
     ProjectOut,
@@ -51,6 +52,13 @@ def _project_out(project, members_users: dict[uuid.UUID, User], progress: dict |
         is_demo=bool(getattr(project, "is_demo", False)),
         auto_urgency_from_due=bool(getattr(project, "auto_urgency_from_due", True)),
         rhythm=_rhythm_out(project),
+        digest=DigestSettingsOut(
+            daily=bool(getattr(project, "digest_daily", False)),
+            weekly=bool(getattr(project, "digest_weekly", True)),
+            time=project.digest_time.strftime("%H:%M")
+            if getattr(project, "digest_time", None)
+            else "18:00",
+        ),
         created_at=project.created_at,
         updated_at=project.updated_at,
         members=members,
@@ -197,6 +205,13 @@ async def update_project(
         project.rhythm_timezone = body.rhythm_timezone
     if body.rhythm_days is not None:
         project.rhythm_days = body.rhythm_days
+    if body.digest_daily is not None:
+        project.digest_daily = body.digest_daily
+    if body.digest_weekly is not None:
+        project.digest_weekly = body.digest_weekly
+    if body.digest_time is not None:
+        hh, mm = body.digest_time.split(":")
+        project.digest_time = dt_time(int(hh), int(mm))
     await db.commit()
     project = await project_service.get_project(db, project_id)
     umap = await _users_map(db, [m.user_id for m in project.members])  # type: ignore[union-attr]

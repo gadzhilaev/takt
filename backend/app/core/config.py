@@ -117,6 +117,12 @@ class Settings(BaseSettings):
     RHYTHM_WINDOW_HOURS: int = 3
     RHYTHM_MAX_TASKS: int = 5
 
+    # Digest («Сводка»): in-app + push always; email only with DIGEST_EMAIL_ENABLED.
+    DIGEST_ENABLED: bool = True
+    DIGEST_INTERVAL_SECONDS: int = 300
+    DIGEST_WINDOW_HOURS: int = 3
+    DIGEST_EMAIL_ENABLED: bool = False
+
     # Logging level for app.* loggers (background loop passes are logged at INFO).
     APP_LOG_LEVEL: str = "INFO"
 

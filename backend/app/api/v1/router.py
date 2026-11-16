@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     admin,
     auth,
+    digest,
     files,
     invites,
     notifications,
@@ -30,3 +31,4 @@ api_router.include_router(reports.router)
 api_router.include_router(files.router)
 api_router.include_router(notifications.router)
 api_router.include_router(rhythm.router)
+api_router.include_router(digest.router)

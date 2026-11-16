@@ -1,5 +1,6 @@
 from app.models.auth import RefreshToken
 from app.models.device_push_token import DevicePushToken
+from app.models.digest import DigestDelivery
 from app.models.email_code import EmailCode, EmailCodePurpose
 from app.models.invite import ProjectInvite, ProjectInviteStatus
 from app.models.leave_request import ProjectLeaveRequest, ProjectLeaveRequestStatus
@@ -80,4 +81,5 @@ __all__ = [
     "RhythmCheckinItem",
     "CheckinStatus",
     "CheckinAnswer",
+    "DigestDelivery",
 ]

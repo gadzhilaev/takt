@@ -222,3 +222,19 @@ async def send_otp_email(*, to: str, code: str, purpose: str) -> str | None:
         text_body=text_body,
         html_body=html_body,
     )
+
+
+async def send_html_email(*, to: str, subject: str, text_body: str, html_body: str) -> str | None:
+    """Generic HTML email (digests etc.) via the same transport as OTP. None in dry-run."""
+    settings = get_settings()
+    destination = (to or "").strip().lower()
+    if not destination:
+        raise EmailDeliveryError("Пустой адрес получателя")
+    if not is_email_configured():
+        logger.info("Email dry-run: to=%s subject=%s", mask_email(destination), subject)
+        return None
+    if settings.SMTP_BZ_API_KEY.strip():
+        return await _send_via_smtp_bz_api(
+            to=destination, subject=subject, html_body=html_body, text_body=text_body
+        )
+    return _send_via_smtp(to=destination, subject=subject, text_body=text_body, html_body=html_body)
