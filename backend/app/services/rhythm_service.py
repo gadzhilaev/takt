@@ -191,44 +191,157 @@ async def generate_project_checkins(
     for user_id in members:
         if user_id in existing:
             continue
-        tasks = await open_tasks_for(
-            db, project.id, user_id, now=now, limit=max(1, settings.RHYTHM_MAX_TASKS)
+        created = await create_user_checkin(
+            db, project, user_id, day=day, now=now, settings=settings
         )
-        if not tasks:
+        if created is None:
             continue
-        token = secrets.token_urlsafe(24)
-        checkin = RhythmCheckin(
-            user_id=user_id,
-            project_id=project.id,
-            date=day,
-            status=CheckinStatus.pending.value,
-            created_at=now,
-            push_token_hash=_hash_token(token),
-        )
-        try:
-            async with db.begin_nested():  # unique (user, project, date) guards restarts/races
-                db.add(checkin)
-                await db.flush()
-                for pos, task in enumerate(tasks):
-                    db.add(RhythmCheckinItem(checkin_id=checkin.id, task_id=task.id, position=pos))
-                await db.flush()
-        except IntegrityError:
-            continue
-        # Older unanswered check-ins of this person in this project are no longer actionable.
-        skipped = await db.execute(
-            update(RhythmCheckin)
-            .where(
-                RhythmCheckin.user_id == user_id,
-                RhythmCheckin.project_id == project.id,
-                RhythmCheckin.date < day,
-                RhythmCheckin.status == CheckinStatus.pending.value,
-            )
-            .values(status=CheckinStatus.skipped.value)
-        )
-        result.skipped_old += skipped.rowcount or 0
+        checkin, token, skipped = created
+        result.skipped_old += skipped
         result.created += 1
         result.tokens[checkin.id] = token
     return result
+
+
+async def create_user_checkin(
+    db: AsyncSession,
+    project: Project,
+    user_id: uuid.UUID,
+    *,
+    day: date,
+    now: datetime,
+    settings: Settings,
+) -> tuple[RhythmCheckin, str, int] | None:
+    """Create one person's check-in for ``day`` (same picking for the loop and manual start).
+
+    Returns (checkin, raw push token, older pending marked skipped) or None when the person
+    has no open tasks or the check-in already exists (unique user+project+date).
+    Caller commits.
+    """
+    tasks = await open_tasks_for(
+        db, project.id, user_id, now=now, limit=max(1, settings.RHYTHM_MAX_TASKS)
+    )
+    if not tasks:
+        return None
+    token = secrets.token_urlsafe(24)
+    checkin = RhythmCheckin(
+        user_id=user_id,
+        project_id=project.id,
+        date=day,
+        status=CheckinStatus.pending.value,
+        created_at=now,
+        push_token_hash=_hash_token(token),
+    )
+    try:
+        async with db.begin_nested():  # unique (user, project, date) guards restarts/races
+            db.add(checkin)
+            await db.flush()
+            for pos, task in enumerate(tasks):
+                db.add(RhythmCheckinItem(checkin_id=checkin.id, task_id=task.id, position=pos))
+            await db.flush()
+    except IntegrityError:
+        return None
+    # Older unanswered check-ins of this person in this project are no longer actionable.
+    skipped = await db.execute(
+        update(RhythmCheckin)
+        .where(
+            RhythmCheckin.user_id == user_id,
+            RhythmCheckin.project_id == project.id,
+            RhythmCheckin.date < day,
+            RhythmCheckin.status == CheckinStatus.pending.value,
+        )
+        .values(status=CheckinStatus.skipped.value)
+    )
+    return checkin, token, skipped.rowcount or 0
+
+
+async def start_checkin_now(
+    db: AsyncSession,
+    *,
+    user: User,
+    project_id: uuid.UUID,
+    settings: Settings | None = None,
+    now: datetime | None = None,
+) -> RhythmCheckin:
+    """Manual «Пройти чек-ин сейчас»: today's check-in without push (existing one is returned).
+
+    Access: member/admin of a project with rhythm enabled. Caller commits.
+    """
+    settings = settings or get_settings()
+    now = now or datetime.now(UTC)
+    role = await db.scalar(
+        select(ProjectMember.role).where(
+            ProjectMember.project_id == project_id, ProjectMember.user_id == user.id
+        )
+    )
+    if role not in (ProjectMemberRole.admin, ProjectMemberRole.member):
+        raise RhythmError("forbidden", "Нет доступа к проекту", 403)
+    project = await db.get(Project, project_id)
+    if project is None or project.is_archived:
+        raise RhythmError("not_found", "Проект не найден", 404)
+    if not project.rhythm_enabled:
+        raise RhythmError("rhythm_off", "Ритм в этом проекте выключен", 409)
+    day = local_today(project, now)
+
+    async def existing() -> RhythmCheckin | None:
+        return await db.scalar(
+            select(RhythmCheckin)
+            .options(selectinload(RhythmCheckin.items))
+            .where(
+                RhythmCheckin.user_id == user.id,
+                RhythmCheckin.project_id == project_id,
+                RhythmCheckin.date == day,
+            )
+        )
+
+    found = await existing()
+    if found is not None:
+        return found
+    created = await create_user_checkin(
+        db, project, user.id, day=day, now=now, settings=settings
+    )
+    if created is None:
+        found = await existing()  # lost a race with the loop — reuse it
+        if found is not None:
+            return found
+        raise RhythmError("no_open_tasks", "Открытых задач нет — отвечать не на что", 409)
+    await db.flush()
+    return await existing()  # type: ignore[return-value]
+
+
+async def startable_project_ids(
+    db: AsyncSession, user: User, *, now: datetime | None = None
+) -> list[uuid.UUID]:
+    """Projects where «Пройти чек-ин сейчас» makes sense: rhythm on, no check-in today,
+    the person has open tasks."""
+    now = now or datetime.now(UTC)
+    rows = (
+        await db.execute(
+            select(Project)
+            .join(ProjectMember, ProjectMember.project_id == Project.id)
+            .where(
+                ProjectMember.user_id == user.id,
+                ProjectMember.role.in_([ProjectMemberRole.admin, ProjectMemberRole.member]),
+                Project.rhythm_enabled.is_(True),
+                Project.is_archived.is_(False),
+            )
+        )
+    ).scalars().all()
+    out: list[uuid.UUID] = []
+    for project in rows:
+        day = local_today(project, now)
+        has = await db.scalar(
+            select(RhythmCheckin.id).where(
+                RhythmCheckin.user_id == user.id,
+                RhythmCheckin.project_id == project.id,
+                RhythmCheckin.date == day,
+            )
+        )
+        if has:
+            continue
+        if await open_tasks_for(db, project.id, user.id, now=now, limit=1):
+            out.append(project.id)
+    return out
 
 
 async def notify_checkin(

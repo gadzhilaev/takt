@@ -576,3 +576,74 @@ async def test_activity_rows_written_for_checkin(settings, monkeypatch, client):
     assert ("checkin", "in_progress") in actions
     assert ("moved", "status_id") in actions
     assert all(u == w.member.id for _a, _f, u in rows)
+
+
+@pytest.mark.asyncio
+async def test_manual_start_creates_today_checkin_without_push(client, settings, monkeypatch):
+    sent: list = []
+
+    async def fake_fcm(*a, **kw):
+        sent.append(kw)
+
+    async def fake_webpush(*a, **kw):
+        sent.append(kw)
+
+    from app.services import fcm_service, push_service
+
+    monkeypatch.setattr(fcm_service, "send_fcm_to_users", fake_fcm)
+    monkeypatch.setattr(push_service, "send_push_to_users", fake_webpush)
+    # Outside the loop window — only a manual start can create today's check-in.
+    w = await _world(rhythm_time=time(23, 59), days=[1, 2, 3, 4, 5, 6, 7])
+    h = await _login(client, w.member)
+
+    cur = (await client.get("/api/v1/rhythm/checkins/current")).json()
+    assert cur["checkins"] == []
+    assert cur["startable_project_ids"] == [str(w.project_id)]
+
+    url = "/api/v1/rhythm/checkins/start"
+    r = await client.post(url, headers=h, params={"project_id": str(w.project_id)})
+    assert r.status_code == 200, r.text
+    first = r.json()["checkin"]
+    assert first["status"] == "pending"
+    # Same picking as the loop: overdue → nearest deadline → priority, max 5
+    t = w.tasks
+    assert [i["task_id"] for i in first["items"]] == [
+        str(t["overdue"]), str(t["soon"]), str(t["later"]), str(t["far"]), str(t["urgent"])
+    ]
+    assert sent == []  # no push for a manual start
+
+    again = await client.post(url, headers=h, params={"project_id": str(w.project_id)})
+    assert again.json()["checkin"]["id"] == first["id"]  # unique user+project+date
+    cur = (await client.get("/api/v1/rhythm/checkins/current")).json()
+    assert cur["pending"] == 1 and cur["startable_project_ids"] == []
+
+
+@pytest.mark.asyncio
+async def test_manual_start_access_and_conditions(client, settings):
+    w = await _world(rhythm_time=time(23, 59), days=[1, 2, 3, 4, 5, 6, 7])
+    params = {"project_id": str(w.project_id)}
+    url = "/api/v1/rhythm/checkins/start"
+
+    async with await _client() as c:
+        h = await _login(c, w.viewer)  # viewer can't answer → can't start
+        assert (await c.post(url, headers=h, params=params)).status_code == 403
+    async with await _client() as c:
+        h = await _login(c, w.idle)  # member without open tasks
+        r = await c.post(url, headers=h, params=params)
+        assert r.status_code == 409 and r.json()["detail"]["error"]["code"] == "no_open_tasks"
+    async with TestSession() as db:
+        outsider = await _user(db, "outsider-rhythm@example.com", "Чужой")
+        await db.commit()
+    async with await _client() as c:
+        h = await _login(c, outsider)
+        assert (await c.post(url, headers=h, params=params)).status_code == 403
+
+    async with TestSession() as db:
+        p = await db.get(Project, w.project_id)
+        p.rhythm_enabled = False
+        await db.commit()
+    h = await _login(client, w.member)
+    r = await client.post(url, headers=h, params=params)
+    assert r.status_code == 409 and r.json()["detail"]["error"]["code"] == "rhythm_off"
+    cur = (await client.get("/api/v1/rhythm/checkins/current")).json()
+    assert cur["startable_project_ids"] == []

@@ -121,7 +121,7 @@ async def current_checkins(
     if project_id is not None:
         project_ids = [p for p in project_ids if p == project_id]
     if not project_ids:
-        return {"checkins": [], "pending": 0}
+        return {"checkins": [], "pending": 0, "startable_project_ids": []}
     since = (datetime.now(UTC) - timedelta(days=2)).date()
     rows = (
         await db.execute(
@@ -145,9 +145,14 @@ async def current_checkins(
         if data["items"]:
             out.append(data)
     out.sort(key=lambda c: (c["status"] != CheckinStatus.pending.value, c["project"]["name"]))
+    startable = await rhythm_service.startable_project_ids(db, user)
+    if project_id is not None:
+        startable = [p for p in startable if p == project_id]
     return {
         "checkins": out,
         "pending": sum(1 for c in out if c["status"] == CheckinStatus.pending.value),
+        # Projects where the person can start today's check-in by hand (no check-in yet).
+        "startable_project_ids": [str(p) for p in startable],
     }
 
 
@@ -219,6 +224,23 @@ async def answer_checkin(
         raise _http(e) from e
     await _commit_and_broadcast(db, applied)
     checkin = await rhythm_service.load_checkin_for(db, user, checkin_id)
+    return {"checkin": await _checkin_out(db, checkin)}
+
+
+@router.post("/checkins/start", dependencies=[Depends(verify_csrf)])
+async def start_checkin(
+    project_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """«Пройти чек-ин сейчас»: today's check-in by hand (no push). Existing one is returned."""
+    try:
+        checkin = await rhythm_service.start_checkin_now(db, user=user, project_id=project_id)
+    except RhythmError as e:
+        await db.rollback()
+        raise _http(e) from e
+    await db.commit()
+    checkin = await rhythm_service.load_checkin_for(db, user, checkin.id)
     return {"checkin": await _checkin_out(db, checkin)}
 
 

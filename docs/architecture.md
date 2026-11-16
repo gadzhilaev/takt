@@ -104,7 +104,7 @@ Depends: `get_db`, `get_current_user` (cookie или Bearer), `verify_csrf` (п�
 | `tasks` | CRUD, move, comments, checklist (+ project ACL) |
 | `settings` | столбцы проекта |
 | `notifications` | in-app + device tokens / Web Push |
-| `rhythm` | ежедневный чек-ин: текущий, ответ, история, ответ из push по токену |
+| `rhythm` | ежедневный чек-ин: текущий (+ `startable_project_ids`), ручной запуск `POST /checkins/start?project_id=` (тот же отбор и уникальность, без push), ответ, история, ответ из push по токену |
 | `admin` | legacy workspace admin users |
 | `platform` | platform console API |
 | `reports` | агрегаты / Excel (API есть; web UI упрощён) |
