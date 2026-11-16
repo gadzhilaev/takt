@@ -101,30 +101,52 @@ async def process_due_reminders(
     return {"due_soon": sent_soon, "overdue": sent_overdue}
 
 
+async def run_due_pass(settings: Settings | None = None) -> dict[str, int]:
+    """One iteration of the background loop: reminders + auto urgency.
+
+    Each step gets its own session from ``AsyncSessionLocal`` and is isolated:
+    a failure in one step is logged and does not skip the other.
+    """
+    settings = settings or get_settings()
+    result = {"due_soon": 0, "overdue": 0, "urgency_bumped": 0}
+    try:
+        counts = await process_due_reminders(settings=settings)
+        result["due_soon"] = counts["due_soon"]
+        result["overdue"] = counts["overdue"]
+        if counts["due_soon"] or counts["overdue"]:
+            logger.info(
+                "due reminders: soon=%s overdue=%s",
+                counts["due_soon"],
+                counts["overdue"],
+            )
+    except Exception:
+        logger.exception("due reminder pass failed")
+    try:
+        from app.services.due_urgency_service import apply_auto_urgency
+
+        async with AsyncSessionLocal() as db:
+            # apply_auto_urgency commits (or rolls back) on its own.
+            result["urgency_bumped"] = await apply_auto_urgency(db)
+        if result["urgency_bumped"]:
+            logger.info("auto urgency escalated: %s", result["urgency_bumped"])
+    except Exception:
+        logger.exception("auto urgency pass failed")
+    logger.info(
+        "due pass ok: soon=%s overdue=%s urgency=%s",
+        result["due_soon"],
+        result["overdue"],
+        result["urgency_bumped"],
+    )
+    return result
+
+
 async def due_reminder_loop(stop: asyncio.Event) -> None:
     settings = get_settings()
     if not settings.DUE_REMINDER_ENABLED or settings.DUE_REMINDER_INTERVAL_SECONDS <= 0:
         return
     interval = max(30, int(settings.DUE_REMINDER_INTERVAL_SECONDS))
     while not stop.is_set():
-        try:
-            counts = await process_due_reminders(settings=settings)
-            if counts["due_soon"] or counts["overdue"]:
-                logger.info(
-                    "due reminders: soon=%s overdue=%s",
-                    counts["due_soon"],
-                    counts["overdue"],
-                )
-        except Exception:
-            logger.exception("due reminder pass failed")
-        try:
-            from app.services.due_urgency_service import apply_auto_urgency
-
-            bumped = await apply_auto_urgency()
-            if bumped:
-                logger.info("auto urgency escalated: %s", bumped)
-        except Exception:
-            logger.exception("auto urgency pass failed")
+        await run_due_pass(settings)
         try:
             await asyncio.wait_for(stop.wait(), timeout=interval)
         except TimeoutError:
