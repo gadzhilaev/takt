@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { AccountDeletePreview } from "@/components/account-delete-preview";
 import { BrandLogo } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { api, messageFromApiError } from "@/lib/api";
@@ -78,9 +79,8 @@ export default function AccountDeletePage() {
         </h1>
         <p className="mt-2 text-[14px] text-muted">
           Удаление необратимо: профиль обезличивается, сессии и push-токены отзываются.
-          Проекты, где вы единственный участник, удаляются. Общие проекты команды сохраняются —
-          если вы единственный администратор с другими участниками, сначала назначьте другого
-          администратора.
+          Проекты, где кроме вас никого нет, удаляются. Если вы единственный администратор
+          общего проекта, права перейдут к участнику, который вступил раньше всех.
         </p>
 
         {user === undefined && (
@@ -110,6 +110,10 @@ export default function AccountDeletePage() {
             <p className="text-[14px] text-muted">
               Вы вошли как <span className="text-foreground">{user.email}</span> ({user.name}).
             </p>
+            <div className="space-y-1.5">
+              <p className="text-[13px] text-muted">Что произойдёт с проектами:</p>
+              <AccountDeletePreview className="text-[13px]" />
+            </div>
             <label className="block text-[13px] text-muted">
               Для подтверждения введите <span className="text-foreground">УДАЛИТЬ</span>
               <input

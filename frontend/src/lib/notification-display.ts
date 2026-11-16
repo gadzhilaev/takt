@@ -32,6 +32,8 @@ export function notificationKindLabel(kind: string): string {
       return "Участник удалён";
     case "leave_rejected":
       return "Заявка отклонена";
+    case "project_admin_granted":
+      return "Права администратора";
     default:
       return "Уведомление";
   }
@@ -72,6 +74,7 @@ export function notificationIconName(kind: string): NotificationIconName {
     case "member_removed":
     case "leave_approved":
     case "leave_rejected":
+    case "project_admin_granted":
       return "profile";
     default:
       return "notifications";

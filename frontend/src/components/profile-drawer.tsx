@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountDeletePreview } from "@/components/account-delete-preview";
 import { AppIcon } from "@/components/ui/app-icon";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -309,8 +310,10 @@ export function ProfileDrawer({
           ) : (
             <div className="space-y-2 rounded-md border border-hairline p-3">
               <p className="text-xs text-muted">
-                Необратимо. Общие проекты команды сохранятся. Введите УДАЛИТЬ.
+                Необратимо. Профиль обезличится, сессии и уведомления отключатся.
               </p>
+              <AccountDeletePreview />
+              <p className="text-xs text-muted">Для подтверждения введите УДАЛИТЬ.</p>
               <Input
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}

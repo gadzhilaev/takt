@@ -86,6 +86,7 @@ class AppIcon extends StatelessWidget {
       case 'member_removed':
       case 'leave_approved':
       case 'leave_rejected':
+      case 'project_admin_granted':
         return AppIcons.profile;
       default:
         return AppIcons.notifications;

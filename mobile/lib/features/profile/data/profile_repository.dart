@@ -4,10 +4,17 @@ import 'package:dio/dio.dart';
 
 import '../../../core/api_client.dart';
 import '../../../shared/models/models.dart';
+import 'account_delete_preview.dart';
 
 class ProfileRepository {
   ProfileRepository(this._api);
   final ApiClient _api;
+
+  /// Что произойдёт с проектами при удалении аккаунта.
+  Future<AccountDeletePreview> deletePreview() async {
+    final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/users/me/delete-preview');
+    return AccountDeletePreview.fromJson(res.data ?? const {});
+  }
 
   Future<UserProfile> update({String? name, String? email}) async {
     final res = await _api.dio.patch<Map<String, dynamic>>(

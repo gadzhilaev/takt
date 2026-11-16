@@ -18,6 +18,7 @@ import '../../../shared/widgets/user_avatar.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../board/cubit/board_cubit.dart';
 import '../../projects/data/projects_repository.dart';
+import '../data/account_delete_preview.dart';
 import '../data/profile_repository.dart';
 import 'sign_in_methods_section.dart';
 
@@ -374,17 +375,52 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _deleteAccount(BuildContext context) async {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final muted = dark ? TaktColors.mutedDark : TaktColors.muted;
+    final fg = Theme.of(context).colorScheme.onSurface;
+    AccountDeletePreview? preview;
+    try {
+      preview = await context.read<ProfileRepository>().deletePreview();
+    } catch (_) {
+      preview = null; // без предпросмотра — общий текст, сервер всё равно применит правила
+    }
+    if (!context.mounted) return;
+    if (preview != null && !preview.canDelete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(preview.blockedMessage ?? 'Аккаунт сейчас нельзя удалить')),
+      );
+      return;
+    }
+    final lines = preview?.lines ?? const <String>[];
     final ok = await showTaktSheet(
       context: context,
       title: 'Удалить аккаунт навсегда?',
       confirmLabel: 'Удалить',
-      body: Text(
-        'Профиль будет обезличен, сессии и уведомления отключены. '
-        'Проекты, где вы единственный участник, удалятся. '
-        'Общие проекты команды сохранятся — если вы единственный администратор, '
-        'сначала назначьте другого.\n\n'
-        'Веб-форма: ${TaktLinks.accountDeleteUrl}',
-        style: TextStyle(fontSize: 14, height: 1.4, color: muted),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Профиль будет обезличен, сессии и уведомления отключены.',
+            style: TextStyle(fontSize: 14, height: 1.4, color: muted),
+          ),
+          if (lines.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Что произойдёт с проектами:',
+              style: TextStyle(fontSize: 14, height: 1.4, color: muted),
+            ),
+            const SizedBox(height: 6),
+            for (final line in lines)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• $line', style: TextStyle(fontSize: 14, height: 1.4, color: fg)),
+              ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            'Веб-форма: ${TaktLinks.accountDeleteUrl}',
+            style: TextStyle(fontSize: 13, height: 1.4, color: muted),
+          ),
+        ],
       ),
     );
     if (ok != true || !context.mounted) return;

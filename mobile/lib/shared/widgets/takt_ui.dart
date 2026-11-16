@@ -478,6 +478,8 @@ String taktNotificationKindLabel(String kind) {
       return 'Участник удалён';
     case 'leave_rejected':
       return 'Заявка отклонена';
+    case 'project_admin_granted':
+      return 'Права администратора';
     default:
       return 'Уведомление';
   }
