@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:home_widget/home_widget.dart';
 
@@ -17,6 +18,8 @@ Future<void> main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   // Keep native splash (same brand as Dart SplashPage) until first Flutter frame.
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  // Только портрет на телефонах (iOS и Android); Info.plist — тот же набор.
+  await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
   await HomeWidget.setAppGroupId(AppConfig.appGroupId);
 
   final tokens = TokenStorage();
