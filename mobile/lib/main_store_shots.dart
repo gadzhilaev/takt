@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
+import 'core/config.dart';
 import 'core/token_storage.dart';
 import 'main.dart' as app;
 
@@ -33,7 +34,8 @@ Future<void> main() async {
 
   final dio = Dio(
     BaseOptions(
-      baseUrl: 'https://taktapp.ru',
+      // API_BASE (dart-define) — локальный стенд; по умолчанию prod.
+      baseUrl: AppConfig.apiBase,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
     ),
