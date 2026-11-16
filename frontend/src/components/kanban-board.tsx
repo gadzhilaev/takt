@@ -914,6 +914,15 @@ export function KanbanBoard({
       >
         Доска
       </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={false}
+        className="min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
+        onClick={() => router.push(`/app/projects/${projectId}/digest`)}
+      >
+        Сводка
+      </button>
     </div>
   ) : null;
 

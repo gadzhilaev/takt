@@ -13,7 +13,12 @@ import { UserAvatar } from "@/components/user-avatar";
 import { BrandLogo, BrandMark } from "@/components/brand-mark";
 import { Dialog } from "@/components/ui/dialog";
 import { CheckinBanner } from "@/components/checkin-banner";
-import { RhythmSettingsFields } from "@/components/rhythm-settings";
+import {
+  DEFAULT_DIGEST,
+  DigestSettingsFields,
+  RhythmSettingsFields,
+  type DigestSettings,
+} from "@/components/rhythm-settings";
 import { DEFAULT_RHYTHM, type RhythmSettings } from "@/lib/rhythm";
 import { NotificationToasts } from "@/components/notification-toasts";
 import { NotificationsDrawer } from "@/components/notifications-drawer";
@@ -59,6 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [renameValue, setRenameValue] = useState("");
   const [renameAutoUrgency, setRenameAutoUrgency] = useState(true);
   const [renameRhythm, setRenameRhythm] = useState<RhythmSettings>(DEFAULT_RHYTHM);
+  const [renameDigest, setRenameDigest] = useState<DigestSettings>(DEFAULT_DIGEST);
   const [inviteOpen, setInviteOpen] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
@@ -340,6 +346,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         rhythm_time: renameRhythm.time,
         rhythm_timezone: renameRhythm.timezone,
         rhythm_days: renameRhythm.days,
+        digest_daily: renameDigest.daily,
+        digest_weekly: renameDigest.weekly,
+        digest_time: renameDigest.time,
       },
     });
     setRenameProjectId(null);
@@ -487,6 +496,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           setRenameValue(p.name);
                           setRenameAutoUrgency(p.auto_urgency_from_due !== false);
                           setRenameRhythm(p.rhythm ?? { ...DEFAULT_RHYTHM, enabled: false });
+                          setRenameDigest(p.digest ?? DEFAULT_DIGEST);
                           setRenameProjectId(p.id);
                         }}
                       >
@@ -716,6 +726,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </label>
             <RhythmSettingsFields value={renameRhythm} onChange={setRenameRhythm} />
+            <DigestSettingsFields value={renameDigest} onChange={setRenameDigest} />
             <Button type="submit" className="w-full" disabled={!renameValue.trim()}>
               Сохранить
             </Button>

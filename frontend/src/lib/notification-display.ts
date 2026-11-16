@@ -36,6 +36,8 @@ export function notificationKindLabel(kind: string): string {
       return "Права администратора";
     case "rhythm_checkin":
       return "Чек-ин";
+    case "digest":
+      return "Сводка";
     default:
       return "Уведомление";
   }
@@ -60,6 +62,8 @@ export function notificationIconName(kind: string): NotificationIconName {
     case "task_completed":
     case "rhythm_checkin":
       return "circle-check";
+    case "digest":
+      return "status";
     case "task_due_soon":
       return "timer";
     case "task_overdue":

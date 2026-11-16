@@ -60,6 +60,8 @@ function showBrowserNotification(n: NotificationItem, toast: ToastItem) {
       note.close();
       if (n.kind === "rhythm_checkin") {
         window.location.href = "/app/checkin";
+      } else if (n.kind === "digest" && n.project_id) {
+        window.location.href = `/app/projects/${n.project_id}/digest`;
       } else if (n.project_id && n.task_id) {
         window.location.href = `/app/projects/${n.project_id}?task=${n.task_id}`;
       } else if (n.project_id) {
@@ -156,7 +158,9 @@ export function NotificationToasts() {
       /* ignore */
     }
     setToasts((prev) => prev.filter((x) => x.id !== t.id));
-    if (t.kind === "rhythm_checkin") {
+    if (t.kind === "digest" && t.projectId) {
+      router.push(`/app/projects/${t.projectId}/digest`);
+    } else if (t.kind === "rhythm_checkin") {
       qc.invalidateQueries({ queryKey: ["rhythm", "current"] });
       router.push("/app/checkin");
     } else if (t.projectId && t.taskId) router.push(`/app/projects/${t.projectId}?task=${t.taskId}`);

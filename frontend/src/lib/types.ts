@@ -76,6 +76,8 @@ export type Project = {
   auto_urgency_from_due?: boolean;
   /** Ритм: ежедневный чек-ин (время локальное в timezone, дни ISO 1–7). */
   rhythm?: { enabled: boolean; time: string; timezone: string; days: number[] } | null;
+  /** Сводка: ежедневно и/или по пятницам в `time` (часовой пояс ритма). */
+  digest?: { daily: boolean; weekly: boolean; time: string } | null;
   created_at: string;
   updated_at: string;
   members: ProjectMember[];
