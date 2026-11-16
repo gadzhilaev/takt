@@ -68,6 +68,19 @@ class _AppShellState extends State<AppShell> {
     final editAction = hasProject
         ? [
             IconButton(
+              tooltip: 'Сводка',
+              visualDensity: VisualDensity.compact,
+              onPressed: () {
+                final id = context.read<BoardCubit>().state.project?.id;
+                if (id != null) context.push('/digest/$id');
+              },
+              icon: AppIcon(
+                AppIcons.status,
+                size: 22,
+                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
+              ),
+            ),
+            IconButton(
               tooltip: 'Проект',
               visualDensity: VisualDensity.compact,
               onPressed: _openProjectMenu,

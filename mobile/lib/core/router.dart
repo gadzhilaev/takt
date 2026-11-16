@@ -16,6 +16,8 @@ import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/projects/presentation/project_members_page.dart';
 import '../features/projects/presentation/projects_welcome_page.dart';
+import '../features/digest/data/digest_models.dart';
+import '../features/digest/presentation/digest_page.dart';
 import '../features/rhythm/presentation/checkin_page.dart';
 import '../features/shell/app_shell.dart';
 import '../features/shell/sliding_branch_stack.dart';
@@ -172,6 +174,17 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
         pageBuilder: (_, state) => CupertinoPage<void>(
           key: state.pageKey,
           child: const NotificationsPage(),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/digest/:projectId',
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: DigestPage(
+            projectId: state.pathParameters['projectId']!,
+            period: DigestPeriod.fromWire(state.uri.queryParameters['period']),
+          ),
         ),
       ),
       GoRoute(

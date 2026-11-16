@@ -75,6 +75,7 @@ class Project extends Equatable {
     this.isDefault = false,
     this.autoUrgencyFromDue = true,
     this.rhythm = const RhythmSettings(),
+    this.digest = const DigestSchedule(),
     this.members = const [],
   });
 
@@ -86,6 +87,7 @@ class Project extends Equatable {
   final bool isDefault;
   final bool autoUrgencyFromDue;
   final RhythmSettings rhythm;
+  final DigestSchedule digest;
   final List<ProjectMember> members;
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -99,6 +101,9 @@ class Project extends Equatable {
         rhythm: json['rhythm'] is Map<String, dynamic>
             ? RhythmSettings.fromJson(json['rhythm'] as Map<String, dynamic>)
             : const RhythmSettings(enabled: false),
+        digest: json['digest'] is Map<String, dynamic>
+            ? DigestSchedule.fromJson(json['digest'] as Map<String, dynamic>)
+            : const DigestSchedule(),
         members: (json['members'] as List<dynamic>? ?? [])
             .map((e) => ProjectMember.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -113,12 +118,39 @@ class Project extends Equatable {
         'is_default': isDefault,
         'auto_urgency_from_due': autoUrgencyFromDue,
         'rhythm': rhythm.toJson(),
+        'digest': digest.toJson(),
         'members': members.map((m) => m.toJson()).toList(),
       };
 
   @override
   List<Object?> get props =>
-      [id, name, description, color, isDemo, isDefault, autoUrgencyFromDue, rhythm, members];
+      [id, name, description, color, isDemo, isDefault, autoUrgencyFromDue, rhythm, digest, members];
+}
+
+/// Расписание сводки: ежедневно и/или по пятницам в [time] (часовой пояс ритма).
+class DigestSchedule extends Equatable {
+  const DigestSchedule({this.daily = false, this.weekly = true, this.time = '18:00'});
+
+  final bool daily;
+  final bool weekly;
+  final String time;
+
+  factory DigestSchedule.fromJson(Map<String, dynamic> json) => DigestSchedule(
+        daily: json['daily'] as bool? ?? false,
+        weekly: json['weekly'] as bool? ?? true,
+        time: json['time'] as String? ?? '18:00',
+      );
+
+  Map<String, dynamic> toJson() => {'daily': daily, 'weekly': weekly, 'time': time};
+
+  DigestSchedule copyWith({bool? daily, bool? weekly, String? time}) => DigestSchedule(
+        daily: daily ?? this.daily,
+        weekly: weekly ?? this.weekly,
+        time: time ?? this.time,
+      );
+
+  @override
+  List<Object?> get props => [daily, weekly, time];
 }
 
 /// Ритм проекта: ежедневный чек-ин (время локальное в [timezone], дни ISO 1–7).

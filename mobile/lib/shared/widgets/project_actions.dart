@@ -12,6 +12,7 @@ import 'app_icon.dart';
 import 'takt_sheet.dart';
 import 'user_avatar.dart';
 import '../../features/rhythm/presentation/rhythm_settings_card.dart';
+import '../../features/digest/presentation/digest_settings_card.dart';
 
 bool isProjectOwner(Project project, String? userId) {
   if (userId == null) return false;
@@ -105,6 +106,7 @@ Future<void> renameProjectFlow(
   );
   var autoUrgency = project.autoUrgencyFromDue;
   var rhythm = project.rhythm;
+  var digest = project.digest;
   final ok = await showModalBottomSheet<bool>(
     context: context,
     useRootNavigator: true,
@@ -134,7 +136,8 @@ Future<void> renameProjectFlow(
             padding: EdgeInsets.only(bottom: inset),
             child: SafeArea(
               top: false,
-              child: Column(
+              child: SingleChildScrollView(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
@@ -233,7 +236,15 @@ Future<void> renameProjectFlow(
                       onChanged: (v) => setModalState(() => rhythm = v),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    child: DigestSettingsCard(
+                      value: digest,
+                      onChanged: (v) => setModalState(() => digest = v),
+                    ),
+                  ),
                 ],
+              ),
               ),
             ),
           );
@@ -248,7 +259,8 @@ Future<void> renameProjectFlow(
   final unchangedName = name == project.name;
   final unchangedFlag = autoUrgency == project.autoUrgencyFromDue;
   final unchangedRhythm = rhythm == project.rhythm;
-  if (unchangedName && unchangedFlag && unchangedRhythm) return;
+  final unchangedDigest = digest == project.digest;
+  if (unchangedName && unchangedFlag && unchangedRhythm && unchangedDigest) return;
   final repo = context.read<ProjectsRepository>();
   final board = context.read<BoardCubit>();
   final messenger = ScaffoldMessenger.of(context);
@@ -258,6 +270,7 @@ Future<void> renameProjectFlow(
       name: name,
       autoUrgencyFromDue: autoUrgency,
       rhythm: unchangedRhythm ? null : rhythm,
+      digest: unchangedDigest ? null : digest,
     );
     await board.refreshProjects(forceLoading: true);
     onChanged?.call();

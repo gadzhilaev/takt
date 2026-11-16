@@ -480,6 +480,10 @@ String taktNotificationKindLabel(String kind) {
       return 'Заявка отклонена';
     case 'project_admin_granted':
       return 'Права администратора';
+    case 'rhythm_checkin':
+      return 'Чек-ин';
+    case 'digest':
+      return 'Сводка';
     default:
       return 'Уведомление';
   }

@@ -65,6 +65,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (!mounted) return;
     if (n.kind == 'rhythm_checkin') {
       context.push('/checkin');
+    } else if (n.kind == 'digest' && (n.projectId ?? '').isNotEmpty) {
+      context.push('/digest/${n.projectId}');
     } else if (n.taskId != null && n.taskId!.isNotEmpty) {
       context.push('/task/${n.taskId}');
     } else if (n.projectId != null && n.projectId!.isNotEmpty) {

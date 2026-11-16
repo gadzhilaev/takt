@@ -180,6 +180,10 @@ class FcmBootstrap {
 
   /// Same as [routeFromMessage] for a raw data map (also used by local notifications).
   static String? routeFromData(Map<String, dynamic> data) {
+    if (data['kind'] == 'digest' && data['project_id'] is String) {
+      final period = data['period'] is String ? '?period=${data['period']}' : '';
+      return '/digest/${data['project_id']}$period';
+    }
     if (data['kind'] == 'rhythm_checkin') {
       final id = data['checkin_id'];
       return id is String && id.isNotEmpty ? '/checkin/$id' : '/checkin';

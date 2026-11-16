@@ -88,6 +88,10 @@ class AppIcon extends StatelessWidget {
       case 'leave_rejected':
       case 'project_admin_granted':
         return AppIcons.profile;
+      case 'rhythm_checkin':
+        return AppIcons.circleCheck;
+      case 'digest':
+        return AppIcons.status;
       default:
         return AppIcons.notifications;
     }

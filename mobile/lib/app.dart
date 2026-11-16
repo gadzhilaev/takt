@@ -13,6 +13,7 @@ import 'core/theme.dart';
 import 'core/theme_controller.dart';
 import 'core/theme_scope.dart';
 import 'core/token_storage.dart';
+import 'features/digest/data/digest_repository.dart';
 import 'features/rhythm/data/rhythm_repository.dart';
 import 'features/auth/cubit/auth_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -136,6 +137,7 @@ class _TaktAppState extends State<TaktApp> {
         RepositoryProvider.value(value: _oauth),
         RepositoryProvider.value(value: _notifications),
         RepositoryProvider.value(value: _rhythm),
+        RepositoryProvider.value(value: DigestRepository(widget.api)),
         RepositoryProvider.value(value: ProfileRepository(widget.api)),
         RepositoryProvider.value(value: _widgetSync),
         RepositoryProvider.value(value: widget.fcm),

@@ -36,6 +36,7 @@ class ProjectsRepository {
     required String name,
     bool? autoUrgencyFromDue,
     RhythmSettings? rhythm,
+    DigestSchedule? digest,
   }) async {
     final data = <String, dynamic>{'name': name.trim()};
     if (autoUrgencyFromDue != null) {
@@ -46,6 +47,11 @@ class ProjectsRepository {
       data['rhythm_time'] = rhythm.time;
       data['rhythm_timezone'] = rhythm.timezone;
       data['rhythm_days'] = rhythm.days;
+    }
+    if (digest != null) {
+      data['digest_daily'] = digest.daily;
+      data['digest_weekly'] = digest.weekly;
+      data['digest_time'] = digest.time;
     }
     final res = await _api.dio.patch<Map<String, dynamic>>(
       '/api/v1/projects/$projectId',
