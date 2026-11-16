@@ -11,6 +11,7 @@ Backend FastAPI — единый центр. Client secrets и Apple private key
 - Не считайте Apple ID автоматически допустимым для аудитории РФ, если закон применим к оператору Takt.
 - Настройки по умолчанию: `OAUTH_APPLE_ENABLED=false`, `OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR=false`.
 - При `OAUTH_OPERATOR_REGION=ru` Apple остаётся выключенным, даже если credentials заданы, пока явно не разрешите `OAUTH_APPLE_ALLOWED_FOR_RU_OPERATOR=true` после юридического решения.
+- iOS (App Store Guideline 4.8): приложение запрашивает `GET /api/v1/auth/oauth/providers?client=ios`. Если Apple выключен (политика, админка или нет credentials), VK ID и Яндекс ID для iOS тоже отдаются `enabled=false` с `reason=apple_required_on_ios`; mobile дублирует правило на клиенте. Web и Android не затрагиваются.
 - Геолокация пользователя по IP **не** используется как критерий.
 - Email/password не отключается этими настройками.
 

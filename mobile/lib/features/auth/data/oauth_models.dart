@@ -39,6 +39,36 @@ abstract final class OAuthProviderId {
   }
 }
 
+/// App Store Guideline 4.8: на iOS VK ID / Яндекс ID показываем только вместе
+/// с Sign in with Apple. Backend применяет то же правило для `?client=ios`;
+/// здесь — защита от старого сервера / кэша.
+Map<String, dynamic> applyIosAppleRule(
+  Map<String, dynamic> providers, {
+  required bool isIOS,
+}) {
+  if (!isIOS) return providers;
+  bool on(String id) {
+    final v = providers[id];
+    return v is Map && v['enabled'] == true;
+  }
+
+  if (on(OAuthProviderId.apple)) return providers;
+  final out = <String, dynamic>{};
+  for (final e in providers.entries) {
+    final v = e.value;
+    if (e.key != OAuthProviderId.apple && v is Map && v['enabled'] == true) {
+      out[e.key] = <String, dynamic>{
+        ...Map<String, dynamic>.from(v),
+        'enabled': false,
+        'reason': 'apple_required_on_ios',
+      };
+    } else {
+      out[e.key] = v;
+    }
+  }
+  return out;
+}
+
 class OAuthProviderInfo extends Equatable {
   const OAuthProviderInfo({
     required this.id,

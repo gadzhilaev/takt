@@ -105,12 +105,14 @@ class _OAuthButtonsState extends State<OAuthButtons> {
       }
     }
     if (enabled.isEmpty) {
+      // Нет доступных провайдеров — только вход по email, без служебных подсказок.
+      if (_error == null) return const SizedBox.shrink();
       return Padding(
         padding: const EdgeInsets.only(top: 12),
         child: Text(
-          'Apple / VK ID / Яндекс ID появятся после настройки на сервере.',
+          _error!,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
         ),
       );
     }

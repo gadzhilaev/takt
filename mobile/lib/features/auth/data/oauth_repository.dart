@@ -64,8 +64,17 @@ class OAuthRepository {
     if (!force && _providersCache != null) return _providersCache!;
     return _providersInflight ??= () async {
       try {
-        final res = await _api.dio.get<Map<String, dynamic>>('/api/v1/auth/oauth/providers');
-        _providersCache = res.data ?? {};
+        final isIOS = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+        final res = await _api.dio.get<Map<String, dynamic>>(
+          '/api/v1/auth/oauth/providers',
+          queryParameters: isIOS ? const {'client': 'ios'} : null,
+        );
+        final data = Map<String, dynamic>.from(res.data ?? const {});
+        final map = data['providers'];
+        if (map is Map<String, dynamic>) {
+          data['providers'] = applyIosAppleRule(map, isIOS: isIOS);
+        }
+        _providersCache = data;
         return _providersCache!;
       } finally {
         _providersInflight = null;

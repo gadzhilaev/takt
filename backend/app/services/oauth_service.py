@@ -97,10 +97,21 @@ async def load_oauth_method_flags(db: AsyncSession | None) -> dict[str, bool]:
     return flags
 
 
+IOS_CLIENT = "ios"
+APPLE_REQUIRED_ON_IOS = "apple_required_on_ios"
+
+
 async def provider_availability(
-    db: AsyncSession | None = None, settings: Settings | None = None
+    db: AsyncSession | None = None,
+    settings: Settings | None = None,
+    client: str | None = None,
 ) -> dict[str, Any]:
-    """Public provider flags. Env credentials + admin toggles + Apple RU policy."""
+    """Public provider flags. Env credentials + admin toggles + Apple RU policy.
+
+    ``client="ios"``: App Store Guideline 4.8 — сторонние провайдеры (VK ID / Яндекс ID)
+    показываются только вместе с Sign in with Apple. Если Apple выключен, VK/Яндекс
+    для iOS тоже выключаются (``reason=apple_required_on_ios``).
+    """
     s = settings or get_settings()
     admin_flags = await load_oauth_method_flags(db)
     apple_configured = bool(
@@ -135,6 +146,19 @@ async def provider_availability(
     if not admin_flags["yandex"] and yandex_configured:
         notes.append("Яндекс ID выключен в админке платформы.")
 
+    vk_enabled = bool(s.OAUTH_VK_ENABLED and vk_configured and admin_flags["vk"])
+    yandex_enabled = bool(s.OAUTH_YANDEX_ENABLED and yandex_configured and admin_flags["yandex"])
+    is_ios = (client or "").strip().lower() == IOS_CLIENT
+    third_party_reason: str | None = None
+    if is_ios and not apple_enabled and (vk_enabled or yandex_enabled):
+        vk_enabled = False
+        yandex_enabled = False
+        third_party_reason = APPLE_REQUIRED_ON_IOS
+        notes.append(
+            "На iOS VK ID и Яндекс ID скрыты: без входа через Apple их нельзя показывать "
+            "(App Store Guideline 4.8)."
+        )
+
     return {
         "email_password": admin_flags["email_password"],
         "admin_flags": admin_flags,
@@ -150,21 +174,24 @@ async def provider_availability(
             "vk": {
                 "id": "vk",
                 "label": "VK ID",
-                "enabled": s.OAUTH_VK_ENABLED and vk_configured and admin_flags["vk"],
+                "enabled": vk_enabled,
                 "configured": vk_configured,
                 "admin_enabled": admin_flags["vk"],
                 "policy_blocked": False,
+                "reason": third_party_reason,
             },
             "yandex": {
                 "id": "yandex",
                 "label": "Яндекс ID",
-                "enabled": s.OAUTH_YANDEX_ENABLED and yandex_configured and admin_flags["yandex"],
+                "enabled": yandex_enabled,
                 "configured": yandex_configured,
                 "admin_enabled": admin_flags["yandex"],
                 "policy_blocked": False,
+                "reason": third_party_reason,
             },
         },
         "operator_region": s.OAUTH_OPERATOR_REGION,
+        "client": IOS_CLIENT if is_ios else None,
         "notes": notes,
         "legal_notice": (
             "Доступность способов входа задаётся конфигурацией оператора и админкой. "

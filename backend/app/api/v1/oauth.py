@@ -45,8 +45,12 @@ def _oauth_http(e: oauth_service.OAuthError) -> HTTPException:
 
 
 @router.get("/providers")
-async def list_providers(db: Annotated[AsyncSession, Depends(get_db)]):
-    return await oauth_service.provider_availability(db)
+async def list_providers(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    client: Annotated[str | None, Query(max_length=16)] = None,
+):
+    """``?client=ios`` — правило Guideline 4.8: VK/Яндекс только вместе с Apple."""
+    return await oauth_service.provider_availability(db, client=client)
 
 
 @router.get("/launch")
