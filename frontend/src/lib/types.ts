@@ -74,6 +74,8 @@ export type Project = {
   is_demo?: boolean;
   /** Escalate priority as due date approaches (≤35% → важно, ≤10% → срочно). */
   auto_urgency_from_due?: boolean;
+  /** Ритм: ежедневный чек-ин (время локальное в timezone, дни ISO 1–7). */
+  rhythm?: { enabled: boolean; time: string; timezone: string; days: number[] } | null;
   created_at: string;
   updated_at: string;
   members: ProjectMember[];
@@ -118,6 +120,10 @@ export type Task = {
   subtask_total?: number;
   subtask_done?: number;
   attachments?: TaskAttachment[];
+  /** «Застряла» — из ответа на чек-ин; снимается при следующем движении задачи. */
+  blocked_at?: string | null;
+  blocked_reason?: string | null;
+  blocked_by?: { id: string; name: string; avatar_url: string | null } | null;
 };
 
 export type NotificationItem = {

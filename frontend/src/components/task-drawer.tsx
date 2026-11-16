@@ -274,6 +274,20 @@ export function TaskDrawer({
                     aria-hidden
                   />
                   <div className="space-y-2 px-3 py-2.5">
+                    {task.blocked_at && !task.closed_at && (
+                      <div className="flex items-start gap-2 rounded-[var(--radius)] bg-[var(--warning-soft)] px-2.5 py-2 text-sm text-foreground">
+                        <AppIcon name="alert" size={16} className="mt-0.5 shrink-0 text-[var(--warning)]" />
+                        <span className="min-w-0">
+                          <span className="font-semibold text-[var(--warning)]">Застряла</span>
+                          {task.blocked_reason ? <> — {task.blocked_reason}</> : null}
+                          {task.blocked_by?.name && (
+                            <span className="block text-xs text-muted">
+                              Отметил(а) {task.blocked_by.name} в чек-ине
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                     <p className="text-sm leading-snug text-foreground">
                       <span className="text-muted">Срочность:</span>{" "}
                       <span

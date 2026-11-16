@@ -20,20 +20,21 @@ export type TaskActivityItem = {
   created_at: string;
 };
 
+/** В истории: переносы между столбцами и ответы на чек-ин. */
 function isColumnMove(item: TaskActivityItem) {
   const a = (item.action || "").toLowerCase();
-  return a === "moved" || a === "status_changed" || item.field === "status_id";
+  return a === "moved" || a === "status_changed" || a === "checkin" || item.field === "status_id";
 }
 
 function moveCountLabel(n: number) {
   const mod10 = n % 10;
   const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "перенос";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "переноса";
-  return "переносов";
+  if (mod10 === 1 && mod100 !== 11) return "изменение";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "изменения";
+  return "изменений";
 }
 
-/** Collapsible history — only column (status) moves. */
+/** Collapsible history — column moves and check-in answers. */
 export function TaskActivityPanel({ taskId }: { taskId: string }) {
   const [open, setOpen] = useState(false);
   const { data, isLoading, isError } = useQuery({
@@ -62,7 +63,7 @@ export function TaskActivityPanel({ taskId }: { taskId: string }) {
         aria-expanded={open}
       >
         <span className="min-w-0">
-          <span className="block text-[13px] font-semibold text-foreground">История столбцов</span>
+          <span className="block text-[13px] font-semibold text-foreground">История</span>
           <span className="block text-[12px] text-muted">{subtitle}</span>
         </span>
         <span className={cn("text-muted transition", open && "rotate-180")} aria-hidden>

@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user-avatar";
 import { BrandLogo, BrandMark } from "@/components/brand-mark";
 import { Dialog } from "@/components/ui/dialog";
+import { CheckinBanner } from "@/components/checkin-banner";
+import { RhythmSettingsFields } from "@/components/rhythm-settings";
+import { DEFAULT_RHYTHM, type RhythmSettings } from "@/lib/rhythm";
 import { NotificationToasts } from "@/components/notification-toasts";
 import { NotificationsDrawer } from "@/components/notifications-drawer";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -55,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameAutoUrgency, setRenameAutoUrgency] = useState(true);
+  const [renameRhythm, setRenameRhythm] = useState<RhythmSettings>(DEFAULT_RHYTHM);
   const [inviteOpen, setInviteOpen] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
@@ -329,7 +333,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!name) return;
     await api(`/api/v1/projects/${renameProject.id}`, {
       method: "PATCH",
-      json: { name, auto_urgency_from_due: renameAutoUrgency },
+      json: {
+        name,
+        auto_urgency_from_due: renameAutoUrgency,
+        rhythm_enabled: renameRhythm.enabled,
+        rhythm_time: renameRhythm.time,
+        rhythm_timezone: renameRhythm.timezone,
+        rhythm_days: renameRhythm.days,
+      },
     });
     setRenameProjectId(null);
     qc.invalidateQueries({ queryKey: ["projects"] });
@@ -475,6 +486,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           setMenuProjectId(null);
                           setRenameValue(p.name);
                           setRenameAutoUrgency(p.auto_urgency_from_due !== false);
+                          setRenameRhythm(p.rhythm ?? { ...DEFAULT_RHYTHM, enabled: false });
                           setRenameProjectId(p.id);
                         }}
                       >
@@ -576,6 +588,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden bg-[var(--kanban-board-bg)] px-2 pb-2 pt-3 sm:px-3 sm:pb-3 sm:pt-4 md:px-4 md:pb-4 md:pt-5">
+          {!pathname?.startsWith("/app/checkin") && !pathname?.startsWith("/app/admin") && (
+            <CheckinBanner />
+          )}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
         </main>
       </div>
@@ -700,6 +715,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
               </span>
             </label>
+            <RhythmSettingsFields value={renameRhythm} onChange={setRenameRhythm} />
             <Button type="submit" className="w-full" disabled={!renameValue.trim()}>
               Сохранить
             </Button>

@@ -19,6 +19,7 @@ type ToastItem = {
   body: string;
   projectId: string | null;
   taskId: string | null;
+  kind?: string;
 };
 
 function loadSeenIds(): Set<string> {
@@ -57,7 +58,9 @@ function showBrowserNotification(n: NotificationItem, toast: ToastItem) {
     note.onclick = () => {
       window.focus();
       note.close();
-      if (n.project_id && n.task_id) {
+      if (n.kind === "rhythm_checkin") {
+        window.location.href = "/app/checkin";
+      } else if (n.project_id && n.task_id) {
         window.location.href = `/app/projects/${n.project_id}?task=${n.task_id}`;
       } else if (n.project_id) {
         window.location.href = `/app/projects/${n.project_id}`;
@@ -79,6 +82,7 @@ function toastFromNotification(n: NotificationItem): ToastItem {
     body,
     projectId: n.project_id,
     taskId: n.task_id,
+    kind: n.kind,
   };
 }
 
@@ -152,7 +156,10 @@ export function NotificationToasts() {
       /* ignore */
     }
     setToasts((prev) => prev.filter((x) => x.id !== t.id));
-    if (t.projectId && t.taskId) router.push(`/app/projects/${t.projectId}?task=${t.taskId}`);
+    if (t.kind === "rhythm_checkin") {
+      qc.invalidateQueries({ queryKey: ["rhythm", "current"] });
+      router.push("/app/checkin");
+    } else if (t.projectId && t.taskId) router.push(`/app/projects/${t.projectId}?task=${t.taskId}`);
     else if (t.projectId) router.push(`/app/projects/${t.projectId}`);
   }
 

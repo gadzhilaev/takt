@@ -141,6 +141,15 @@ export function TaskCard({
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="kanban-urgency-badge">{urgencyLabel(task.priority)}</span>
+            {task.blocked_at && !done && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--warning)]"
+                title={task.blocked_reason ? `Застряла: ${task.blocked_reason}` : "Застряла"}
+              >
+                <AppIcon name="alert" size={12} className="opacity-80" />
+                Застряла
+              </span>
+            )}
             {dueLabel && (
               <span
                 className={cn(
@@ -165,6 +174,11 @@ export function TaskCard({
               </span>
             )}
           </div>
+          {task.blocked_at && !done && task.blocked_reason && (
+            <p className="mt-1.5 line-clamp-2 border-l-2 border-[var(--warning)] pl-1.5 text-[12px] leading-snug text-foreground/85">
+              {task.blocked_reason}
+            </p>
+          )}
           {task.description?.trim() && (
             <p
               className={cn(
