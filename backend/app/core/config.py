@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     DUE_REMINDER_INTERVAL_SECONDS: int = 300
     DUE_REMINDER_ENABLED: bool = True
 
+    # Logging level for app.* loggers (background loop passes are logged at INFO).
+    APP_LOG_LEVEL: str = "INFO"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

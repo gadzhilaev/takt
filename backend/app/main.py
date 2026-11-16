@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import subprocess
 import sys
 from contextlib import asynccontextmanager
@@ -18,6 +19,21 @@ from app.core.limiter import limiter
 from app.db.session import AsyncSessionLocal
 from app.services.bootstrap import bootstrap_db
 from app.services.due_reminder_service import due_reminder_loop
+
+
+def configure_app_logging(level: str) -> None:
+    """app.* loggers → stdout (docker logs). Background loop passes are logged at INFO.
+
+    Uvicorn configures only its own loggers; without this, app INFO lines are dropped.
+    """
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(getattr(logging, (level or "INFO").upper(), logging.INFO))
+    if not any(getattr(h, "_takt_app", False) for h in app_logger.handlers):
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        handler._takt_app = True  # type: ignore[attr-defined]
+        app_logger.addHandler(handler)
+    app_logger.propagate = False
 
 
 def run_migrations() -> None:
@@ -51,6 +67,7 @@ def run_migrations() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    configure_app_logging(settings.APP_LOG_LEVEL)
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     run_migrations()
     async with AsyncSessionLocal() as db:

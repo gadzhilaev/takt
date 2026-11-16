@@ -14,6 +14,15 @@ from app.core.config import get_settings
 
 logger = logging.getLogger("takt.email")
 
+
+def mask_email(address: str | None) -> str:
+    """a***@example.com — logs must not carry full addresses."""
+    value = (address or "").strip()
+    if "@" not in value:
+        return "***"
+    local, _, domain = value.partition("@")
+    return f"{local[:1]}***@{domain}"
+
 _SMTP_BZ_SEND_URL = "https://api.smtp.bz/v1/smtp/send"
 _FROM_RE = re.compile(r"^(?:(.+?)\s*)?<([^>]+)>$")
 
@@ -113,9 +122,9 @@ def _send_via_smtp(*, to: str, subject: str, text_body: str, html_body: str) -> 
                 smtp.login(settings.SMTP_USER.strip(), settings.SMTP_PASSWORD)
             smtp.send_message(msg)
     except Exception as exc:
-        logger.warning("SMTP send failed to=%s err=%s", to, type(exc).__name__)
+        logger.warning("SMTP send failed to=%s err=%s", mask_email(to), type(exc).__name__)
         raise EmailDeliveryError("Не удалось отправить письмо через SMTP") from exc
-    logger.info("Email sent via SMTP to=%s subject=%s", to, subject)
+    logger.info("Email sent via SMTP to=%s subject=%s", mask_email(to), subject)
     return "smtp_ok"
 
 
@@ -159,11 +168,16 @@ async def _send_via_smtp_bz_api(
                 },
             )
     except httpx.HTTPError as exc:
-        logger.exception("SMTP.BZ network error to=%s", to)
+        logger.exception("SMTP.BZ network error to=%s", mask_email(to))
         raise EmailDeliveryError("Не удалось отправить письмо через SMTP.BZ") from exc
 
     if response.status_code >= 400:
-        logger.error("SMTP.BZ HTTP %s to=%s body=%s", response.status_code, to, response.text)
+        logger.error(
+            "SMTP.BZ HTTP %s to=%s body=%s",
+            response.status_code,
+            mask_email(to),
+            response.text[:300],
+        )
         raise EmailDeliveryError("Не удалось отправить письмо. Проверьте адрес почты.")
 
     try:
@@ -172,10 +186,10 @@ async def _send_via_smtp_bz_api(
         payload = None
 
     if isinstance(payload, dict) and payload.get("result") is False:
-        logger.error("SMTP.BZ rejected to=%s payload=%s", to, payload)
+        logger.error("SMTP.BZ rejected to=%s payload=%s", mask_email(to), payload)
         raise EmailDeliveryError("Не удалось отправить письмо. Проверьте адрес почты.")
 
-    logger.info("Email sent via SMTP.BZ API to=%s subject=%s", to, subject)
+    logger.info("Email sent via SMTP.BZ API to=%s subject=%s", mask_email(to), subject)
     return "smtp_bz_ok"
 
 
@@ -190,7 +204,7 @@ async def send_otp_email(*, to: str, code: str, purpose: str) -> str | None:
     subject, text_body, html_body = _otp_bodies(app_name=app_name, code=code, purpose=purpose)
 
     if not is_email_configured():
-        logger.info("Email dry-run: to=%s purpose=%s", destination, purpose)
+        logger.info("Email dry-run: to=%s purpose=%s", mask_email(destination), purpose)
         return None
 
     # Prefer SMTP.BZ HTTP API (works when VPS blocks outbound SMTP ports).
