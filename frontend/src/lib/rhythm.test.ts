@@ -4,6 +4,7 @@ import {
   bannerText,
   buildAnswers,
   initialSelection,
+  startProjectId,
   tasksWord,
   timezoneOptions,
   toggleDay,
@@ -78,5 +79,16 @@ describe("rhythm helpers", () => {
   it("неизвестный часовой пояс остаётся в списке", () => {
     expect(timezoneOptions("Europe/Berlin").at(-1)?.value).toBe("Europe/Berlin");
     expect(timezoneOptions("Europe/Moscow").some((t) => t.value === "Europe/Berlin")).toBe(false);
+  });
+});
+
+describe("startProjectId", () => {
+  it("кнопка только без активного чек-ина; приоритет — текущий проект", () => {
+    const data = { checkins: [], pending: 0, startable_project_ids: ["p1", "p2"] };
+    expect(startProjectId(data, "p2")).toBe("p2");
+    expect(startProjectId(data, "other")).toBe("p1");
+    expect(startProjectId({ ...data, startable_project_ids: [] })).toBeNull();
+    expect(startProjectId({ checkins: [checkin], pending: 1, startable_project_ids: ["p1"] })).toBeNull();
+    expect(startProjectId(undefined)).toBeNull();
   });
 });

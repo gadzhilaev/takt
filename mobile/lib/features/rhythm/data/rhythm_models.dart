@@ -149,3 +149,14 @@ String? checkinBannerText(List<Checkin> checkins) {
   if (left == 0) return null;
   return 'Чек-ин на сегодня · $left ${tasksWord(left)}';
 }
+
+/// Проект для «Пройти чек-ин сейчас»: только без активного чек-ина; текущий — в приоритете.
+String? checkinStartProjectId(
+  List<Checkin> checkins,
+  List<String> startable, {
+  String? currentProjectId,
+}) {
+  if (startable.isEmpty || checkinBannerText(checkins) != null) return null;
+  if (currentProjectId != null && startable.contains(currentProjectId)) return currentProjectId;
+  return startable.first;
+}

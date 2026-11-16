@@ -24,7 +24,23 @@ export type Checkin = {
   items: CheckinItem[];
 };
 
-export type CurrentCheckins = { checkins: Checkin[]; pending: number };
+export type CurrentCheckins = {
+  checkins: Checkin[];
+  pending: number;
+  /** Проекты, где можно пройти чек-ин вручную (на сегодня его ещё нет). */
+  startable_project_ids?: string[];
+};
+
+/** Проект для «Пройти чек-ин сейчас»: текущий открытый, иначе первый доступный. */
+export function startProjectId(
+  data: CurrentCheckins | undefined,
+  currentProjectId?: string | null
+): string | null {
+  const ids = data?.startable_project_ids ?? [];
+  if (!ids.length || bannerText(data)) return null;
+  if (currentProjectId && ids.includes(currentProjectId)) return currentProjectId;
+  return ids[0];
+}
 
 export type RhythmSettings = {
   enabled: boolean;

@@ -66,4 +66,11 @@ void main() {
     expect(p.rhythm, const RhythmSettings(time: '09:30', timezone: 'Asia/Omsk', days: [1, 3]));
     expect(Project.fromJson({'id': 'p', 'name': 'P'}).rhythm.enabled, isFalse);
   });
+
+  test('«Пройти чек-ин сейчас»: только без активного чек-ина, текущий проект в приоритете', () {
+    expect(checkinStartProjectId(const [], ['p1', 'p2'], currentProjectId: 'p2'), 'p2');
+    expect(checkinStartProjectId(const [], ['p1', 'p2'], currentProjectId: 'x'), 'p1');
+    expect(checkinStartProjectId(const [], const []), isNull);
+    expect(checkinStartProjectId([_checkin()], ['p1']), isNull);
+  });
 }
