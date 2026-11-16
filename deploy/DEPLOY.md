@@ -118,6 +118,16 @@ Platform role:
 docker compose exec backend python -m app.cli grant-super-admin --email you@example.com
 ```
 
+Аккаунт для App Review (скрипты `backend/scripts/` входят в образ backend). Сначала план, затем выполнение:
+
+```bash
+C="docker compose -f deploy/docker-compose.prod.yml --env-file .env"
+$C exec -T -e REVIEW_ACCOUNT_EMAIL=store.review@taktapp.ru backend \
+  python scripts/seed_review_account.py                                  # dry-run
+$C exec -T -e REVIEW_ACCOUNT_EMAIL=store.review@taktapp.ru backend \
+  python scripts/seed_review_account.py --apply --allow-production
+```
+
 ---
 
 ## 5. Обновление

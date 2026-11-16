@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY alembic.ini .
 COPY alembic ./alembic/
 COPY app ./app/
+# Служебные скрипты (seed и т.п.): docker compose exec backend python scripts/<name>.py
+COPY scripts ./scripts/
 
 RUN mkdir -p /data/uploads && chown -R appuser:appuser /data/uploads
 
