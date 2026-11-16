@@ -241,3 +241,65 @@ async def test_plan_and_cli_dry_run_change_nothing():
             select(func.count()).select_from(Project).where(Project.name == REVIEW_PROJECTS[0].name)
         )
         assert n == 0
+
+
+@pytest.mark.asyncio
+async def test_seed_turns_on_rhythm_and_creates_today_checkin():
+    from datetime import time as dtime
+
+    from app.models.rhythm import RhythmCheckin
+    from app.models.team import TaskStatus
+    from app.services.rhythm_service import local_today
+
+    email = "reviewer-rhythm@example.com"
+    async with TestSession() as db:
+        r1 = await seed_review_account(db, email=email, password="Review-Pass-123!")
+    assert r1["checkin"]["status"] == "pending" and r1["checkin"]["tasks"] >= 3
+    assert r1["blocked_task"] == "Настроить проектор в актовом зале"
+
+    async with TestSession() as db:
+        me = await db.scalar(select(User).where(User.email == email))
+        projects = (
+            await db.scalars(
+                select(Project).join(ProjectMember).where(ProjectMember.user_id == me.id)
+            )
+        ).all()
+        assert len(projects) == 3
+        now = datetime.now(UTC)
+        for p in projects:
+            assert p.rhythm_enabled and p.rhythm_time == dtime(0, 5)
+            assert p.rhythm_timezone == "Europe/Moscow" and p.rhythm_days == [1, 2, 3, 4, 5, 6, 7]
+            open_mine = (
+                await db.scalars(
+                    select(Task)
+                    .join(TaskAssignee, TaskAssignee.task_id == Task.id)
+                    .join(TaskStatus, TaskStatus.id == Task.status_id)
+                    .where(
+                        Task.project_id == p.id,
+                        TaskAssignee.user_id == me.id,
+                        TaskStatus.is_done.is_(False),
+                    )
+                )
+            ).all()
+            assert 3 <= len(open_mine) <= 5, (p.name, len(open_mine))
+            assert any(
+                t.due_date and 0 < (t.due_date - now).total_seconds() < 72 * 3600 for t in open_mine
+            ), p.name
+        checkins = (
+            await db.scalars(select(RhythmCheckin).where(RhythmCheckin.user_id == me.id))
+        ).all()
+        assert len(checkins) == 1
+        c = checkins[0]
+        project = await db.get(Project, c.project_id)
+        assert project.name == "Цифровые сервисы колледжа"
+        assert c.status == "pending" and c.date == local_today(project)
+        blocked = await db.scalar(
+            select(Task).where(Task.title == "Настроить проектор в актовом зале")
+        )
+        assert blocked.blocked_at is not None
+        assert blocked.blocked_reason == "Ждём переходник HDMI от завхоза"
+
+    # Повторный запуск в тот же день — тот же чек-ин, без дублей.
+    async with TestSession() as db:
+        r2 = await seed_review_account(db, email=email)
+    assert r2["checkin"]["id"] == r1["checkin"]["id"]

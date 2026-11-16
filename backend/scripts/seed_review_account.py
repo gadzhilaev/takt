@@ -70,6 +70,8 @@ def _print_plan(plan: dict) -> None:
         print("  посторонних проектов нет")
     names = ", ".join(f"«{p.name}»" for p in REVIEW_PROJECTS)
     print(f"  проекты сида (создать/обновить): {names}")
+    print("  ритм: включить во всех проектах сида — каждый день, 00:05, Europe/Moscow")
+    print("  чек-ин на сегодня: «Цифровые сервисы колледжа» (без push); одна задача «Застряла»")
     if plan["shared_with_real"]:
         shared = ", ".join(f"«{n}»" for n in plan["shared_with_real"])
         print(f"  ВНИМАНИЕ: другие реальные участники в {shared}")
@@ -124,6 +126,10 @@ async def main() -> int:
         print(f"  project: {p['name']} ({p['id']})")
     for key in ("tasks_created", "tasks_updated", "comments", "attachments", "notifications"):
         print(f"  {key}: {report[key]}")
+    print(f"  blocked_task: {report['blocked_task']}")
+    c = report["checkin"]
+    if c:
+        print(f"  checkin today: {c['id']} status={c['status']} tasks={c['tasks']}")
     return 0
 
 

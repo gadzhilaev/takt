@@ -22,7 +22,7 @@ import io
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 from PIL import Image, ImageDraw
 from sqlalchemy import delete, select
@@ -38,6 +38,16 @@ from app.services.account_service import exit_projects, plan_project_exits
 from app.services.attachment_service import attachments_dir, remove_dirs
 from app.services.project_service import DEFAULT_STATUS_TEMPLATE
 from app.services.ru_names import format_assignment_line, format_completed_line
+
+# Ритм ревьюера: каждый день в 00:05 МСК — цикл сам создаёт новый чек-ин, пока идёт ревью.
+REVIEW_RHYTHM_TIME = time(0, 5)
+REVIEW_RHYTHM_TZ = "Europe/Moscow"
+REVIEW_RHYTHM_DAYS = [1, 2, 3, 4, 5, 6, 7]
+CHECKIN_PROJECT = "Цифровые сервисы колледжа"
+# «Застряла» на доске — отметил демо-сотрудник.
+BLOCKED_TASK = ("Цифровые сервисы колледжа", "Настроить проектор в актовом зале")
+BLOCKED_BY = "kuznetsov"
+BLOCKED_REASON = "Ждём переходник HDMI от завхоза"
 
 P = TaskPriority
 
@@ -108,7 +118,7 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
                 "Собрать ответы на частые вопросы абитуриентов",
                 "Вопросы из приёмной и чата за прошлый год: общежитие, проходной балл, "
                 "документы, сроки. Сформулировать короткие ответы.",
-                P.medium, 0, ("lebedeva",), ME, 3,
+                P.medium, 0, ("lebedeva", ME), ME, 3,
                 due_in_hours=24 * 6,
             ),
             SeedTask(
@@ -121,7 +131,7 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Проверить работу телефона горячей линии",
                 "Переадресация на дежурного, автоответчик в нерабочее время.",
-                P.high, 2, ("kuznetsov",), ME, 4,
+                P.high, 2, ("kuznetsov", ME), ME, 4,
                 due_in_hours=10, in_status_days=1,
                 comments=(
                     ("kuznetsov", "Переадресацию настроил, осталось записать автоответчик."),
@@ -158,14 +168,14 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Настроить проектор в актовом зале",
                 "Не определяется ноутбук по HDMI. Проверить кабель и переходник.",
-                P.high, 0, ("kuznetsov",), ME, 1,
+                P.high, 0, (ME, "kuznetsov"), ME, 1,
                 due_in_hours=20,
                 attachment="image", attachment_name="Фото подключения.png",
             ),
             SeedTask(
                 "Выдать преподавателям доступ к электронному журналу",
                 "12 новых преподавателей. Логины отправить на рабочую почту.",
-                P.high, 2, ("morozov",), "belova", 5,
+                P.high, 2, ("morozov", ME), "belova", 5,
                 due_in_hours=48, in_status_days=1,
             ),
             SeedTask(
@@ -182,7 +192,7 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Проверить Wi‑Fi в библиотеке",
                 "Жалобы студентов на обрывы связи. Замерить скорость в читальном зале.",
-                P.medium, 1, ("orlov",), ME, 3,
+                P.medium, 1, ("orlov", ME), ME, 3,
                 due_in_hours=60, in_status_days=1,
                 comments=(("orlov", "Нужна ещё одна точка доступа у окна."),),
             ),
@@ -385,6 +395,10 @@ async def _ensure_project(db: AsyncSession, spec: SeedProject, owner: User) -> P
         project.description = spec.description
         project.is_archived = False
         project.is_demo = True
+    project.rhythm_enabled = True
+    project.rhythm_time = REVIEW_RHYTHM_TIME
+    project.rhythm_timezone = REVIEW_RHYTHM_TZ
+    project.rhythm_days = list(REVIEW_RHYTHM_DAYS)
     return project
 
 
@@ -558,6 +572,8 @@ async def seed_review_account(
         "attachments": 0,
         "notifications": 0,
         "removed_projects": [],
+        "blocked_task": None,
+        "checkin": None,
     }
 
     me, report["user_created"] = await _ensure_review_user(db, email, password, name)
@@ -723,6 +739,27 @@ async def seed_review_account(
                     )
                     report["attachments"] += 1
 
+    # «Застряла»: одна задача на доске с причиной от демо-сотрудника.
+    blocked = tasks_by_title.get(BLOCKED_TASK)
+    if blocked is not None:
+        blocker = staff[BLOCKED_BY]
+        blocked.blocked_at = now - timedelta(hours=3)
+        blocked.blocked_reason = BLOCKED_REASON
+        blocked.blocked_by_id = blocker.id
+        has_log = await db.scalar(
+            select(ActivityLog.id).where(
+                ActivityLog.task_id == blocked.id, ActivityLog.action == "checkin"
+            )
+        )
+        if not has_log:
+            db.add(
+                _log(
+                    blocked.id, blocker.id, "checkin", now - timedelta(hours=3),
+                    "blocked", None, BLOCKED_REASON,
+                )
+            )
+        report["blocked_task"] = blocked.title
+
     # Notifications: replace previous review notifications in these projects.
     project_ids = [p.id for p in projects_by_name.values()]
     await db.execute(
@@ -754,6 +791,19 @@ async def seed_review_account(
             )
         )
         report["notifications"] += 1
+
+    await db.flush()
+    # Сегодняшний чек-ин ревьюера — тем же кодом, что «Пройти чек-ин сейчас» (без push).
+    from app.services.rhythm_service import start_checkin_now
+
+    checkin = await start_checkin_now(
+        db, user=me, project_id=projects_by_name[CHECKIN_PROJECT].id, now=now
+    )
+    report["checkin"] = {
+        "id": str(checkin.id),
+        "status": checkin.status,
+        "tasks": len(checkin.items),
+    }
 
     await db.commit()
     remove_dirs(file_dirs)  # only after a successful commit
