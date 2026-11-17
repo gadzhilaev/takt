@@ -10,6 +10,7 @@ import '../../../core/avatar_cache.dart';
 import '../../../core/push/fcm_bootstrap.dart';
 import '../../../core/theme.dart';
 import '../../board/cubit/board_cubit.dart';
+import '../../onboarding/onboarding_controller.dart';
 import '../cubit/auth_cubit.dart';
 import '../data/oauth_repository.dart';
 
@@ -112,6 +113,11 @@ class _SplashPageState extends State<SplashPage> {
     if (!_minElapsed || !_warmDone || !mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final onboarding = context.read<OnboardingController>();
+      if (!onboarding.seen) {
+        context.go('/onboarding');
+        return;
+      }
       if (state is AuthAuthenticated) {
         final fcm = context.read<FcmBootstrap>();
         context.go(fcm.shouldShowPrompt ? '/enable-notifications' : '/projects');

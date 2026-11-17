@@ -11,7 +11,7 @@ import '../../../shared/widgets/kanban_drag_edge_scroll.dart';
 import '../../../shared/widgets/kanban_page_physics.dart';
 import '../../rhythm/presentation/checkin_banner.dart';
 
-/// «Мои задачи» только для открытого проекта (Kanban с назначенными на меня).
+/// «Мои задачи» только для открытого проекта (столбцы с назначенными на меня).
 class MyTasksPage extends StatefulWidget {
   const MyTasksPage({super.key});
 
@@ -154,6 +154,19 @@ class _MyTasksPageState extends State<MyTasksPage> {
                     'Войдите снова, чтобы увидеть назначенные задачи',
                     style: TextStyle(
                       fontSize: 13,
+                      color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                    ),
+                  ),
+                )
+              else if (userId.isNotEmpty &&
+                  state.tasks.where((t) => t.assignees.any((a) => a.id == userId)).isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    'На сегодня на вас ничего не назначено. Когда появится задача или чек-ин — они будут здесь.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
                       color: dark ? TaktColors.mutedDark : TaktColors.muted,
                     ),
                   ),

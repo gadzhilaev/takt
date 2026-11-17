@@ -9,7 +9,9 @@ import '../../../shared/widgets/kanban_column.dart';
 import '../../../shared/widgets/kanban_drag_edge_scroll.dart';
 import '../../../shared/widgets/kanban_page_physics.dart';
 import '../cubit/board_cubit.dart';
+import '../../onboarding/widget_tip_card.dart';
 import '../../rhythm/presentation/checkin_banner.dart';
+import '../../rhythm/presentation/rhythm_enable_card.dart';
 
 class BoardPage extends StatefulWidget {
   const BoardPage({super.key, this.deepTaskId, this.deepProjectId});
@@ -346,6 +348,8 @@ class _BoardPageState extends State<BoardPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const CheckinBanner(padding: EdgeInsets.fromLTRB(16, 0, 16, 8)),
+              const RhythmEnableCard(),
+              const WidgetTipCard(padding: EdgeInsets.fromLTRB(16, 0, 16, 8)),
               Expanded(child: board),
             ],
           ),

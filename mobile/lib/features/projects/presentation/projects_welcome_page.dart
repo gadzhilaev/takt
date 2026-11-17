@@ -143,7 +143,7 @@ class _ProjectsWelcomePageState extends State<ProjectsWelcomePage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Доска откроется сразу: четыре стандартных столбца.',
+                          'Или вступите по приглашению. Дальше включите ежедневный чек-ин — команда будет отвечать за 10 секунд, а задачи обновятся сами.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: muted, height: 1.4),
                         ),

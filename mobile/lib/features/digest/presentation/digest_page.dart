@@ -96,6 +96,22 @@ class _DigestPageState extends State<DigestPage> {
                 ),
                 const SizedBox(height: 12),
                 _Numbers(d: d, dark: dark),
+                if (d.done == 0 &&
+                    d.stuck == 0 &&
+                    d.overdue == 0 &&
+                    d.rhythmTotal == 0) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    d.rhythmEnabled
+                        ? 'Сводка наполнится после ответов на чек-ин и закрытых задач за выбранный период. Обычно это видно уже на следующий рабочий день.'
+                        : 'Сводка наполнится, когда включите ежедневный чек-ин и команда начнёт отмечать задачи.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 _Section(
                   title: 'Застряло',

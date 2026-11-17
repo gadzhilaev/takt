@@ -72,6 +72,7 @@ run_seeded() {
   cd "$ROOT"
   flutter run -d "$UDID" -t lib/main_store_shots.dart \
     --dart-define=SKIP_PUSH_INTRO=true \
+    --dart-define=SKIP_ONBOARDING=true \
     --dart-define=STORE_EMAIL="$STORE_EMAIL" \
     --dart-define=STORE_PASSWORD="$STORE_PASSWORD" \
     --dart-define=STORE_PROJECT_ID="$PROJECT_ID" \

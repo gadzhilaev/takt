@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_icon.dart';
 import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../../board/cubit/board_cubit.dart';
+import '../../onboarding/onboarding_controller.dart';
 import '../data/rhythm_models.dart';
 import '../data/rhythm_repository.dart';
 
@@ -134,6 +135,8 @@ class _CheckinPageState extends State<CheckinPage> {
     });
     try {
       await _repo.answer(c.id, answers);
+      if (!mounted) return;
+      await context.read<OnboardingController>().markCheckinAnswered();
       if (!mounted) return;
       final board = context.read<BoardCubit>();
       if (board.state.project?.id == c.projectId) {

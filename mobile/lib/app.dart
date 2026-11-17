@@ -21,6 +21,7 @@ import 'features/auth/data/oauth_repository.dart';
 import 'features/board/cubit/board_cubit.dart';
 import 'features/board/data/board_repository.dart';
 import 'features/notifications/data/notifications_repository.dart';
+import 'features/onboarding/onboarding_controller.dart';
 import 'features/profile/data/profile_repository.dart';
 import 'features/projects/data/projects_repository.dart';
 import 'features/widget_sync/widget_sync.dart';
@@ -33,11 +34,13 @@ class TaktApp extends StatefulWidget {
     required this.tokens,
     required this.api,
     required this.fcm,
+    required this.onboarding,
   });
 
   final TokenStorage tokens;
   final ApiClient api;
   final FcmBootstrap fcm;
+  final OnboardingController onboarding;
 
   /// Set before runApp / from FCM / widget launch.
   static String? get pendingDeepLink => PendingDeepLink.value;
@@ -99,7 +102,7 @@ class _TaktAppState extends State<TaktApp> {
       widgetSync: _widgetSync,
     );
     _boardRealtime = BoardRealtime(tokens: widget.tokens, boardCubit: _boardCubit);
-    _router = createRouter(_authCubit, widget.fcm);
+    _router = createRouter(_authCubit, widget.fcm, widget.onboarding);
     TaktApp.onWidgetDeepLink = _consumeDeepLink;
     WidgetsBinding.instance.addPostFrameCallback((_) => _consumeDeepLink());
   }
@@ -153,6 +156,7 @@ class _TaktAppState extends State<TaktApp> {
         RepositoryProvider.value(value: ProfileRepository(widget.api)),
         RepositoryProvider.value(value: _widgetSync),
         RepositoryProvider.value(value: widget.fcm),
+        RepositoryProvider.value(value: widget.onboarding),
       ],
       child: MultiBlocProvider(
         providers: [

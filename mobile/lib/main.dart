@@ -13,6 +13,7 @@ import 'core/push/checkin_push.dart';
 import 'core/push/fcm_bootstrap.dart';
 import 'core/token_storage.dart';
 import 'features/notifications/data/notifications_repository.dart';
+import 'features/onboarding/onboarding_controller.dart';
 import 'features/widget_sync/widget_sync.dart';
 
 Future<void> main() async {
@@ -39,6 +40,12 @@ Future<void> main() async {
   // Local QA / CI: --dart-define=SKIP_PUSH_INTRO=true skips the first-run push screen.
   if (const bool.fromEnvironment('SKIP_PUSH_INTRO')) {
     await fcm.markPromptSeen();
+  }
+  final onboarding = OnboardingController();
+  await onboarding.load();
+  // Local QA / CI / golden: skip product onboarding.
+  if (const bool.fromEnvironment('SKIP_ONBOARDING')) {
+    await onboarding.markSeen();
   }
   await fcm.init();
 
@@ -67,5 +74,5 @@ Future<void> main() async {
     TaktApp.onWidgetDeepLink?.call();
   });
 
-  runApp(TaktApp(tokens: tokens, api: api, fcm: fcm));
+  runApp(TaktApp(tokens: tokens, api: api, fcm: fcm, onboarding: onboarding));
 }

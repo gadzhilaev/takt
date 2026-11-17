@@ -18,6 +18,8 @@ import '../features/projects/presentation/project_members_page.dart';
 import '../features/projects/presentation/projects_welcome_page.dart';
 import '../features/digest/data/digest_models.dart';
 import '../features/digest/presentation/digest_page.dart';
+import '../features/onboarding/onboarding_controller.dart';
+import '../features/onboarding/onboarding_page.dart';
 import '../features/rhythm/presentation/checkin_page.dart';
 import '../features/shell/app_shell.dart';
 import '../features/shell/sliding_branch_stack.dart';
@@ -30,11 +32,15 @@ import 'theme.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
+GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm, OnboardingController onboarding) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
-    refreshListenable: Listenable.merge([_AuthListenable(authCubit), fcm.promptSeenListenable]),
+    refreshListenable: Listenable.merge([
+      _AuthListenable(authCubit),
+      fcm.promptSeenListenable,
+      onboarding.seenListenable,
+    ]),
     redirect: (context, state) {
       final mapped = _mapDeepLink(state);
       if (mapped != null) return mapped;
@@ -44,6 +50,7 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
       final onSplash = loc == '/splash';
       final loggingIn = loc == '/login' || loc == '/register' || loc == '/forgot-password';
       final onPushIntro = loc == '/enable-notifications';
+      final onOnboarding = loc == '/onboarding';
 
       if (auth is AuthUnknown) {
         return onSplash ? null : '/splash';
@@ -56,6 +63,8 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
 
       if (auth is AuthGuest) {
         if (onSplash) return null;
+        if (!onboarding.seen && !onOnboarding) return '/onboarding';
+        if (onOnboarding) return null;
         if (onPushIntro) return '/login';
         // Defer deep link until after login — keep as pending via fullPath store.
         if (!loggingIn && _isAppPath(loc)) {
@@ -67,6 +76,8 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
 
       if (auth is AuthAuthenticated) {
         if (onSplash) return null;
+        if (!onboarding.seen && !onOnboarding) return '/onboarding';
+        if (onOnboarding) return null;
         if (onPushIntro) return null;
         if (fcm.shouldShowPrompt) return '/enable-notifications';
         // Задание/сброс пароля доступен и из профиля (OAuth-only аккаунты).
@@ -88,6 +99,8 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
 
       if (auth is AuthFailure) {
         if (onSplash) return null;
+        if (!onboarding.seen && !onOnboarding) return '/onboarding';
+        if (onOnboarding) return null;
         return loggingIn ? null : '/login';
       }
 
@@ -96,6 +109,7 @@ GoRouter createRouter(AuthCubit authCubit, FcmBootstrap fcm) {
     errorBuilder: (context, state) => _TaktNotFoundPage(error: state.error),
     routes: [
       GoRoute(path: '/splash', builder: (_, _) => const SplashPage()),
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(
         path: '/register',
@@ -273,7 +287,8 @@ bool _isAppPath(String loc) {
       loc.startsWith('/notifications') ||
       loc.startsWith('/digest') ||
       loc.startsWith('/checkin') ||
-      loc.startsWith('/enable-notifications');
+      loc.startsWith('/enable-notifications') ||
+      loc.startsWith('/onboarding');
 }
 
 class _TaktNotFoundPage extends StatelessWidget {
