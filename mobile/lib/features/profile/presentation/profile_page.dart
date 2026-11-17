@@ -21,6 +21,8 @@ import '../../projects/data/projects_repository.dart';
 import '../data/account_delete_preview.dart';
 import '../data/profile_repository.dart';
 import 'sign_in_methods_section.dart';
+import '../../../core/live_activity.dart';
+import '../../rhythm/data/rhythm_repository.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, this.embeddedInShell = false});
@@ -195,6 +197,25 @@ class _ProfilePageState extends State<ProfilePage> {
                           : AppIcon(AppIcons.settings, size: 20, color: muted),
                       onTap: _pushBusy ? null : () => _handlePushTap(context),
                     ),
+                    if (context.read<LiveActivityController>().available)
+                      ValueListenableBuilder<bool>(
+                        valueListenable: context.read<LiveActivityController>().enabled,
+                        builder: (context, on, _) => TaktListTile(
+                          leading: AppIcon(AppIcons.circleCheck, size: 20, color: muted),
+                          title: 'Чек-ин на экране блокировки',
+                          subtitle: 'Live Activity: чек-ин или ближайший срок',
+                          trailing: Switch.adaptive(
+                            value: on,
+                            onChanged: (v) async {
+                              final live = context.read<LiveActivityController>();
+                              await live.setEnabled(v);
+                              if (v && context.mounted) {
+                                await context.read<RhythmRepository>().loadCurrent();
+                              }
+                            },
+                          ),
+                        ),
+                      ),
                     TaktListTile(
                       leading: AppIcon(AppIcons.inbox, size: 20, color: muted),
                       title: 'Центр уведомлений',

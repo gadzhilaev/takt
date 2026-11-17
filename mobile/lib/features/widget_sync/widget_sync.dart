@@ -81,6 +81,24 @@ class WidgetSync {
     await _writeSnapshot(snapshot);
   }
 
+  /// Сегодняшний чек-ин для виджета «Чек-ин» и Live Activity (iOS).
+  /// Токен — только на этот чек-ин и на сегодня (не JWT); null — убрать из виджета.
+  Future<void> publishCheckin(Map<String, dynamic>? payload) async {
+    try {
+      await HomeWidget.saveWidgetData<String>(
+        checkinKey,
+        payload == null ? null : jsonEncode(payload),
+      );
+      await HomeWidget.saveWidgetData<String>('takt_api_base', AppConfig.apiBase);
+      await HomeWidget.updateWidget(iOSName: checkinWidgetIos);
+    } catch (_) {
+      /* виджет — не критичный путь */
+    }
+  }
+
+  static const checkinKey = 'checkin';
+  static const checkinWidgetIos = 'TaktCheckinWidget';
+
   Future<void> clearOnLogout() async {
     final snapshot = <String, dynamic>{
       'v': 3,
@@ -98,6 +116,7 @@ class WidgetSync {
       'accent': '#315F72',
     };
     await _writeSnapshot(snapshot);
+    await publishCheckin(null);
   }
 
   Future<Map<String, dynamic>?> _readLocalSnapshot() async {
@@ -232,6 +251,14 @@ class WidgetSync {
 
     if (host == 'my-tasks' || host == 'profile' || host == 'notifications') {
       return '/$host';
+    }
+    // Виджет «Чек-ин», Shortcuts: takt://checkin[/<id>], takt://digest?project=<id>
+    if (host == 'checkin') {
+      return segments.isNotEmpty ? '/checkin/${segments.first}' : '/checkin';
+    }
+    if (host == 'digest') {
+      final projectId = q['project'];
+      return projectId == null || projectId.isEmpty ? '/digest' : '/digest?project=$projectId';
     }
     if (segments.isNotEmpty &&
         (segments.first == 'my-tasks' ||

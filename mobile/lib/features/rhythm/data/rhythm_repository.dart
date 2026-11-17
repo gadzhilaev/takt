@@ -1,12 +1,24 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/api_client.dart';
+import '../../widget_sync/widget_sync.dart';
 import 'rhythm_models.dart';
 
 class RhythmRepository {
-  RhythmRepository(this._api);
+  RhythmRepository(this._api, {this.widgetSync});
 
   final ApiClient _api;
+  final WidgetSync? widgetSync;
+
+  /// Виджет «Чек-ин» и Live Activity следят за [current].
+  void _publish() {
+    final payload = checkinWidgetPayload(current.value);
+    widgetSync?.publishCheckin(payload);
+    onCheckinsChanged?.call(current.value);
+  }
+
+  /// Подписка Live Activity (iOS); задаётся в app.dart.
+  void Function(List<Checkin> checkins)? onCheckinsChanged;
 
   /// Последний ответ `/current` — баннеры на нескольких экранах без лишних запросов.
   final ValueNotifier<List<Checkin>> current = ValueNotifier(const []);
@@ -28,6 +40,7 @@ class RhythmRepository {
         for (final id in (res.data?['startable_project_ids'] as List<dynamic>? ?? const []))
           '$id',
       ];
+      _publish();
     }
     return list;
   }
@@ -46,6 +59,7 @@ class RhythmRepository {
     final c = Checkin.fromJson(res.data!['checkin'] as Map<String, dynamic>);
     startable.value = [for (final id in startable.value) if (id != projectId) id];
     current.value = [c, for (final x in current.value) if (x.id != c.id) x];
+    _publish();
     return c;
   }
 
@@ -59,6 +73,7 @@ class RhythmRepository {
       for (final c in current.value)
         if (c.id == updated.id) updated else c,
     ];
+    _publish();
     return updated;
   }
 }

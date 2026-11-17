@@ -62,6 +62,8 @@ class Checkin extends Equatable {
     this.projectId,
     this.projectName,
     this.date,
+    this.actionToken,
+    this.actionPath,
   });
 
   final String id;
@@ -70,6 +72,10 @@ class Checkin extends Equatable {
   final String? projectName;
   final String? date;
   final List<CheckinItem> items;
+
+  /// Токен только на этот чек-ин и сегодня — для виджета и Live Activity (не JWT).
+  final String? actionToken;
+  final String? actionPath;
 
   bool get isPending => status == 'pending';
   int get unanswered => items.where((i) => i.answer == null).length;
@@ -82,6 +88,8 @@ class Checkin extends Equatable {
       projectId: project?['id'] as String?,
       projectName: project?['name'] as String?,
       date: json['date'] as String?,
+      actionToken: json['action_token'] as String?,
+      actionPath: json['action_path'] as String?,
       items: (json['items'] as List<dynamic>? ?? [])
           .map((e) => CheckinItem.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -159,4 +167,29 @@ String? checkinStartProjectId(
   if (startable.isEmpty || checkinBannerText(checkins) != null) return null;
   if (currentProjectId != null && startable.contains(currentProjectId)) return currentProjectId;
   return startable.first;
+}
+
+/// Данные для виджета «Чек-ин» / Live Activity: первый неотвеченный чек-ин на сегодня.
+Map<String, dynamic>? checkinWidgetPayload(List<Checkin> checkins) {
+  final c = checkins.where((x) => x.isPending && x.unanswered > 0).firstOrNull;
+  if (c == null || c.actionToken == null) return null;
+  return {
+    'checkin_id': c.id,
+    'project_id': c.projectId,
+    'project_name': c.projectName,
+    'date': c.date,
+    'token': c.actionToken,
+    'action_path': c.actionPath ?? '/api/v1/rhythm/push-answer',
+    'total': c.items.length,
+    'answered': c.items.length - c.unanswered,
+    'tasks': [
+      for (final i in c.items)
+        {
+          'id': i.taskId,
+          'title': i.title,
+          'priority': i.priority,
+          'answer': i.answer?.wire,
+        },
+    ],
+  };
 }

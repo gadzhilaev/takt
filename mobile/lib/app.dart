@@ -25,6 +25,7 @@ import 'features/profile/data/profile_repository.dart';
 import 'features/projects/data/projects_repository.dart';
 import 'features/widget_sync/widget_sync.dart';
 import 'shared/widgets/notification_toast_host.dart';
+import 'core/live_activity.dart';
 
 class TaktApp extends StatefulWidget {
   const TaktApp({
@@ -59,6 +60,7 @@ class _TaktAppState extends State<TaktApp> {
   late final BoardCubit _boardCubit;
   late final NotificationsRepository _notifications;
   late final RhythmRepository _rhythm;
+  final LiveActivityController _liveActivity = LiveActivityController();
   late final ThemeController _themeController;
   late final GoRouter _router;
   late final BoardRealtime _boardRealtime;
@@ -73,7 +75,16 @@ class _TaktAppState extends State<TaktApp> {
     _board = BoardRepository(widget.api);
     _oauth = OAuthRepository(widget.api);
     _notifications = NotificationsRepository(widget.api);
-    _rhythm = RhythmRepository(widget.api);
+    _rhythm = RhythmRepository(widget.api, widgetSync: _widgetSync);
+    _liveActivity.init();
+    _rhythm.onCheckinsChanged = (checkins) {
+      final me = _boardCubit.currentUserId;
+      final mine = [
+        for (final t in _boardCubit.state.tasks)
+          if (me != null && t.assignees.any((a) => a.id == me)) t,
+      ];
+      _liveActivity.sync(liveActivityPayload(checkins: checkins, myTasks: mine));
+    };
     _authCubit = AuthCubit(
       auth: _authRepo,
       api: widget.api,
@@ -137,6 +148,7 @@ class _TaktAppState extends State<TaktApp> {
         RepositoryProvider.value(value: _oauth),
         RepositoryProvider.value(value: _notifications),
         RepositoryProvider.value(value: _rhythm),
+        RepositoryProvider.value(value: _liveActivity),
         RepositoryProvider.value(value: DigestRepository(widget.api)),
         RepositoryProvider.value(value: ProfileRepository(widget.api)),
         RepositoryProvider.value(value: _widgetSync),
