@@ -71,7 +71,7 @@ class ProjectMember(Base, TimestampMixin):
     role: Mapped[ProjectMemberRole] = mapped_column(
         Enum(ProjectMemberRole), default=ProjectMemberRole.member, nullable=False
     )
-    # Non-admins may subscribe to the project digest; admins always receive it.
-    digest_subscribed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Every member receives the project digest by default; anyone can unsubscribe.
+    digest_subscribed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     project: Mapped[Project] = relationship(back_populates="members")

@@ -352,7 +352,7 @@ def email_bodies(digest: dict, *, app_url: str) -> tuple[str, str, str]:
     p = digest["project"]
     s = digest["summary"]
     subject = f"{short_text(digest)} · {p['name']}"
-    link = f"{app_url.rstrip('/')}/app/projects/{p['id']}/digest?period={digest['period']['kind']}"
+    link = f"{app_url.rstrip('/')}/app/projects/{p['id']}?view=digest&period={digest['period']['kind']}"
     lines = [short_text(digest), f"Проект: {p['name']}", ""]
     if digest["stuck"]:
         lines.append("Застряло:")
@@ -437,7 +437,7 @@ def due_periods(
 
 
 async def recipients(db: AsyncSession, project: Project) -> list[tuple[User, bool]]:
-    """(user, is_admin): project admins always, members only when subscribed."""
+    """(user, is_admin): every subscribed member (subscription is on by default)."""
     rows = (
         await db.execute(
             select(User, ProjectMember.role, ProjectMember.digest_subscribed)
@@ -449,11 +449,7 @@ async def recipients(db: AsyncSession, project: Project) -> list[tuple[User, boo
             )
         )
     ).all()
-    return [
-        (u, role == ProjectMemberRole.admin)
-        for u, role, subscribed in rows
-        if role == ProjectMemberRole.admin or subscribed
-    ]
+    return [(u, role == ProjectMemberRole.admin) for u, role, subscribed in rows if subscribed]
 
 
 async def deliver_digest(
@@ -503,7 +499,7 @@ async def deliver_digest(
             continue
         digest = full if is_admin else brief
         title = short_text(digest)
-        url = f"/app/projects/{project.id}/digest?period={kind}"
+        url = f"/app/projects/{project.id}?view=digest&period={kind}"
         await notify_service.create_in_app(
             db,
             user_id=user.id,

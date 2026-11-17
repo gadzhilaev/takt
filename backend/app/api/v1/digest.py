@@ -73,10 +73,7 @@ async def get_digest(
         raise HTTPException(
             status_code=e.status_code, detail={"error": {"code": e.code, "message": e.message}}
         ) from e
-    digest["viewer"] = {
-        "is_admin": is_admin,
-        "subscribed": is_admin or bool(member.digest_subscribed),
-    }
+    digest["viewer"] = {"is_admin": is_admin, "subscribed": bool(member.digest_subscribed)}
     digest["schedule"] = {
         "daily": bool(project.digest_daily),
         "weekly": bool(project.digest_weekly),
@@ -92,8 +89,8 @@ async def set_subscription(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Own subscription to the project digest (admins always receive it)."""
+    """Own subscription to the project digest (on by default for every member)."""
     member = await _membership(db, user, project_id)
     member.digest_subscribed = body.subscribed
     await db.commit()
-    return {"subscribed": member.role == ProjectMemberRole.admin or body.subscribed}
+    return {"subscribed": body.subscribed}

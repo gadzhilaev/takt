@@ -110,6 +110,7 @@ async def _world(now: datetime) -> SimpleNamespace:
         member = await _user(db, f"d-member-{tag}@example.com", "Участник Сводки")
         sub = await _user(db, f"d-sub-{tag}@example.com", "Подписчик Сводки")
         demo = await _user(db, f"d-demo-{tag}@example.com", "Демо Сводки", demo=True)
+        viewer = await _user(db, f"d-viewer-{tag}@example.com", "Наблюдатель Сводки")
         project = Project(name="Сводка", rhythm_enabled=True, rhythm_timezone=MSK)
         db.add(project)
         await db.flush()
@@ -120,7 +121,8 @@ async def _world(now: datetime) -> SimpleNamespace:
             cols.append(s)
         await db.flush()
         for u, r, subscribed in (
-            (admin, ProjectMemberRole.admin, False),
+            (admin, ProjectMemberRole.admin, True),
+            (viewer, ProjectMemberRole.viewer, True),
             (member, ProjectMemberRole.member, False),
             (sub, ProjectMemberRole.member, True),
             (demo, ProjectMemberRole.member, True),
@@ -208,6 +210,7 @@ async def _world(now: datetime) -> SimpleNamespace:
             admin=admin,
             member=member,
             sub=sub,
+            viewer=viewer,
             demo=demo,
             ids={
                 k: str(v.id)
@@ -321,6 +324,19 @@ async def test_api_rights_and_subscription(client):
         assert r.json() == {"subscribed": True}
         assert (await c.get(url)).json()["digest"]["viewer"]["subscribed"] is True
 
+    # Viewer sees the summary too, but not who missed check-ins.
+    async with await _client() as c:
+        await _login(c, w.viewer)
+        d = (await c.get(url)).json()["digest"]
+        assert d["summary"]["done"] == 2 and d["rhythm"]["participation"] == 75
+        assert "members_without_answer" not in d["rhythm"]
+
+    # Admin can opt out as well.
+    h = await _login(client, w.admin)
+    r = await client.put(f"{url}-subscription", headers=h, json={"subscribed": False})
+    assert r.json() == {"subscribed": False}
+    assert (await client.get(url)).json()["digest"]["viewer"]["subscribed"] is False
+
     async with TestSession() as db:
         outsider = await _user(db, "d-outsider@example.com", "Чужой")
         await db.commit()
@@ -371,8 +387,9 @@ async def test_delivery_idempotent_admins_and_subscribers(monkeypatch):
             db, project, kind="week", end_day=end_day, settings=settings, now=now
         )
         await db.commit()
-    assert sent == 2  # admin + subscribed member; demo and unsubscribed — no
-    assert {u for u, _t in pushes} == {w.admin.id, w.sub.id}
+    # Everyone subscribed (admin, member, viewer); demo and the opted-out member — no.
+    assert sent == 3
+    assert {u for u, _t in pushes} == {w.admin.id, w.sub.id, w.viewer.id}
     assert pushes[0][1] == "Сводка за неделю: 2 сделано, 1 застряла"
     assert emails == []  # DIGEST_EMAIL_ENABLED=false by default
 
@@ -388,7 +405,7 @@ async def test_delivery_idempotent_admins_and_subscribers(monkeypatch):
             .select_from(DigestDelivery)
             .where(DigestDelivery.project_id == w.project_id)
         )
-        assert n == 2
+        assert n == 3
         notes = (
             await db.scalars(
                 select(Notification.title).where(
@@ -403,9 +420,10 @@ async def test_delivery_idempotent_admins_and_subscribers(monkeypatch):
         project = await db.get(Project, w.project_id)
         await deliver_digest(db, project, kind="day", end_day=end_day, settings=settings, now=now)
         await db.commit()
-    assert {to for to, _s, _h in emails} == {w.admin.email, w.sub.email}
+    assert {to for to, _s, _h in emails} == {w.admin.email, w.sub.email, w.viewer.email}
     admin_html = next(h for to, _s, h in emails if to == w.admin.email)
     assert "Ждём подпись" in admin_html and "Узкое место" in admin_html
+    assert f"/app/projects/{w.project_id}?view=digest&amp;period=day" in admin_html
 
 
 @pytest.mark.asyncio
@@ -448,7 +466,7 @@ async def test_loop_iteration_sends_digest(monkeypatch, caplog):
             await asyncio.sleep(0.05)
         stop.set()
         await asyncio.wait_for(task, timeout=5)
-    assert await delivered() == 2
+    assert await delivered() == 3
     assert "digest pass ok" in caplog.text
     assert "Админ" not in caplog.text and "@example.com" not in caplog.text
 
