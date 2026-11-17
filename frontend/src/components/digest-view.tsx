@@ -282,8 +282,12 @@ export function DigestView({ projectId }: { projectId: string }) {
         </label>
           {!d.done.length && !d.stuck.length && !d.overdue.length && !d.rhythm.total && (
             <EmptyState
-              title="Пока тихо"
-              description="Сводка наполнится, когда команда начнёт закрывать задачи и отвечать на чек-ин."
+              title="Сводка ещё пустая"
+              description={
+                d.rhythm.enabled
+                  ? "Она наполнится после ответов на чек-ин и закрытых задач за выбранный период — обычно уже на следующий рабочий день."
+                  : "Включите ежедневный чек-ин в настройках проекта — тогда здесь появятся сделанное, застрявшее и узкое место."
+              }
             />
           )}
         </div>

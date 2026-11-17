@@ -13,6 +13,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { BrandLogo, BrandMark } from "@/components/brand-mark";
 import { Dialog } from "@/components/ui/dialog";
 import { CheckinBanner } from "@/components/checkin-banner";
+import { OPEN_PROJECT_SETTINGS_EVENT, RhythmEnableCard } from "@/components/rhythm-enable-card";
 import {
   DEFAULT_DIGEST,
   DigestSettingsFields,
@@ -280,6 +281,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     () => projects.find((p) => p.id === renameProjectId) ?? null,
     [projects, renameProjectId]
   );
+
+  function openProjectSettings(p: Project) {
+    setRenameValue(p.name);
+    setRenameAutoUrgency(p.auto_urgency_from_due !== false);
+    setRenameRhythm(p.rhythm ?? { ...DEFAULT_RHYTHM, enabled: false });
+    setRenameDigest(p.digest ?? DEFAULT_DIGEST);
+    setRenameProjectId(p.id);
+  }
+
+  // «Включить чек-ин» на доске просит открыть настройки проекта.
+  useEffect(() => {
+    function onOpen(e: Event) {
+      const id = (e as CustomEvent<{ projectId?: string }>).detail?.projectId;
+      const target = id ? projects.find((p) => p.id === id) : undefined;
+      if (!target) return;
+      // Подсказка включает ритм «с нуля» — сразу показываем включённым с настройками по умолчанию.
+      openProjectSettings(target);
+      if (!target.rhythm?.enabled) setRenameRhythm({ ...(target.rhythm ?? DEFAULT_RHYTHM), enabled: true });
+    }
+    window.addEventListener(OPEN_PROJECT_SETTINGS_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_PROJECT_SETTINGS_EVENT, onOpen);
+  }, [projects]);
   async function removeMember(projectId: string, member: Project["members"][number]) {
     if (!confirm(`Убрать ${member.name} из проекта?`)) return;
     await api(`/api/v1/projects/${projectId}/members/${member.user_id}`, { method: "DELETE" });
@@ -493,11 +516,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-[15px] font-medium hover:bg-[var(--surface)]"
                         onClick={() => {
                           setMenuProjectId(null);
-                          setRenameValue(p.name);
-                          setRenameAutoUrgency(p.auto_urgency_from_due !== false);
-                          setRenameRhythm(p.rhythm ?? { ...DEFAULT_RHYTHM, enabled: false });
-                          setRenameDigest(p.digest ?? DEFAULT_DIGEST);
-                          setRenameProjectId(p.id);
+                          openProjectSettings(p);
                         }}
                       >
                         <AppIcon name="edit" size={18} className="shrink-0 text-muted" />
@@ -599,7 +618,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
         <main className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden bg-[var(--kanban-board-bg)] px-2 pb-2 pt-3 sm:px-3 sm:pb-3 sm:pt-4 md:px-4 md:pb-4 md:pt-5">
           {!pathname?.startsWith("/app/checkin") && !pathname?.startsWith("/app/admin") && (
-            <CheckinBanner />
+            <>
+              <CheckinBanner />
+              <RhythmEnableCard />
+            </>
           )}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
         </main>
