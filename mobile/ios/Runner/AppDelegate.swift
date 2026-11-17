@@ -17,6 +17,9 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "TaktLiveActivity") {
+      TaktLiveActivity.register(messenger: registrar.messenger())
+    }
   }
 
   override func userNotificationCenter(

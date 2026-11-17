@@ -24,6 +24,11 @@
 		C10FBACB0DC4E7B9CC4DCD93 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B09BA5C9CD7982CF89539ED9 /* Pods_RunnerTests.framework */; };
 		E8D0C4954A2A358C6AFE7188 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 93EECAD59DF6329AFF2DD5E9 /* Pods_Runner.framework */; };
 		EACBE8DE882CEF752F84DD50 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C80357A326AFE5DEF371616E /* Assets.xcassets */; };
+		B1A0000000000000000000B1 /* TaktActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000A1 /* TaktActivityAttributes.swift */; };
+		B1A0000000000000000000C1 /* TaktActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000A1 /* TaktActivityAttributes.swift */; };
+		B1A0000000000000000000B2 /* TaktLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000A2 /* TaktLiveActivity.swift */; };
+		B1A0000000000000000000B3 /* TaktAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000A3 /* TaktAppIntents.swift */; };
+		B1A0000000000000000000C4 /* TaktCheckinWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000A4 /* TaktCheckinWidget.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -102,6 +107,10 @@
 		CA262D8726ADD68677F956B7 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		DD16DF6014578BC3ACDD5A34 /* Runner.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		E14D6FC4BC9684119078D700 /* TaktHomeWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = TaktHomeWidget.entitlements; sourceTree = "<group>"; };
+		B1A0000000000000000000A1 /* TaktActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaktActivityAttributes.swift; sourceTree = "<group>"; };
+		B1A0000000000000000000A2 /* TaktLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaktLiveActivity.swift; sourceTree = "<group>"; };
+		B1A0000000000000000000A3 /* TaktAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaktAppIntents.swift; sourceTree = "<group>"; };
+		B1A0000000000000000000A4 /* TaktCheckinWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaktCheckinWidget.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,6 +196,9 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
+				B1A0000000000000000000A1 /* TaktActivityAttributes.swift */,
+				B1A0000000000000000000A2 /* TaktLiveActivity.swift */,
+				B1A0000000000000000000A3 /* TaktAppIntents.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				DD16DF6014578BC3ACDD5A34 /* Runner.entitlements */,
 			);
@@ -197,6 +209,7 @@
 			isa = PBXGroup;
 			children = (
 				8F01F95E82661EBC2EC44AD8 /* TaktHomeWidget.swift */,
+				B1A0000000000000000000A4 /* TaktCheckinWidget.swift */,
 				6813CBBBB71841BDD5CA327F /* Info.plist */,
 				E14D6FC4BC9684119078D700 /* TaktHomeWidget.entitlements */,
 				C80357A326AFE5DEF371616E /* Assets.xcassets */,
@@ -501,6 +514,9 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
+				B1A0000000000000000000B1 /* TaktActivityAttributes.swift in Sources */,
+				B1A0000000000000000000B2 /* TaktLiveActivity.swift in Sources */,
+				B1A0000000000000000000B3 /* TaktAppIntents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -509,6 +525,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				3B1925988774C3B48AB0C09A /* TaktHomeWidget.swift in Sources */,
+				B1A0000000000000000000C1 /* TaktActivityAttributes.swift in Sources */,
+				B1A0000000000000000000C4 /* TaktCheckinWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

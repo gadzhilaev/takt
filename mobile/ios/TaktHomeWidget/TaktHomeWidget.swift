@@ -595,7 +595,7 @@ struct TaktHomeWidgetEntryView: View {
 
 // MARK: - Widget
 
-@main
+// Входит в TaktWidgetBundle (TaktCheckinWidget.swift).
 struct TaktHomeWidget: Widget {
     let kind: String = "TaktHomeWidget"
 
