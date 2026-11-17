@@ -66,6 +66,9 @@ REVIEW_STAFF: list[tuple[str, str, str]] = [
 
 ME = "me"  # the review account itself as an assignee
 
+# Display name for App Review — ordinary Russian name (not "Store Reviewer").
+REVIEW_ACCOUNT_DEFAULT_NAME = "Анна Смирнова"
+
 
 @dataclass(frozen=True)
 class SeedTask:
@@ -325,7 +328,7 @@ async def _ensure_review_user(
             )
         user = User(
             email=email,
-            name=name or "Ковалёва Ирина",
+            name=name or REVIEW_ACCOUNT_DEFAULT_NAME,
             role=UserRole.member,
             password_hash=hash_password(password),
             is_active=True,
@@ -340,8 +343,8 @@ async def _ensure_review_user(
             raise RuntimeError("Аккаунт помечен как is_demo — для ревьюера нужен обычный аккаунт.")
         if password:
             user.password_hash = hash_password(password)
-        if name:
-            user.name = name
+        # Always refresh display name on re-seed (default or explicit --name / ENV).
+        user.name = name or REVIEW_ACCOUNT_DEFAULT_NAME
         user.is_active = True
         user.blocked_until = None
         user.must_change_password = False
