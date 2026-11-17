@@ -21,6 +21,10 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
+/// Ветки оболочки: 0 доска, 1 мои задачи, 2 сводка, 3 профиль.
+const _digestIdx = 2;
+const _profileIdx = 3;
+
 class _AppShellState extends State<AppShell> {
   StatefulNavigationShell get navigationShell => widget.navigationShell;
 
@@ -57,7 +61,7 @@ class _AppShellState extends State<AppShell> {
     required String? projectName,
     required bool hasProject,
   }) {
-    if (idx == 2) {
+    if (idx == _profileIdx) {
       return const TaktAppBar(title: 'Профиль');
     }
 
@@ -67,19 +71,6 @@ class _AppShellState extends State<AppShell> {
 
     final editAction = hasProject
         ? [
-            IconButton(
-              tooltip: 'Сводка',
-              visualDensity: VisualDensity.compact,
-              onPressed: () {
-                final id = context.read<BoardCubit>().state.project?.id;
-                if (id != null) context.push('/digest/$id');
-              },
-              icon: AppIcon(
-                AppIcons.status,
-                size: 22,
-                color: dark ? TaktColors.foregroundDark : TaktColors.graphite,
-              ),
-            ),
             IconButton(
               tooltip: 'Проект',
               visualDensity: VisualDensity.compact,
@@ -93,6 +84,15 @@ class _AppShellState extends State<AppShell> {
             const SizedBox(width: 4),
           ]
         : null;
+
+    if (idx == _digestIdx) {
+      return TaktAppBar(
+        title: 'Сводка',
+        subtitle: projectName,
+        onBack: _backToProjects,
+        actions: editAction,
+      );
+    }
 
     if (idx == 1) {
       return TaktAppBar(
@@ -119,8 +119,8 @@ class _AppShellState extends State<AppShell> {
     final idx = navigationShell.currentIndex;
     final dark = Theme.of(context).brightness == Brightness.dark;
 
-    // Без проекта вкладка «Мои задачи» скрыта; если уже на ней — на главную.
-    if (!hasProject && idx == 1) {
+    // Без проекта вкладки проекта скрыты; если уже на одной из них — на главную.
+    if (!hasProject && (idx == 1 || idx == _digestIdx)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/projects');
       });
@@ -130,31 +130,44 @@ class _AppShellState extends State<AppShell> {
       TaktBottomNavItem(
         label: 'Главная',
         icon: AppIcons.home,
-        selected: idx == 0,
+        selected: !hasProject && idx == 0,
         onTap: () {
           if (hasProject) {
-            _goBranch(0);
+            _backToProjects();
           } else {
             context.go('/projects');
           }
         },
       ),
-      if (hasProject)
+      if (hasProject) ...[
+        TaktBottomNavItem(
+          label: 'Доска',
+          icon: AppIcons.inbox,
+          selected: idx == 0,
+          onTap: () => _goBranch(0),
+        ),
         TaktBottomNavItem(
           label: 'Мои задачи',
           icon: AppIcons.myTasks,
           selected: idx == 1,
           onTap: () => _goBranch(1),
         ),
+        TaktBottomNavItem(
+          label: 'Сводка',
+          icon: AppIcons.status,
+          selected: idx == _digestIdx,
+          onTap: () => _goBranch(_digestIdx),
+        ),
+      ],
       TaktBottomNavItem(
         label: 'Профиль',
         icon: AppIcons.profile,
-        selected: idx == 2,
-        onTap: () => _goBranch(2),
+        selected: idx == _profileIdx,
+        onTap: () => _goBranch(_profileIdx),
       ),
     ];
 
-    final canSwipeBack = hasProject && (idx == 0 || idx == 1);
+    final canSwipeBack = hasProject && (idx == 0 || idx == 1 || idx == _digestIdx);
 
     return SwipeBackEdge(
       enabled: canSwipeBack,

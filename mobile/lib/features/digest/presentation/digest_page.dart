@@ -10,14 +10,23 @@ import '../../../shared/widgets/takt_app_bar.dart';
 import '../../../shared/widgets/takt_ui.dart';
 import '../data/digest_models.dart';
 import '../data/digest_repository.dart';
+import '../../board/cubit/board_cubit.dart';
 
 /// «Сводка»: сверху 4 числа, ниже «Застряло», «Просрочено», «Узкое место», «Сделано», «Ритм».
 /// Любая строка ведёт в задачу.
 class DigestPage extends StatefulWidget {
-  const DigestPage({super.key, required this.projectId, this.period = DigestPeriod.week});
+  const DigestPage({
+    super.key,
+    required this.projectId,
+    this.period = DigestPeriod.week,
+    this.embedded = false,
+  });
 
   final String projectId;
   final DigestPeriod period;
+
+  /// Вкладка внутри проекта: без своей шапки (её рисует оболочка).
+  final bool embedded;
 
   @override
   State<DigestPage> createState() => _DigestPageState();
@@ -68,122 +77,192 @@ class _DigestPageState extends State<DigestPage> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final d = _digest;
     final bg = dark ? TaktColors.surface2Dark : TaktColors.surface2;
+    final body = _loading
+        ? const Center(child: CircularProgressIndicator.adaptive())
+        : d == null
+        ? TaktEmptyState(title: _error ?? 'Не удалось загрузить сводку')
+        : RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              children: [
+                _PeriodSwitch(
+                  value: _period,
+                  dark: dark,
+                  onChanged: (p) {
+                    setState(() => _period = p);
+                    _load();
+                  },
+                ),
+                const SizedBox(height: 12),
+                _Numbers(d: d, dark: dark),
+                const SizedBox(height: 12),
+                _Section(
+                  title: 'Застряло',
+                  count: d.stuckTasks.length,
+                  dark: dark,
+                  empty: 'Ничего не застряло.',
+                  children: [
+                    for (final t in d.stuckTasks)
+                      _TaskRow(
+                        task: t,
+                        dark: dark,
+                        meta: digestDaysLabel(t.daysStuck ?? 0),
+                        note: [
+                          t.reason ?? 'Причина не указана',
+                          if (t.blockedBy != null) t.blockedBy!,
+                        ].join(' · '),
+                      ),
+                  ],
+                ),
+                _Section(
+                  title: 'Просрочено и скоро срок',
+                  count: d.overdueTasks.length + d.dueSoonTasks.length,
+                  dark: dark,
+                  empty: 'Просрочек нет, ближайшие 48 часов спокойные.',
+                  children: [
+                    for (final t in d.overdueTasks)
+                      _TaskRow(
+                        task: t,
+                        dark: dark,
+                        meta: 'просрочено',
+                        metaDanger: true,
+                      ),
+                    for (final t in d.dueSoonTasks)
+                      _TaskRow(
+                        task: t,
+                        dark: dark,
+                        meta: 'срок в ближайшие 48 ч.',
+                      ),
+                  ],
+                ),
+                _Section(
+                  title: 'Узкое место',
+                  dark: dark,
+                  empty: 'За этот период данных о переносах нет.',
+                  header: d.bottleneckName == null
+                      ? null
+                      : 'Дольше всего задачи стоят в «${d.bottleneckName}» — '
+                            'в среднем ${formatDigestHours(d.bottleneckHours ?? 0)}',
+                  children: [
+                    for (final t in d.bottleneckTasks)
+                      _TaskRow(
+                        task: t,
+                        dark: dark,
+                        meta:
+                            'в столбце ${formatDigestHours(t.hoursInStatus ?? 0)}',
+                      ),
+                  ],
+                ),
+                _Section(
+                  title: 'Сделано',
+                  count: d.doneTasks.length,
+                  dark: dark,
+                  empty: 'За этот период ничего не закрыто.',
+                  children: [
+                    for (final t in d.doneTasks) _TaskRow(task: t, dark: dark),
+                  ],
+                ),
+                _Section(
+                  title: 'Ритм',
+                  dark: dark,
+                  empty: d.rhythmEnabled
+                      ? 'Чек-инов за этот период ещё не было.'
+                      : 'Ежедневный чек-ин выключен — включите его в настройках проекта.',
+                  header: d.rhythmTotal == 0
+                      ? null
+                      : 'Ответы на чек-ин: ${d.rhythmAnswered} из ${d.rhythmTotal} '
+                            '(${digestParticipation(d.participation)})',
+                  children: [
+                    for (final m in d.missed)
+                      _PlainRow(
+                        text: m.name,
+                        meta: 'без ответа: ${m.missed} из ${m.total}',
+                        dark: dark,
+                      ),
+                  ],
+                ),
+                SwitchListTile.adaptive(
+                  value: d.subscribed,
+                  onChanged: _subscribe,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Получать сводку в уведомлениях'),
+                ),
+              ],
+            ),
+          );
+    if (widget.embedded) return ColoredBox(color: bg, child: body);
     return Scaffold(
       backgroundColor: bg,
       appBar: TaktAppBar(
         title: 'Сводка',
-        subtitle: d == null ? null : '${d.projectName} · ${digestPeriodLabel(d.start, d.end)}',
+        subtitle: d == null
+            ? null
+            : '${d.projectName} · ${digestPeriodLabel(d.start, d.end)}',
         onBack: () => context.canPop() ? context.pop() : context.go('/board'),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator.adaptive())
-          : d == null
-              ? TaktEmptyState(title: _error ?? 'Не удалось загрузить сводку')
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                    children: [
-                      _PeriodSwitch(
-                        value: _period,
-                        dark: dark,
-                        onChanged: (p) {
-                          setState(() => _period = p);
-                          _load();
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _Numbers(d: d, dark: dark),
-                      const SizedBox(height: 12),
-                      _Section(
-                        title: 'Застряло',
-                        count: d.stuckTasks.length,
-                        dark: dark,
-                        empty: 'Ничего не застряло.',
-                        children: [
-                          for (final t in d.stuckTasks)
-                            _TaskRow(
-                              task: t,
-                              dark: dark,
-                              meta: digestDaysLabel(t.daysStuck ?? 0),
-                              note: [
-                                t.reason ?? 'Причина не указана',
-                                if (t.blockedBy != null) t.blockedBy!,
-                              ].join(' · '),
-                            ),
-                        ],
-                      ),
-                      _Section(
-                        title: 'Просрочено и скоро срок',
-                        count: d.overdueTasks.length + d.dueSoonTasks.length,
-                        dark: dark,
-                        empty: 'Просрочек нет, ближайшие 48 часов спокойные.',
-                        children: [
-                          for (final t in d.overdueTasks)
-                            _TaskRow(task: t, dark: dark, meta: 'просрочено', metaDanger: true),
-                          for (final t in d.dueSoonTasks)
-                            _TaskRow(task: t, dark: dark, meta: 'срок в ближайшие 48 ч.'),
-                        ],
-                      ),
-                      _Section(
-                        title: 'Узкое место',
-                        dark: dark,
-                        empty: 'За этот период данных о переносах нет.',
-                        header: d.bottleneckName == null
-                            ? null
-                            : 'Дольше всего задачи стоят в «${d.bottleneckName}» — '
-                                'в среднем ${formatDigestHours(d.bottleneckHours ?? 0)}',
-                        children: [
-                          for (final t in d.bottleneckTasks)
-                            _TaskRow(
-                              task: t,
-                              dark: dark,
-                              meta: 'в столбце ${formatDigestHours(t.hoursInStatus ?? 0)}',
-                            ),
-                        ],
-                      ),
-                      _Section(
-                        title: 'Сделано',
-                        count: d.doneTasks.length,
-                        dark: dark,
-                        empty: 'За этот период ничего не закрыто.',
-                        children: [for (final t in d.doneTasks) _TaskRow(task: t, dark: dark)],
-                      ),
-                      _Section(
-                        title: 'Ритм',
-                        dark: dark,
-                        empty: d.rhythmEnabled
-                            ? 'Чек-инов за этот период ещё не было.'
-                            : 'Ежедневный чек-ин выключен — включите его в настройках проекта.',
-                        header: d.rhythmTotal == 0
-                            ? null
-                            : 'Ответы на чек-ин: ${d.rhythmAnswered} из ${d.rhythmTotal} '
-                                '(${digestParticipation(d.participation)})',
-                        children: [
-                          for (final m in d.missed)
-                            _PlainRow(
-                              text: m.name,
-                              meta: 'без ответа: ${m.missed} из ${m.total}',
-                              dark: dark,
-                            ),
-                        ],
-                      ),
-                      if (!d.isAdmin)
-                        SwitchListTile.adaptive(
-                          value: d.subscribed,
-                          onChanged: _subscribe,
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Получать сводку в уведомлениях'),
-                        ),
-                    ],
-                  ),
-                ),
+      body: body,
+    );
+  }
+}
+
+/// Вкладка «Сводка» в нижнем меню проекта. [projectId] из ссылки (push, уведомление)
+/// открывает нужный проект; иначе — текущий проект доски.
+class DigestTab extends StatefulWidget {
+  const DigestTab({super.key, this.projectId, this.period = DigestPeriod.week});
+
+  final String? projectId;
+  final DigestPeriod period;
+
+  @override
+  State<DigestTab> createState() => _DigestTabState();
+}
+
+class _DigestTabState extends State<DigestTab> {
+  @override
+  void initState() {
+    super.initState();
+    _ensureProject();
+  }
+
+  @override
+  void didUpdateWidget(covariant DigestTab old) {
+    super.didUpdateWidget(old);
+    if (old.projectId != widget.projectId) _ensureProject();
+  }
+
+  void _ensureProject() {
+    final wanted = widget.projectId;
+    if (wanted == null || wanted.isEmpty) return;
+    final board = context.read<BoardCubit>();
+    if (board.state.project?.id != wanted) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => board.openProject(wanted),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final projectId = context.select<BoardCubit, String?>(
+      (c) => c.state.project?.id,
+    );
+    if (projectId == null) return const SizedBox.shrink();
+    return DigestPage(
+      key: ValueKey('digest-$projectId-${widget.period.wire}'),
+      projectId: projectId,
+      period: widget.period,
+      embedded: true,
     );
   }
 }
 
 class _PeriodSwitch extends StatelessWidget {
-  const _PeriodSwitch({required this.value, required this.onChanged, required this.dark});
+  const _PeriodSwitch({
+    required this.value,
+    required this.onChanged,
+    required this.dark,
+  });
 
   final DigestPeriod value;
   final ValueChanged<DigestPeriod> onChanged;
@@ -194,7 +273,8 @@ class _PeriodSwitch extends StatelessWidget {
     final accent = dark ? TaktColors.accentDark : TaktColors.accent;
     return SegmentedButton<DigestPeriod>(
       segments: [
-        for (final p in DigestPeriod.values) ButtonSegment(value: p, label: Text(p.label)),
+        for (final p in DigestPeriod.values)
+          ButtonSegment(value: p, label: Text(p.label)),
       ],
       selected: {value},
       showSelectedIcon: false,
@@ -220,7 +300,11 @@ class _Numbers extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      ('${d.done}', 'сделано', dark ? TaktColors.successDark : TaktColors.success),
+      (
+        '${d.done}',
+        'сделано',
+        dark ? TaktColors.successDark : TaktColors.success,
+      ),
       ('${d.stuck}', 'застряло', d.stuck > 0 ? blockedColor(dark) : null),
       ('${d.overdue}', 'просрочено', d.overdue > 0 ? TaktColors.urgent : null),
       (digestParticipation(d.participation), 'ответы на чек-ин', null),
@@ -246,12 +330,19 @@ class _Numbers extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
-                    color: color ?? (dark ? TaktColors.foregroundDark : TaktColors.graphite),
+                    color:
+                        color ??
+                        (dark
+                            ? TaktColors.foregroundDark
+                            : TaktColors.graphite),
                   ),
                 ),
                 Text(
                   label,
-                  style: TextStyle(fontSize: 12, color: dark ? TaktColors.mutedDark : TaktColors.muted),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: dark ? TaktColors.mutedDark : TaktColors.muted,
+                  ),
                 ),
               ],
             ),
@@ -269,14 +360,16 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: dark ? TaktColors.surfaceDark : TaktColors.surface,
-          border: Border.all(color: dark ? TaktColors.borderDark : TaktColors.border),
-          borderRadius: BorderRadius.circular(TaktRadii.md),
-        ),
-        child: child,
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: dark ? TaktColors.surfaceDark : TaktColors.surface,
+      border: Border.all(
+        color: dark ? TaktColors.borderDark : TaktColors.border,
+      ),
+      borderRadius: BorderRadius.circular(TaktRadii.md),
+    ),
+    child: child,
+  );
 }
 
 class _Section extends StatelessWidget {
@@ -317,10 +410,20 @@ class _Section extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
               child: Row(
                 children: [
-                  Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: fg,
+                    ),
+                  ),
                   if (count != null) ...[
                     const SizedBox(width: 6),
-                    Text('$count', style: TextStyle(fontSize: 12, color: muted)),
+                    Text(
+                      '$count',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
                   ],
                 ],
               ),
@@ -329,12 +432,18 @@ class _Section extends StatelessWidget {
             if (header != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                child: Text(header!, style: TextStyle(fontSize: 14, height: 1.35, color: fg)),
+                child: Text(
+                  header!,
+                  style: TextStyle(fontSize: 14, height: 1.35, color: fg),
+                ),
               ),
             if (isEmpty)
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text(empty, style: TextStyle(fontSize: 13, color: muted)),
+                child: Text(
+                  empty,
+                  style: TextStyle(fontSize: 13, color: muted),
+                ),
               ),
             for (var i = 0; i < children.length; i++) ...[
               if (i > 0 || header != null) Divider(height: 1, color: border),
@@ -377,7 +486,14 @@ class _TaskRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(task.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: fg)),
+                  Text(
+                    task.title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: fg,
+                    ),
+                  ),
                   if (meta != null || who.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text.rich(
@@ -387,9 +503,12 @@ class _TaskRow extends StatelessWidget {
                           if (meta != null)
                             TextSpan(
                               text: meta,
-                              style: metaDanger ? const TextStyle(color: TaktColors.urgent) : null,
+                              style: metaDanger
+                                  ? const TextStyle(color: TaktColors.urgent)
+                                  : null,
                             ),
-                          if (meta != null && who.isNotEmpty) const TextSpan(text: ' · '),
+                          if (meta != null && who.isNotEmpty)
+                            const TextSpan(text: ' · '),
                           if (who.isNotEmpty) TextSpan(text: who),
                         ],
                       ),
@@ -400,9 +519,14 @@ class _TaskRow extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.only(left: 6),
                       decoration: BoxDecoration(
-                        border: Border(left: BorderSide(color: blockedColor(dark), width: 2)),
+                        border: Border(
+                          left: BorderSide(color: blockedColor(dark), width: 2),
+                        ),
                       ),
-                      child: Text(note!, style: TextStyle(fontSize: 12, color: fg)),
+                      child: Text(
+                        note!,
+                        style: TextStyle(fontSize: 12, color: fg),
+                      ),
                     ),
                   ],
                 ],
@@ -434,7 +558,10 @@ class _PlainRow extends StatelessWidget {
           style: TextStyle(fontSize: 14, color: fg),
           children: [
             TextSpan(text: text),
-            TextSpan(text: ' — $meta', style: TextStyle(color: muted)),
+            TextSpan(
+              text: ' — $meta',
+              style: TextStyle(color: muted),
+            ),
           ],
         ),
       ),
