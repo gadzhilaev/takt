@@ -79,7 +79,7 @@ export function NotificationsDrawer({
     }
     onClose();
     if (n.kind === "rhythm_checkin") router.push("/app/checkin");
-    else if (n.kind === "digest" && n.project_id) router.push(`/app/projects/${n.project_id}/digest`);
+    else if (n.kind === "digest" && n.project_id) router.push(`/app/projects/${n.project_id}?view=digest`);
     else if (n.project_id && n.task_id) router.push(`/app/projects/${n.project_id}?task=${n.task_id}`);
     else if (n.project_id) router.push(`/app/projects/${n.project_id}`);
   }

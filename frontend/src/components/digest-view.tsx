@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/app-icon";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -65,7 +65,7 @@ function TaskRow({
 }) {
   return (
     <Link
-      href={`/app/projects/${projectId}?task=${task.task_id}`}
+      href={`/app/projects/${projectId}?view=digest&task=${task.task_id}`}
       className="block px-3 py-2.5 hover:bg-[var(--surface-2)]"
     >
       <div className="flex items-start gap-2">
@@ -87,6 +87,7 @@ function Empty({ text }: { text: string }) {
 
 export function DigestView({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useSearchParams();
   const qc = useQueryClient();
   const period = (params.get("period") as DigestPeriod) || "week";
@@ -107,15 +108,8 @@ export function DigestView({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl overflow-y-auto pb-8">
+    <div className="mx-auto w-full max-w-3xl pb-8">
       <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href={`/app/projects/${projectId}`}
-          className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"
-        >
-          <AppIcon name="chevron-left" size={16} /> Доска
-        </Link>
-        <h1 className="text-lg font-semibold tracking-tight">Сводка</h1>
         {d && <span className="text-sm text-muted">{periodLabel(d.period)}</span>}
         <div
           className="ml-auto flex rounded-[var(--radius)] bg-[var(--surface-2)] p-0.5"
@@ -128,7 +122,12 @@ export function DigestView({ projectId }: { projectId: string }) {
               type="button"
               role="tab"
               aria-selected={period === p.value}
-              onClick={() => router.replace(`/app/projects/${projectId}/digest?period=${p.value}`)}
+              onClick={() => {
+                const next = new URLSearchParams(params.toString());
+                next.set("view", "digest");
+                next.set("period", p.value);
+                router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+              }}
               className={cn(
                 "min-h-8 rounded-[calc(var(--radius)-2px)] px-3 text-[13px] font-medium",
                 period === p.value
@@ -272,17 +271,15 @@ export function DigestView({ projectId }: { projectId: string }) {
             )}
           </Section>
 
-          {!d.viewer.is_admin && (
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-[var(--radius)] border border-hairline bg-[var(--surface)] px-3 py-2.5 text-sm">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-[var(--accent)]"
-                checked={d.viewer.subscribed}
-                onChange={(e) => void toggleSubscription(e.target.checked)}
-              />
-              Получать сводку в уведомлениях
-            </label>
-          )}
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-[var(--radius)] border border-hairline bg-[var(--surface)] px-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[var(--accent)]"
+              checked={d.viewer.subscribed}
+              onChange={(e) => void toggleSubscription(e.target.checked)}
+            />
+            Получать сводку в уведомлениях
+        </label>
           {!d.done.length && !d.stuck.length && !d.overdue.length && !d.rhythm.total && (
             <EmptyState
               title="Пока тихо"

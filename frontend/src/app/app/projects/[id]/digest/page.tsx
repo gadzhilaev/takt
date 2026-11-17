@@ -1,14 +1,13 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { Suspense } from "react";
-import { useParams } from "next/navigation";
-import { DigestView } from "@/components/digest-view";
-
-export default function ProjectDigestRoute() {
-  const { id } = useParams<{ id: string }>();
-  return (
-    <Suspense fallback={null}>
-      <DigestView projectId={id} />
-    </Suspense>
-  );
+/** Старый адрес сводки → вкладка «Сводка» в проекте. */
+export default function ProjectDigestRedirect({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { period?: string };
+}) {
+  const period = searchParams.period ? `&period=${encodeURIComponent(searchParams.period)}` : "";
+  redirect(`/app/projects/${encodeURIComponent(params.id)}?view=digest${period}`);
 }

@@ -24,6 +24,7 @@ import { ColumnStartDroppable, KanbanColumn } from "@/components/kanban-column";
 import { TaskCard } from "@/components/task-card";
 import { PendingFilesList } from "@/components/task-attachments";
 import { TaskDrawer } from "@/components/task-drawer";
+import { DigestView } from "@/components/digest-view";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -102,8 +103,30 @@ export function KanbanBoard({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
-  /** По умолчанию полная доска; «Мои задачи» — отдельная вкладка. */
-  const [boardTab, setBoardTab] = useState<"mine" | "board">("board");
+  /** По умолчанию полная доска; «Мои задачи» и «Сводка» — вкладки того же переключателя.
+   * «Сводка» отражается в URL (`?view=digest`): обновление страницы и ссылки из уведомлений. */
+  const viewParam = searchParams.get("view");
+  const [boardTab, setBoardTabState] = useState<"mine" | "board" | "digest">(
+    viewParam === "digest" ? "digest" : "board"
+  );
+  useEffect(() => {
+    if (viewParam === "digest") setBoardTabState("digest");
+    else setBoardTabState((t) => (t === "digest" ? "board" : t));
+  }, [viewParam]);
+  const setBoardTab = useCallback(
+    (tab: "mine" | "board" | "digest") => {
+      setBoardTabState(tab);
+      const next = new URLSearchParams(searchParams.toString());
+      if (tab === "digest") next.set("view", "digest");
+      else {
+        next.delete("view");
+        next.delete("period");
+      }
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [addingColumn, setAddingColumn] = useState(false);
@@ -917,9 +940,14 @@ export function KanbanBoard({
       <button
         type="button"
         role="tab"
-        aria-selected={false}
-        className="min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
-        onClick={() => router.push(`/app/projects/${projectId}/digest`)}
+        aria-selected={boardTab === "digest"}
+        className={cn(
+          "min-h-9 min-w-0 flex-1 truncate rounded-[calc(var(--radius)-2px)] px-2 text-[13px] font-medium transition-colors",
+          boardTab === "digest"
+            ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
+            : "text-muted hover:text-foreground"
+        )}
+        onClick={() => setBoardTab("digest")}
       >
         Сводка
       </button>
@@ -978,6 +1006,19 @@ export function KanbanBoard({
       {isDesktop ? "+ Добавить столбец" : "+ Столбец"}
     </button>
   );
+
+  /* «Сводка»: тот же переключатель и компоновка, меняется только содержимое. */
+  if (boardTab === "digest") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+        {tabBar}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+          <DigestView projectId={projectId} />
+        </div>
+        {drawer}
+      </div>
+    );
+  }
 
   /* Phone / tablet: вкладки + горизонтальные столбцы со snap. */
   if (!isDesktop) {
