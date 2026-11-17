@@ -16,7 +16,9 @@ Logs contain only ids and counts — no names, emails or task titles.
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
+import hmac
 import logging
 import secrets
 import uuid
@@ -148,6 +150,18 @@ async def open_tasks_for(
 
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def scoped_action_token(checkin: RhythmCheckin, settings: Settings | None = None) -> str:
+    """Token for widget/Live Activity answers: one check-in, its day, its owner.
+
+    Derived (HMAC of SECRET_KEY), so nothing extra is stored; it stops working with the day
+    because ``checkin_by_push_token`` also requires the check-in to be today's.
+    """
+    settings = settings or get_settings()
+    msg = f"takt-checkin:{checkin.id}:{checkin.date.isoformat()}:{checkin.user_id}".encode()
+    digest = hmac.new(settings.SECRET_KEY.encode(), msg, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")[:43]
 
 
 @dataclass
@@ -659,11 +673,15 @@ async def checkin_by_push_token(
         .options(selectinload(RhythmCheckin.items))
         .where(RhythmCheckin.id == checkin_id)
     )
-    if (
-        checkin is None
-        or not checkin.push_token_hash
-        or not secrets.compare_digest(checkin.push_token_hash, _hash_token(token))
-    ):
+    push_ok = bool(
+        checkin is not None
+        and checkin.push_token_hash
+        and secrets.compare_digest(checkin.push_token_hash, _hash_token(token))
+    )
+    scoped_ok = bool(
+        checkin is not None and secrets.compare_digest(scoped_action_token(checkin), token)
+    )
+    if checkin is None or not (push_ok or scoped_ok):
         raise RhythmError("invalid_token", "Ссылка ответа недействительна", 403)
     project = await db.get(Project, checkin.project_id)
     if project is None or checkin.date != local_today(project):

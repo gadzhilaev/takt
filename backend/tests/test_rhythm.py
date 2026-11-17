@@ -647,3 +647,58 @@ async def test_manual_start_access_and_conditions(client, settings):
     assert r.status_code == 409 and r.json()["detail"]["error"]["code"] == "rhythm_off"
     cur = (await client.get("/api/v1/rhythm/checkins/current")).json()
     assert cur["startable_project_ids"] == []
+
+
+@pytest.mark.asyncio
+async def test_widget_scoped_token(client, settings, monkeypatch):
+    """Widget «Сделал»: token from the owner's own API response, one check-in, today only."""
+    w = await _today_world(settings, monkeypatch)
+    await _login(client, w.member)
+    cur = (await client.get("/api/v1/rhythm/checkins/current")).json()["checkins"][0]
+    token = cur["action_token"]
+    assert cur["action_path"] == "/api/v1/rhythm/push-answer" and len(token) >= 40
+
+    # Works without a session (widget has no JWT)
+    async with await _client() as anon:
+        r = await anon.post(
+            "/api/v1/rhythm/push-answer",
+            json={
+                "checkin_id": cur["id"],
+                "task_id": str(w.tasks["overdue"]),
+                "answer": "done",
+                "token": token,
+            },
+        )
+        assert r.status_code == 200, r.text
+    assert (await _task(w.tasks["overdue"])).status_id == w.cols[3]
+
+    # Not valid for another person's check-in
+    other = (await _checkins(w.project_id))[w.admin.id][0].id
+    async with await _client() as anon:
+        r = await anon.post(
+            "/api/v1/rhythm/push-answer",
+            json={
+                "checkin_id": str(other),
+                "task_id": str(w.tasks["admin"]),
+                "answer": "done",
+                "token": token,
+            },
+        )
+        assert r.status_code == 403
+
+    # Expires with the day (token is bound to the check-in date)
+    async with TestSession() as db:
+        c = await db.get(RhythmCheckin, uuid.UUID(cur["id"]))
+        c.date = c.date - timedelta(days=1)
+        await db.commit()
+    async with await _client() as anon:
+        r = await anon.post(
+            "/api/v1/rhythm/push-answer",
+            json={
+                "checkin_id": cur["id"],
+                "task_id": str(w.tasks["soon"]),
+                "answer": "done",
+                "token": token,
+            },
+        )
+        assert r.status_code == 403  # the date is part of the token

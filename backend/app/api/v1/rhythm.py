@@ -94,6 +94,10 @@ async def _checkin_out(db: AsyncSession, checkin: RhythmCheckin) -> dict:
         "created_at": checkin.created_at,
         "answered_at": checkin.answered_at,
         "items": items,
+        # Scoped token for the home-screen widget / Live Activity (this check-in, today only).
+        # Only ever returned to the owner: every endpoint here loads own check-ins only.
+        "action_token": rhythm_service.scoped_action_token(checkin),
+        "action_path": "/api/v1/rhythm/push-answer",
     }
 
 
