@@ -6,6 +6,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app.dart';
 import '../../../core/avatar_cache.dart';
 import '../../../core/push/fcm_bootstrap.dart';
 import '../../../core/theme.dart';
@@ -113,12 +114,22 @@ class _SplashPageState extends State<SplashPage> {
     if (!_minElapsed || !_warmDone || !mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // Deep link мог уже увести с splash (TaktApp._consumeDeepLink) — не затираем /projects.
+      final loc = GoRouterState.of(context).matchedLocation;
+      if (loc != '/splash') return;
       final onboarding = context.read<OnboardingController>();
       if (!onboarding.seen) {
         context.go('/onboarding');
         return;
       }
       if (state is AuthAuthenticated) {
+        final pending = TaktApp.pendingDeepLink;
+        if (pending != null && pending.isNotEmpty) {
+          // Store shots / widget / push: не перетираем целевой маршрут хабом проектов.
+          TaktApp.pendingDeepLink = null;
+          context.go(pending.startsWith('/') ? pending : '/projects');
+          return;
+        }
         final fcm = context.read<FcmBootstrap>();
         context.go(fcm.shouldShowPrompt ? '/enable-notifications' : '/projects');
       } else if (state is AuthGuest || state is AuthFailure) {

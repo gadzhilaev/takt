@@ -120,9 +120,15 @@ class _AppShellState extends State<AppShell> {
     final dark = Theme.of(context).brightness == Brightness.dark;
 
     // Без проекта вкладки проекта скрыты; если уже на одной из них — на главную.
+    // Deep link /digest?project=… /board?project=… ещё открывает проект — не срываем.
     if (!hasProject && (idx == 1 || idx == _digestIdx)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/projects');
+        if (!context.mounted) return;
+        final q = GoRouterState.of(context).uri.queryParameters['project'];
+        if (q != null && q.isNotEmpty) return;
+        if (context.read<BoardCubit>().state.project == null) {
+          context.go('/projects');
+        }
       });
     }
 

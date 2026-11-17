@@ -88,7 +88,8 @@ class LiveActivityController {
       return;
     }
     try {
-      await _channel.invokeMethod<bool>('show', payload);
+      final ok = await _channel.invokeMethod<bool>('show', payload);
+      debugPrint('live activity show → $ok payload=$payload');
     } catch (e) {
       debugPrint('live activity show failed: $e');
     }

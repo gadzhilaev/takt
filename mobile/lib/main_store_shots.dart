@@ -50,9 +50,13 @@ Future<void> main() async {
     refresh: data['refresh_token'] as String,
   );
 
+  final prefs = await SharedPreferences.getInstance();
   if (projectId.isNotEmpty) {
-    final prefs = await SharedPreferences.getInstance();
     await prefs.setString('takt_last_project_id', projectId);
+  }
+  // Store shots: включить Live Activity до runApp (профиль по умолчанию выкл.).
+  if (const bool.fromEnvironment('STORE_LIVE_ACTIVITY')) {
+    await prefs.setBool('takt_live_activity_enabled', true);
   }
   if (route.isNotEmpty) {
     TaktApp.pendingDeepLink = route;

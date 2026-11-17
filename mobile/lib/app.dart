@@ -14,6 +14,7 @@ import 'core/theme_controller.dart';
 import 'core/theme_scope.dart';
 import 'core/token_storage.dart';
 import 'features/digest/data/digest_repository.dart';
+import 'features/rhythm/data/rhythm_models.dart';
 import 'features/rhythm/data/rhythm_repository.dart';
 import 'features/auth/cubit/auth_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -79,15 +80,24 @@ class _TaktAppState extends State<TaktApp> {
     _oauth = OAuthRepository(widget.api);
     _notifications = NotificationsRepository(widget.api);
     _rhythm = RhythmRepository(widget.api, widgetSync: _widgetSync);
-    _liveActivity.init();
-    _rhythm.onCheckinsChanged = (checkins) {
+    void syncLive(List<Checkin> checkins) {
       final me = _boardCubit.currentUserId;
       final mine = [
         for (final t in _boardCubit.state.tasks)
           if (me != null && t.assignees.any((a) => a.id == me)) t,
       ];
-      _liveActivity.sync(liveActivityPayload(checkins: checkins, myTasks: mine));
-    };
+      unawaited(
+        _liveActivity.sync(liveActivityPayload(checkins: checkins, myTasks: mine)),
+      );
+    }
+
+    _rhythm.onCheckinsChanged = syncLive;
+    // init асинхронный: после prefs/enabled — повторный sync (store shots / тумблер).
+    unawaited(
+      _liveActivity.init().then((_) {
+        if (_rhythm.current.value.isNotEmpty) syncLive(_rhythm.current.value);
+      }),
+    );
     _authCubit = AuthCubit(
       auth: _authRepo,
       api: widget.api,
