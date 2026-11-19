@@ -274,6 +274,7 @@ class MobileOAuthBody(BaseModel):
     device_id: str | None = None
     state: str | None = None
     display_name: str | None = None
+    nonce: str | None = None  # optional; checked only when present (build 11 omits)
     link: bool = False
 
 
@@ -298,6 +299,7 @@ async def oauth_mobile(
             state=body.state,
             display_name=body.display_name,
             link_user_id=user.id if body.link and user else None,
+            nonce=body.nonce,
         )
         access, refresh = await oauth_service.issue_session(db, u)
         await record_activity(db, u.id, "login_oauth", {"provider": body.provider, "mobile": True})

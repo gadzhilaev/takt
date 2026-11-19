@@ -74,7 +74,7 @@ const IPHONE = [
 const FAQ = [
   {
     q: "Сколько стоит Takt?",
-    a: "Сейчас Takt бесплатный: можно зарегистрироваться, создать проект и пригласить команду без оплаты.",
+    a: "Takt бесплатный: без подписок, платных тарифов и покупок. Зарегистрироваться может любой человек, проекты и приглашения — бесплатно.",
   },
   {
     q: "Где хранятся данные?",
@@ -134,7 +134,7 @@ export function LandingPage() {
               href={paths.register}
               className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white hover:brightness-[0.96]"
             >
-              Начать бесплатно
+              Начать
             </Link>
           </div>
         </div>
@@ -158,7 +158,7 @@ export function LandingPage() {
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <Link href={paths.register} className={BTN_PRIMARY}>
-                  Начать бесплатно
+                  Начать
                 </Link>
                 {appStoreUrl && (
                   <a href={appStoreUrl} target="_blank" rel="noopener noreferrer" className={BTN_SECONDARY}>
@@ -172,7 +172,7 @@ export function LandingPage() {
                   Войти
                 </Link>
               </div>
-              <p className="mt-4 text-[13px] text-muted">Для колледжей и небольших организаций</p>
+              <p className="mt-4 text-[13px] text-muted">Для учебных групп и небольших команд</p>
             </div>
             <LandingCheckinDemo className="mx-auto w-full max-w-md lg:max-w-none" />
           </div>
@@ -308,7 +308,7 @@ export function LandingPage() {
             </p>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
               <Link href={paths.register} className={BTN_PRIMARY}>
-                Начать бесплатно
+                Начать
               </Link>
               <Link href={paths.login} className={BTN_SECONDARY}>
                 Войти

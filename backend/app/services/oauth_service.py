@@ -504,12 +504,168 @@ async def _exchange_yandex(code: str, redirect_uri: str, verifier: str | None) -
 
 
 def _decode_unverified_jwt_claims(token: str) -> dict[str, Any]:
+    """Decode JWT without signature check (web Apple/VK tokens arrived over TLS from IdP).
+
+    Must disable verify_aud: python-jose still validates audience when verify_signature=False,
+    and Apple/VK tokens set aud to the client id — without an explicit audience this raises
+    JWTClaimsError("Invalid audience") → «Некорректный id_token».
+    """
     try:
         from jose import jwt
 
-        return jwt.decode(token, key="", options={"verify_signature": False})
+        return jwt.decode(
+            token,
+            key="",
+            options={
+                "verify_signature": False,
+                "verify_aud": False,
+                "verify_iss": False,
+                "verify_exp": False,
+                "verify_nbf": False,
+                "verify_iat": False,
+            },
+        )
     except Exception as e:
         raise OAuthError("bad_token", "Некорректный id_token") from e
+
+
+# Apple JWKS cache (in-process). Refreshed on TTL or unknown kid.
+_APPLE_JWKS: dict[str, Any] | None = None
+_APPLE_JWKS_FETCHED_AT: float = 0.0
+_APPLE_JWKS_TTL_SEC = 24 * 3600
+_APPLE_JWKS_TIMEOUT = 5.0
+_APPLE_ISS = "https://appleid.apple.com"
+_APPLE_BUNDLE_ID = "ru.gadzhilaev.takt"
+
+
+def apple_allowed_audiences(settings: Settings | None = None) -> list[str]:
+    s = settings or get_settings()
+    raw = (s.OAUTH_APPLE_AUDIENCES or "").strip()
+    if raw:
+        items = [p.strip() for p in raw.split(",") if p.strip()]
+    else:
+        items = [_APPLE_BUNDLE_ID]
+        if s.OAUTH_APPLE_CLIENT_ID.strip():
+            items.append(s.OAUTH_APPLE_CLIENT_ID.strip())
+    # de-dupe, preserve order
+    seen: set[str] = set()
+    out: list[str] = []
+    for a in items:
+        if a not in seen:
+            seen.add(a)
+            out.append(a)
+    return out
+
+
+def _clear_apple_jwks_cache() -> None:
+    global _APPLE_JWKS, _APPLE_JWKS_FETCHED_AT
+    _APPLE_JWKS = None
+    _APPLE_JWKS_FETCHED_AT = 0.0
+
+
+async def _fetch_apple_jwks(*, force: bool = False) -> dict[str, Any]:
+    global _APPLE_JWKS, _APPLE_JWKS_FETCHED_AT
+    now = time.time()
+    if (
+        not force
+        and _APPLE_JWKS is not None
+        and (now - _APPLE_JWKS_FETCHED_AT) < _APPLE_JWKS_TTL_SEC
+    ):
+        return _APPLE_JWKS
+    try:
+        async with httpx.AsyncClient(timeout=_APPLE_JWKS_TIMEOUT) as client:
+            r = await client.get(APPLE_KEYS)
+            r.raise_for_status()
+            body = r.json()
+    except Exception as e:
+        if _APPLE_JWKS is not None:
+            # Stale cache is better than hard fail when Apple is briefly unreachable
+            # only if we already had keys; first fetch must succeed.
+            return _APPLE_JWKS
+        raise OAuthError(
+            "apple_jwks",
+            "Не удалось получить ключи Apple для проверки входа. Попробуйте позже.",
+            status_code=503,
+        ) from e
+    if not isinstance(body, dict) or not body.get("keys"):
+        raise OAuthError("apple_jwks", "Ответ Apple JWKS пуст", status_code=503)
+    _APPLE_JWKS = body
+    _APPLE_JWKS_FETCHED_AT = now
+    return body
+
+
+def _jwk_for_kid(jwks: dict[str, Any], kid: str | None) -> Any:
+    from jose import jwk
+
+    keys = jwks.get("keys") or []
+    for item in keys:
+        if kid is None or item.get("kid") == kid:
+            return jwk.construct(item)
+    return None
+
+
+async def verify_apple_id_token(
+    token: str,
+    *,
+    nonce: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Verify native Sign in with Apple identityToken (signature + iss/aud/exp).
+
+    Nonce is checked only when the client sends one (build 11 does not).
+    """
+    from jose import jwt
+    from jose.exceptions import ExpiredSignatureError, JWTError
+
+    s = settings or get_settings()
+    try:
+        header = jwt.get_unverified_header(token)
+    except Exception as e:
+        raise OAuthError("bad_token", "Некорректный id_token") from e
+    kid = header.get("kid") if isinstance(header, dict) else None
+
+    jwks = await _fetch_apple_jwks()
+    key = _jwk_for_kid(jwks, kid)
+    if key is None and kid is not None:
+        jwks = await _fetch_apple_jwks(force=True)
+        key = _jwk_for_kid(jwks, kid)
+    if key is None:
+        raise OAuthError("bad_token", "Некорректный id_token")
+
+    try:
+        claims = jwt.decode(
+            token,
+            key,
+            algorithms=["RS256"],
+            issuer=_APPLE_ISS,
+            options={
+                "verify_aud": False,  # checked against allow-list below
+                "leeway": 60,
+            },
+        )
+    except ExpiredSignatureError as e:
+        raise OAuthError("bad_token", "Срок действия id_token истёк") from e
+    except JWTError as e:
+        raise OAuthError("bad_token", "Некорректный id_token") from e
+
+    aud = claims.get("aud")
+    allowed = set(apple_allowed_audiences(s))
+    aud_ok = False
+    if isinstance(aud, str):
+        aud_ok = aud in allowed
+    elif isinstance(aud, (list, tuple)):
+        aud_ok = any(a in allowed for a in aud if isinstance(a, str))
+    if not aud_ok:
+        raise OAuthError("bad_token", "Некорректный id_token")
+
+    if nonce:
+        token_nonce = claims.get("nonce")
+        if not token_nonce or not secrets.compare_digest(str(token_nonce), str(nonce)):
+            raise OAuthError("bad_token", "Некорректный id_token")
+
+    if not claims.get("sub"):
+        raise OAuthError("apple_claims", "Нет sub")
+    return claims
 
 
 async def exchange_code(
@@ -543,6 +699,7 @@ async def mobile_complete(
     state: str | None = None,
     display_name: str | None = None,
     link_user_id: uuid.UUID | None = None,
+    nonce: str | None = None,
 ) -> tuple[User, bool, str | None]:
     settings = get_settings()
     if not await _provider_enabled(db, provider, settings):
@@ -562,10 +719,8 @@ async def mobile_complete(
 
     assert_redirect_allowed(redirect_uri, settings)
     if id_token and provider == OAuthProvider.apple:
-        claims = _decode_unverified_jwt_claims(id_token)
+        claims = await verify_apple_id_token(id_token, nonce=nonce, settings=settings)
         sub = claims.get("sub")
-        if not sub:
-            raise OAuthError("apple_claims", "Нет sub")
         email = claims.get("email")
         name = (display_name or "").strip() or None
         profile = ProviderProfile(

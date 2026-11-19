@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     OAUTH_APPLE_KEY_ID: str = ""
     OAUTH_APPLE_PRIVATE_KEY: str = ""  # PEM contents or path — never commit real key
     OAUTH_APPLE_PRIVATE_KEY_FILE: str = ""
+    # Comma-separated allowed aud for Apple id_token (native bundle + Services ID).
+    # Empty → defaults to "ru.gadzhilaev.takt" plus OAUTH_APPLE_CLIENT_ID when set.
+    OAUTH_APPLE_AUDIENCES: str = ""
     OAUTH_VK_ENABLED: bool = False
     OAUTH_VK_CLIENT_ID: str = ""
     OAUTH_VK_CLIENT_SECRET: str = ""
