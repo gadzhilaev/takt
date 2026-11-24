@@ -52,12 +52,12 @@ class RhythmEnableCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Включите ежедневный чек-ин',
+                            'Ежедневный чек-ин',
                             style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Команда будет отвечать за 10 секунд — задачи обновятся сами, а в сводке появится картина дня.',
+                            'Команда за несколько секунд обновляет свои задачи. В сводке видно, что сделано и что мешает.',
                             style: TextStyle(fontSize: 13, height: 1.35, color: muted),
                           ),
                         ],

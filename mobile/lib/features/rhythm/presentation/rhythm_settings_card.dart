@@ -38,7 +38,7 @@ class RhythmSettingsCard extends StatelessWidget {
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg),
             ),
             subtitle: Text(
-              'Каждый отвечает по своим задачам одним нажатием — доска обновляется сама.',
+              'Команда отмечает задачи одним нажатием, доска обновляется автоматически.',
               style: TextStyle(fontSize: 12, height: 1.3, color: muted),
             ),
           ),
