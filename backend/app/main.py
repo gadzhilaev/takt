@@ -71,7 +71,8 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     configure_app_logging(settings.APP_LOG_LEVEL)
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-    run_migrations()
+    if settings.AUTO_MIGRATE:
+        run_migrations()
     async with AsyncSessionLocal() as db:
         await bootstrap_db(db, settings)
     if settings.SEED_DEMO_DATA:
@@ -81,13 +82,13 @@ async def lifespan(app: FastAPI):
             await seed_demo(db)
     stop = asyncio.Event()
     reminder_task: asyncio.Task | None = None
-    if settings.DUE_REMINDER_ENABLED and settings.DUE_REMINDER_INTERVAL_SECONDS > 0:
+    if settings.BACKGROUND_JOBS_ENABLED and settings.DUE_REMINDER_ENABLED and settings.DUE_REMINDER_INTERVAL_SECONDS > 0:
         reminder_task = asyncio.create_task(due_reminder_loop(stop))
     rhythm_task: asyncio.Task | None = None
-    if settings.RHYTHM_ENABLED and settings.RHYTHM_INTERVAL_SECONDS > 0:
+    if settings.BACKGROUND_JOBS_ENABLED and settings.RHYTHM_ENABLED and settings.RHYTHM_INTERVAL_SECONDS > 0:
         rhythm_task = asyncio.create_task(rhythm_loop(stop))
     digest_task: asyncio.Task | None = None
-    if settings.DIGEST_ENABLED and settings.DIGEST_INTERVAL_SECONDS > 0:
+    if settings.BACKGROUND_JOBS_ENABLED and settings.DIGEST_ENABLED and settings.DIGEST_INTERVAL_SECONDS > 0:
         digest_task = asyncio.create_task(digest_loop(stop))
     try:
         yield

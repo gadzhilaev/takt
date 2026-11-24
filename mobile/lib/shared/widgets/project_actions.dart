@@ -100,6 +100,7 @@ Future<void> renameProjectFlow(
   VoidCallback? onChanged,
 }) async {
   final controller = TextEditingController(text: project.name);
+  final focusNode = FocusNode();
   controller.selection = TextSelection(
     baseOffset: 0,
     extentOffset: controller.text.length,
@@ -173,6 +174,7 @@ Future<void> renameProjectFlow(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                     child: TextField(
                       controller: controller,
+                      focusNode: focusNode,
                       autofocus: true,
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => submit(),
@@ -208,7 +210,7 @@ Future<void> renameProjectFlow(
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     child: Material(
                       color: fieldBg,
                       borderRadius: BorderRadius.circular(10),
@@ -230,14 +232,14 @@ Future<void> renameProjectFlow(
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     child: RhythmSettingsCard(
                       value: rhythm,
                       onChanged: (v) => setModalState(() => rhythm = v),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     child: DigestSettingsCard(
                       value: digest,
                       onChanged: (v) => setModalState(() => digest = v),
@@ -253,6 +255,8 @@ Future<void> renameProjectFlow(
     },
   );
   final name = controller.text.trim();
+  focusNode.unfocus();
+  focusNode.dispose();
   controller.dispose();
   if (ok != true || !context.mounted) return;
   if (name.isEmpty) return;

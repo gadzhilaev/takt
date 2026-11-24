@@ -32,6 +32,7 @@ class _BoardPageState extends State<BoardPage> {
   bool _dragging = false;
 
   final _newColumnName = TextEditingController();
+  final _newColumnFocus = FocusNode();
   bool _addingColumn = false;
   bool _creatingColumn = false;
 
@@ -77,6 +78,7 @@ class _BoardPageState extends State<BoardPage> {
     _edgeScroll?.dispose();
     _pageController?.dispose();
     _newColumnName.dispose();
+    _newColumnFocus.dispose();
     super.dispose();
   }
 
@@ -124,6 +126,7 @@ class _BoardPageState extends State<BoardPage> {
   Future<void> _submitNewColumn() async {
     final name = _newColumnName.text.trim();
     if (name.isEmpty || _creatingColumn) return;
+    _newColumnFocus.unfocus();
     setState(() => _creatingColumn = true);
     final cubit = context.read<BoardCubit>();
     final color = suggestUnusedColumnColor(cubit.state.columns.map((c) => c.color));
@@ -143,6 +146,7 @@ class _BoardPageState extends State<BoardPage> {
   }
 
   void _cancelAddColumn() {
+    _newColumnFocus.unfocus();
     setState(() {
       _addingColumn = false;
       _creatingColumn = false;
@@ -179,6 +183,7 @@ class _BoardPageState extends State<BoardPage> {
                             children: [
                               TextField(
                                 controller: _newColumnName,
+                                focusNode: _newColumnFocus,
                                 autofocus: true,
                                 textInputAction: TextInputAction.done,
                                 decoration: const InputDecoration(
@@ -213,7 +218,10 @@ class _BoardPageState extends State<BoardPage> {
                         ),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(TaktRadii.lg),
-                          onTap: () => setState(() => _addingColumn = true),
+                          onTap: () {
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            setState(() => _addingColumn = true);
+                          },
                           child: SizedBox(
                             width: double.infinity,
                             height: 48,
@@ -347,7 +355,10 @@ class _BoardPageState extends State<BoardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const CheckinBanner(padding: EdgeInsets.fromLTRB(16, 0, 16, 8)),
+              const CheckinBanner(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                showStartButton: false,
+              ),
               const RhythmEnableCard(),
               const WidgetTipCard(padding: EdgeInsets.fromLTRB(16, 0, 16, 8)),
               Expanded(child: board),

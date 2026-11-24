@@ -89,6 +89,7 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final user = await auth.login(email: email, password: password);
       emit(AuthAuthenticated(user));
+      await fcm?.registerForUser();
     } catch (e) {
       emit(AuthFailure(api.messageFromError(e)));
       emit(const AuthGuest());
@@ -122,6 +123,7 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final user = await auth.confirmRegister(email: email, code: code);
       emit(AuthAuthenticated(user));
+      await fcm?.registerForUser();
     } catch (e) {
       emit(AuthFailure(api.messageFromError(e)));
       emit(const AuthGuest());
@@ -151,5 +153,8 @@ class AuthCubit extends Cubit<AuthState> {
   void setUser(UserProfile user) => emit(AuthAuthenticated(user));
 
   /// Успешный OAuth (токены уже сохранены в [OAuthRepository]).
-  void acceptOAuthUser(UserProfile user) => emit(AuthAuthenticated(user));
+  Future<void> acceptOAuthUser(UserProfile user) async {
+    emit(AuthAuthenticated(user));
+    await fcm?.registerForUser();
+  }
 }

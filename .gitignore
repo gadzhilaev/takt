@@ -67,3 +67,22 @@ docs/screenshots/.e2e-capture/
 # Store materials — only local, never commit
 mobile/store/
 /store/
+
+# AI agent instruction files (local only; do not commit these rules)
+AGENTS.override.md
+CLAUDE.md
+GEMINI.md
+.cursorrules
+**/.claude/
+**/.codex/
+.windsurfrules
+**/.windsurf/rules/
+**/.github/copilot-instructions.md
+**/.github/instructions/
+**/.github/prompts/
+**/.clinerules/
+**/.roo/
+**/.continue/rules/
+**/.amazonq/rules/
+**/.junie/
+**/.openhands/

@@ -128,6 +128,8 @@ class Settings(BaseSettings):
 
     # Logging level for app.* loggers (background loop passes are logged at INFO).
     APP_LOG_LEVEL: str = "INFO"
+    BACKGROUND_JOBS_ENABLED: bool = True
+    AUTO_MIGRATE: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

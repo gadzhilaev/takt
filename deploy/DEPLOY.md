@@ -28,7 +28,7 @@ cd /opt/takt
 ```
 
 Скрипт: `git pull --ff-only origin main` → `docker compose -f deploy/docker-compose.prod.yml build` → `up -d`.  
-Миграции Alembic (**001–016**) применяются при старте backend (`alembic upgrade head`).  
+Миграции Alembic (**001–023**) применяются при старте backend (`alembic upgrade head`).
 SSH deploy key: `~/.ssh/takt_deploy` (read-only). Секреты (`.env`, `secrets/`) в git не входят.
 
 ### Standalone (свой VPS + Compose Caddy)
@@ -139,6 +139,42 @@ cd /opt/takt
 ```
 
 Rollback: `git checkout <sha>` на сервере + redeploy. DB down-migration — только при наличии; предпочтителен forward-fix.
+
+### Blue-green на shared VPS
+
+Параллельные слоты добавлены как отдельный Compose файл; обычный `server-deploy.sh` и текущие контейнеры не меняются. Прежде чем впервые использовать слоты на сервере, требуется одноразово установить обновлённый edge vhost и общий файл upstreams. Сначала сохраните копию текущего vhost, затем на сервере:
+
+```bash
+sudo install -d -m 755 /etc/takt/nginx
+sudo cp /etc/takt/nginx/edge.conf /etc/takt/nginx/edge.conf.before-bluegreen
+sudo cp deploy/nginx/taktapp.conf /etc/takt/nginx/edge.conf
+printf '%s\n' 'upstream takt_api { server takt-backend:8000; }' \
+  'upstream takt_web { server takt-frontend:3000; }' | sudo tee /etc/takt/nginx/active-upstreams.conf >/dev/null
+printf '%s\n' legacy | sudo tee /etc/takt/nginx/active-slot >/dev/null
+```
+
+В `deploy/docker-compose.takt-edge.yml` добавлено монтирование каталога `/etc/takt/nginx` в edge-контейнер. Примените overlay из `/opt/gadzhilaev` к уже работающему общему nginx и проверьте конфигурацию до перезагрузки:
+
+```bash
+cd /opt/gadzhilaev
+docker compose -f docker-compose.prod.yml -f docker-compose.smile-edge.yml \
+  -f docker-compose.tarazpay-edge.yml -f docker-compose.aspect-edge.yml \
+  -f docker-compose.takt-edge.yml up -d nginx
+docker exec gadzhilaev-nginx-1 nginx -t
+```
+
+После этого на `/opt/takt` слот можно собрать и включить, например:
+
+```bash
+./deploy/scripts/server-switch-slot.sh blue --build
+# Следующий выпуск собирайте в green, переключайте аналогично.
+# Откат на предыдущий слот: ./deploy/scripts/server-switch-slot.sh blue|green
+# Первый откат до слотов: ./deploy/scripts/server-switch-slot.sh legacy
+```
+
+Скрипт ждёт Docker health обоих контейнеров, атомарно обновляет upstream include, проверяет Nginx и `/login`, а при ошибке возвращает прежний upstream. Старый слот оставляйте запущенным до окончания окна отката. Docker volume PostgreSQL и uploads, а также сеть БД подключаются как внешние ресурсы; новая БД или копия uploads не создаются. Compose overlay ожидает существующие ресурсы `takt_takt_internal`, `gadzhilaev_internal` и `takt_uploads`.
+
+**Ограничения до включения:** две версии приложения одновременно используют одну схему, поэтому миграции обязаны быть expand/contract. Новая версия схемы должна быть совместима с предыдущей на время отката. Слоты запускаются с `BACKGROUND_JOBS_ENABLED=false` и `AUTO_MIGRATE=false`; legacy backend остаётся единственным исполнителем фоновых push и напоминаний, поэтому его пока нельзя останавливать. Убедитесь, что на VPS хватает памяти для legacy и двух слотов одновременно.
 
 ---
 

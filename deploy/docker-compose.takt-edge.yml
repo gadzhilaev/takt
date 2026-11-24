@@ -9,3 +9,4 @@ services:
   nginx:
     volumes:
       - /etc/takt/nginx/edge.conf:/etc/nginx/conf.d/taktapp.conf:ro
+      - /etc/takt/nginx:/etc/nginx/takt:ro

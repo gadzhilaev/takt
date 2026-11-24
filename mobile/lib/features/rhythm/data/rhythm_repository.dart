@@ -71,7 +71,8 @@ class RhythmRepository {
     final updated = Checkin.fromJson(res.data!['checkin'] as Map<String, dynamic>);
     current.value = [
       for (final c in current.value)
-        if (c.id == updated.id) updated else c,
+        if (c.id == updated.id) updated,
+      if (!current.value.any((c) => c.id == updated.id)) updated,
     ];
     _publish();
     return updated;

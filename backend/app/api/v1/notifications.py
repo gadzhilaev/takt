@@ -11,7 +11,9 @@ from app.api.deps import get_current_user, verify_csrf
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.notification import Notification
+from app.models.device_push_token import DevicePushToken
 from app.models.project import Project
+from app.models.push_subscription import PushSubscription
 from app.models.user import User
 from app.services import fcm_service, push_service
 
@@ -32,6 +34,59 @@ class DeviceTokenIn(BaseModel):
     token: str = Field(min_length=8)
     platform: str = Field(description="ios | android")
     app_version: str | None = None
+
+
+def _browser_label(user_agent: str | None) -> str:
+    ua = (user_agent or "").lower()
+    if "edg/" in ua: browser = "Microsoft Edge"
+    elif "firefox/" in ua: browser = "Firefox"
+    elif "chrome/" in ua or "crios/" in ua: browser = "Chrome"
+    elif "safari/" in ua: browser = "Safari"
+    else: browser = "Браузер"
+    if "iphone" in ua or "ipad" in ua: os_name = " · iOS"
+    elif "android" in ua: os_name = " · Android"
+    elif "windows" in ua: os_name = " · Windows"
+    elif "mac os" in ua or "macintosh" in ua: os_name = " · macOS"
+    elif "linux" in ua: os_name = " · Linux"
+    else: os_name = ""
+    return browser + os_name
+
+
+@router.get("/devices")
+async def list_push_devices(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    browsers = (await db.execute(select(PushSubscription).where(PushSubscription.user_id == user.id))).scalars().all()
+    apps = (await db.execute(select(DevicePushToken).where(DevicePushToken.user_id == user.id))).scalars().all()
+    return {"items": [
+        *[{
+            "id": str(row.id), "kind": "browser", "label": _browser_label(row.user_agent),
+            "created_at": row.created_at, "last_activity_at": row.updated_at,
+        } for row in browsers],
+        *[{
+            "id": str(row.id), "kind": "app", "label": "Приложение · " + row.platform.capitalize(),
+            "app_version": row.app_version, "created_at": row.created_at, "last_activity_at": row.updated_at,
+        } for row in apps],
+    ]}
+
+
+@router.delete("/devices/{kind}/{device_id}", dependencies=[Depends(verify_csrf)])
+async def revoke_push_device(
+    kind: str,
+    device_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    model = PushSubscription if kind == "browser" else DevicePushToken if kind == "app" else None
+    if model is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Устройство не найдено"}})
+    row = await db.scalar(select(model).where(model.id == device_id, model.user_id == user.id))
+    if row is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Устройство не найдено"}})
+    await db.delete(row)
+    await db.commit()
+    return {"ok": True}
 
 
 @router.get("")

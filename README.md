@@ -87,7 +87,7 @@ Takt помогает небольшим командам вести проек�
 |------|------------|
 | Frontend | Next.js 14 (App Router), React 18, TanStack Query, dnd-kit, Tailwind CSS, Playwright, Vitest |
 | Mobile | Flutter, Dio, go_router, flutter_bloc, home_widget, flutter_secure_storage, Firebase Messaging |
-| Backend | FastAPI, SQLAlchemy 2 (async), Alembic **001–018**, Pydantic v2, SlowAPI, pywebpush, firebase-admin |
+| Backend | FastAPI, SQLAlchemy 2 (async), Alembic **001–023**, Pydantic v2, SlowAPI, pywebpush, firebase-admin |
 | Infra | PostgreSQL 16, Docker Compose, Caddy / nginx |
 | Auth | JWT (httpOnly cookies + CSRF на web; Bearer на mobile), OAuth PKCE |
 
@@ -167,7 +167,7 @@ flutter run --dart-define=API_BASE=http://127.0.0.1:8000
 Mobile: [mobile/docs/MOBILE_SETUP.md](mobile/docs/MOBILE_SETUP.md).  
 Prod: [deploy/DEPLOY.md](deploy/DEPLOY.md).
 
-Миграции Alembic **001–018** (head `018_rewrite_notification_copy`). При старте backend выполняет `alembic upgrade head`.
+Миграции Alembic **001–023** (head `023_digest_for_everyone`). При старте backend выполняет `alembic upgrade head`.
 
 Демо изолировано (`projects.is_demo` / `users.is_demo`). Учётка `DEMO_USER_*` только в локальном `.env` / private — **не** в git.  
 Сиды: `setup_demo_workspace.py`, `seed_college_demo.py`, `seed_readme_demo.py`.

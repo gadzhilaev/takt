@@ -141,6 +141,7 @@ def _login_error_redirect(settings, *, code: str, message: str | None = None) ->
 
 
 async def _finish_web(
+    request: Request,
     db: AsyncSession,
     response: Response,
     provider: OAuthProvider,
@@ -153,7 +154,9 @@ async def _finish_web(
         user, created, return_path = await oauth_service.exchange_code(
             db, provider, code=code, state=state, device_id=device_id
         )
-        access, refresh = await oauth_service.issue_session(db, user)
+        access, refresh = await oauth_service.issue_session(
+            db, user, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform")
+        )
         await record_activity(db, user.id, "login_oauth", {"provider": provider.value, "created": created})
         await db.commit()
     except oauth_service.OAuthError as e:
@@ -237,7 +240,7 @@ async def oauth_callback_get(
     resolved = OAuthProvider(provider) if provider else (row.provider if row else None)
     if not resolved:
         return _login_error_redirect(settings, code="invalid_state")
-    return await _finish_web(db, response, resolved, code, state, device_id=device_id)
+    return await _finish_web(request, db, response, resolved, code, state, device_id=device_id)
 
 
 @router.post("/callback")
@@ -262,7 +265,7 @@ async def oauth_callback_post(
     resolved = await _provider_from_state(db, state)
     if not resolved:
         return _login_error_redirect(settings, code="invalid_state")
-    return await _finish_web(db, response, resolved, code, state, device_id=device_id)
+    return await _finish_web(request, db, response, resolved, code, state, device_id=device_id)
 
 
 class MobileOAuthBody(BaseModel):
@@ -301,7 +304,9 @@ async def oauth_mobile(
             link_user_id=user.id if body.link and user else None,
             nonce=body.nonce,
         )
-        access, refresh = await oauth_service.issue_session(db, u)
+        access, refresh = await oauth_service.issue_session(
+            db, u, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform") or "mobile"
+        )
         await record_activity(db, u.id, "login_oauth", {"provider": body.provider, "mobile": True})
         await db.commit()
     except oauth_service.OAuthError as e:

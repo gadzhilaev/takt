@@ -49,7 +49,7 @@ class DigestSettingsCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Что сделано, что застряло и где узкое место — администраторам и подписчикам.',
+                    'Прогресс, задержки и узкие места проекта для администраторов и подписчиков.',
                     style: TextStyle(fontSize: 12, height: 1.3, color: muted),
                   ),
                 ],

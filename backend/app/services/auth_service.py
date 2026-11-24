@@ -93,7 +93,14 @@ def touch_last_login(user: User) -> None:
     user.last_login_at = datetime.now(UTC)
 
 
-async def create_token_pair(db: AsyncSession, user: User) -> tuple[str, str, str]:
+async def create_token_pair(
+    db: AsyncSession,
+    user: User,
+    *,
+    session_id: uuid.UUID | None = None,
+    user_agent: str | None = None,
+    platform: str | None = None,
+) -> tuple[str, str, str]:
     """Issue access+refresh and record login activity time.
 
     Called on password login, register/confirm, and OAuth — so «Активность»
@@ -107,7 +114,14 @@ async def create_token_pair(db: AsyncSession, user: User) -> tuple[str, str, str
 
     settings = get_settings()
     expires = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    db.add(RefreshToken(user_id=user.id, jti=jti, expires_at=expires))
+    db.add(RefreshToken(
+        user_id=user.id,
+        jti=jti,
+        session_id=session_id or uuid.uuid4(),
+        user_agent=user_agent[:512] if user_agent else None,
+        platform=platform[:32] if platform else None,
+        expires_at=expires,
+    ))
     await db.flush()
     return access, refresh, jti
 
@@ -118,6 +132,19 @@ async def revoke_refresh_token(db: AsyncSession, jti: str) -> None:
         .where(RefreshToken.jti == jti)
         .values(revoked_at=datetime.now(UTC))
     )
+
+
+async def revoke_session(db: AsyncSession, user_id: uuid.UUID, session_id: uuid.UUID) -> bool:
+    result = await db.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.session_id == session_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=datetime.now(UTC))
+    )
+    return bool(result.rowcount)
 
 
 async def revoke_all_user_tokens(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -155,6 +182,8 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, st
     if not user or not user.is_active:
         raise AuthError("inactive", "Учётная запись отключена")
 
+    stored.updated_at = now
+
     # Backfill empty activity for sessions opened before register/confirm stamped login.
     if getattr(user, "last_login_at", False) is None:
         touch_last_login(user)
@@ -166,7 +195,10 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, st
         jwt_exp = stored.expires_at
     # Sliding: if less than 30 days remain, issue a new refresh but do not revoke old.
     if jwt_exp - now <= timedelta(days=30):
-        access, new_refresh, _ = await create_token_pair(db, user)
+        access, new_refresh, _ = await create_token_pair(
+            db, user, session_id=stored.session_id,
+            user_agent=stored.user_agent, platform=stored.platform,
+        )
         return access, new_refresh, user
 
     access = create_access_token(str(user.id), {"role": user.role.value})

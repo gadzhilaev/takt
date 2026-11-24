@@ -108,7 +108,13 @@ export function NotificationToasts() {
     void (async () => {
       try {
         const status = await getPushStatus();
-        if (status.supported && status.permission === "granted" && status.configured && !status.subscribed) {
+        if (
+          status.supported &&
+          status.permission === "granted" &&
+          status.configured
+        ) {
+          // Repair missing local subscriptions and rebind existing endpoints to the
+          // current account without prompting again when permission is already granted.
           await enableWebPush();
         }
       } catch {

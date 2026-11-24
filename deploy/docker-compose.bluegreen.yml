@@ -1,0 +1,79 @@
+# Parallel application slots for the shared VPS. PostgreSQL and uploads remain
+# owned by docker-compose.prod.yml and are deliberately shared between slots.
+name: takt
+
+services:
+  backend-blue: &backend-slot
+    image: takt-backend:blue
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: takt-backend-blue
+    restart: unless-stopped
+    env_file: ../.env
+    environment: &backend-environment
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-track}:${POSTGRES_PASSWORD}@takt-db:5432/${POSTGRES_DB:-track}
+      UPLOAD_DIR: /data/uploads
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-/secrets/firebase-adminsdk.json}
+      # Legacy backend remains the singleton worker until jobs are externalized.
+      BACKGROUND_JOBS_ENABLED: "false"
+      AUTO_MIGRATE: "false"
+    volumes:
+      - uploads:/data/uploads
+      - ${TAKT_SECRETS_DIR:-../secrets}:/secrets:ro
+    healthcheck: &backend-healthcheck
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 25s
+    networks: [takt_internal, gadzhilaev_internal]
+
+  backend-green:
+    <<: *backend-slot
+    image: takt-backend:green
+    container_name: takt-backend-green
+
+  frontend-blue: &frontend-slot
+    image: takt-frontend:blue
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    container_name: takt-frontend-blue
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      BACKEND_INTERNAL_URL: http://takt-backend-blue:8000
+    healthcheck: &frontend-healthcheck
+      test:
+        ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    networks: [takt_internal, gadzhilaev_internal]
+
+  frontend-green:
+    <<: *frontend-slot
+    image: takt-frontend:green
+    container_name: takt-frontend-green
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      BACKEND_INTERNAL_URL: http://takt-backend-green:8000
+
+volumes:
+  uploads:
+    external: true
+    name: takt_uploads
+
+networks:
+  takt_internal:
+    external: true
+    name: takt_takt_internal
+  gadzhilaev_internal:
+    external: true

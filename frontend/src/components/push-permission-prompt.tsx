@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 export function PushPermissionPrompt() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -19,13 +20,19 @@ export function PushPermissionPrompt() {
 
   async function onAllow() {
     setBusy(true);
+    setError("");
     try {
-      await enableWebPush();
-    } catch {
-      /* ignore — in-app feed still works */
-    } finally {
+      const result = await enableWebPush();
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
       setPushPromptNever();
       setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось подключить push-уведомления");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -70,6 +77,7 @@ export function PushPermissionPrompt() {
           </li>
         </ul>
         <div className="mt-5 flex flex-col gap-1.5">
+          {error && <p role="alert" className="text-center text-sm text-[var(--danger)]">{error}</p>}
           <Button type="button" disabled={busy} onClick={() => void onAllow()}>
             {busy ? "Подключаем…" : "Разрешить уведомления"}
           </Button>

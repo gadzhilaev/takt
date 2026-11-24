@@ -66,7 +66,7 @@ class _OAuthButtonsState extends State<OAuthButtons> {
       final user = await _repo.signIn(id, link: widget.link);
       if (!mounted) return;
       if (!widget.link) {
-        context.read<AuthCubit>().acceptOAuthUser(user);
+        await context.read<AuthCubit>().acceptOAuthUser(user);
       }
     } catch (e, st) {
       debugPrint('── OAuth UI ✕ $id: $e');

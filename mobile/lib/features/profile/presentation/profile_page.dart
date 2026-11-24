@@ -469,8 +469,17 @@ class _ProfilePageState extends State<ProfilePage> {
     final fcm = context.read<FcmBootstrap>();
     setState(() => _pushBusy = true);
     try {
-      if (_pushStatus == PushPermission.notDetermined) {
-        await fcm.enablePush();
+      if (_pushStatus == PushPermission.notDetermined ||
+          _pushStatus == PushPermission.authorized ||
+          _pushStatus == PushPermission.provisional) {
+        final registered = _pushStatus == PushPermission.notDetermined
+            ? await fcm.enablePush()
+            : await fcm.registerForUser();
+        if (!registered && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Не удалось подключить push. Попробуйте ещё раз.')),
+          );
+        }
         await _refreshPushStatus();
         return;
       }
