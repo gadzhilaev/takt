@@ -27,6 +27,7 @@ class FcmBootstrap {
 
   final NotificationsRepository _notifications;
   static const _promptNeverKey = 'takt_push_prompt_never';
+
   /// Legacy key from older builds — treated as «больше не показывать».
   static const _promptSeenLegacyKey = 'takt_push_prompt_seen';
 
@@ -61,7 +62,10 @@ class FcmBootstrap {
 
   Future<void> loadPromptState() async {
     final prefs = await SharedPreferences.getInstance();
-    final never = prefs.getBool(_promptNeverKey) ?? prefs.getBool(_promptSeenLegacyKey) ?? false;
+    final never =
+        prefs.getBool(_promptNeverKey) ??
+        prefs.getBool(_promptSeenLegacyKey) ??
+        false;
     promptNeverListenable.value = never;
     promptSeenListenable.value = never || skippedThisSession;
   }
@@ -85,13 +89,17 @@ class FcmBootstrap {
   /// Soft Firebase init only. Does **not** ask for notification permission.
   Future<void> init() async {
     try {
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       firebaseReady = true;
       await _wireForegroundToast();
     } catch (e) {
       firebaseReady = false;
-      debugPrint('FCM unavailable (проверьте GoogleService-Info / google-services): $e');
+      debugPrint(
+        'FCM unavailable (проверьте GoogleService-Info / google-services): $e',
+      );
     }
   }
 
@@ -116,7 +124,9 @@ class FcmBootstrap {
       ready = false;
       final msg = e.toString();
       if (msg.contains('apns-token-not-set')) {
-        debugPrint('FCM: push пока недоступен (нет APNS-токена; на симуляторе это нормально)');
+        debugPrint(
+          'FCM: push пока недоступен (нет APNS-токена; на симуляторе это нормально)',
+        );
       } else {
         debugPrint('FCM enable failed: $e');
       }
@@ -130,7 +140,8 @@ class FcmBootstrap {
     try {
       final messaging = FirebaseMessaging.instance;
       final permission = await messaging.getNotificationSettings();
-      final allowed = permission.authorizationStatus == AuthorizationStatus.authorized ||
+      final allowed =
+          permission.authorizationStatus == AuthorizationStatus.authorized ||
           permission.authorizationStatus == AuthorizationStatus.provisional;
       if (!allowed) {
         ready = false;
@@ -160,7 +171,9 @@ class FcmBootstrap {
     } catch (e) {
       ready = false;
       if (e.toString().contains('apns-token-not-set')) {
-        debugPrint('FCM: APNs token is not ready yet; registration will retry on resume');
+        debugPrint(
+          'FCM: APNs token is not ready yet; registration will retry on resume',
+        );
       } else {
         debugPrint('FCM registration setup failed: $e');
       }
@@ -181,26 +194,36 @@ class FcmBootstrap {
   }
 
   Future<bool> _register(String t) async {
-    try {
-      await _notifications.registerDeviceToken(
-        token: t,
-        platform: Platform.isIOS ? 'ios' : 'android',
-      );
-      debugPrint('FCM token registered for signed-in user');
-      return true;
-    } catch (e) {
-      debugPrint('FCM register failed: $e');
-      return false;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await _notifications.registerDeviceToken(
+          token: t,
+          platform: Platform.isIOS ? 'ios' : 'android',
+        );
+        debugPrint('FCM token registration confirmed by server');
+        return true;
+      } catch (e) {
+        debugPrint('FCM register attempt ${attempt + 1} failed: $e');
+        if (attempt < 2) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 500 * (attempt + 1)),
+          );
+        }
+      }
     }
+    return false;
   }
 
   /// Deep-link path from notification data (`url` or project/task ids).
-  static String? routeFromMessage(RemoteMessage message) => routeFromData(message.data);
+  static String? routeFromMessage(RemoteMessage message) =>
+      routeFromData(message.data);
 
   /// Same as [routeFromMessage] for a raw data map (also used by local notifications).
   static String? routeFromData(Map<String, dynamic> data) {
     if (data['kind'] == 'digest' && data['project_id'] is String) {
-      final period = data['period'] is String ? '&period=${data['period']}' : '';
+      final period = data['period'] is String
+          ? '&period=${data['period']}'
+          : '';
       return '/digest?project=${data['project_id']}$period';
     }
     if (data['kind'] == 'rhythm_checkin') {
@@ -225,7 +248,8 @@ class FcmBootstrap {
   Future<PushPermission> currentPermission() async {
     if (!firebaseReady) return PushPermission.unavailable;
     try {
-      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
       switch (settings.authorizationStatus) {
         case AuthorizationStatus.authorized:
           return PushPermission.authorized;
