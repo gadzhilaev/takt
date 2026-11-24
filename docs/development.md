@@ -18,7 +18,7 @@ docker compose up db -d
 
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-alembic upgrade head   # 001–016
+alembic upgrade head   # 001–023
 uvicorn app.main:app --reload --port 8000
 
 cd frontend && npm ci && npm run dev
@@ -40,6 +40,8 @@ Production: [`../deploy/DEPLOY.md`](../deploy/DEPLOY.md).
 
 Фоновые циклы (в `lifespan`): напоминания о сроках (`DUE_REMINDER_*`) ритм (`RHYTHM_ENABLED`, `RHYTHM_INTERVAL_SECONDS`, `RHYTHM_WINDOW_HOURS`, `RHYTHM_MAX_TASKS`) и сводка (`DIGEST_ENABLED`, `DIGEST_INTERVAL_SECONDS`, `DIGEST_WINDOW_HOURS`, `DIGEST_EMAIL_ENABLED=false` по умолчанию). Каждый проход пишет INFO-строку в `docker logs` (`due pass ok`, `rhythm pass ok`, `digest pass ok`) — уровень `APP_LOG_LEVEL` (по умолчанию `INFO`), без персональных данных. В pytest циклы выключены (`conftest.py`).
 
+Backend сейчас запускается одним процессом Uvicorn. При переходе на несколько worker-процессов фоновые циклы нужно вынести в отдельный scheduler или защитить распределённой блокировкой, иначе каждый worker будет запускать свой цикл.
+
 Push чек-ина на симуляторе iOS: `xcrun simctl push <device> ru.gadzhilaev.takt payload.apns` с `aps.category=TAKT_CHECKIN_ONE` и полями `kind=rhythm_checkin`, `checkin_id`, `task_id`, `action_token` (долгое нажатие на баннер → кнопки).
 
 ## Стиль кода
@@ -58,7 +60,7 @@ alembic revision -m "short_description"
 alembic upgrade head
 ```
 
-Не переписывать выкатанные revision на production. Head: **016**.
+Не переписывать выкатанные revision на production. Head: **023** (`023_digest_for_everyone`).
 
 ## Тесты
 

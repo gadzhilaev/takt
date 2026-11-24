@@ -28,7 +28,7 @@ cd /opt/takt
 ```
 
 Скрипт: `git pull --ff-only origin main` → `docker compose -f deploy/docker-compose.prod.yml build` → `up -d`.  
-Миграции Alembic (**001–016**) применяются при старте backend (`alembic upgrade head`).  
+Миграции Alembic (**001–023**) применяются при старте backend (`alembic upgrade head`).
 SSH deploy key: `~/.ssh/takt_deploy` (read-only). Секреты (`.env`, `secrets/`) в git не входят.
 
 ### Standalone (свой VPS + Compose Caddy)

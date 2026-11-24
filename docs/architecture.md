@@ -181,7 +181,7 @@ mobile/lib/
 ## База данных
 
 PostgreSQL 16. Технические имена по умолчанию: `track` / `track`. Хост-порт Docker: **5433**.  
-Миграции `backend/alembic/versions/` — **001–022** (head `022_digest`). Runtime: `alembic upgrade head` в lifespan.
+Миграции `backend/alembic/versions/` — **001–023** (head `023_digest_for_everyone`). Runtime: `alembic upgrade head` в lifespan.
 
 | Rev | Суть |
 |-----|------|
@@ -198,6 +198,10 @@ PostgreSQL 16. Технические имена по умолчанию: `track
 | 014 | Invite email nullable (open link) |
 | 015 | OAuth `return_path` |
 | 016 | `tasks.status_entered_at` |
+| 017–018 | Превью вложений; обновление текста уведомлений |
+| 019–020 | Напоминания и автосрочность задач |
+| 021 | Ежедневные чек-ины |
+| 022–023 | Сводки и подписка участников |
 
 ```mermaid
 erDiagram

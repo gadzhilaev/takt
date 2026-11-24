@@ -7,7 +7,7 @@
 
 - Flutter 3.47+ (stable), Xcode 16+ (iOS), Android SDK 34+
 - Backend: production `https://taktapp.ru` или локально `--dart-define=API_BASE=…`
-- Миграции backend до head **016** (нужна как минимум `007_device_push_tokens` для FCM)
+- Миграции backend до head **023** (нужна как минимум `007_device_push_tokens` для FCM)
 
 ## Firebase / FCM
 
