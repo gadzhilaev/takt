@@ -77,20 +77,22 @@ async def send_push_to_users(
     body: str | None,
     url: str | None = None,
     tag: str | None = None,
-) -> None:
+) -> int:
+    """Send a Web Push and return the number of endpoints accepted by the provider."""
     if not vapid_configured(settings) or not user_ids:
-        return
+        return 0
     try:
         from pywebpush import WebPushException, webpush
     except ImportError:
         logger.warning("pywebpush not installed — skip push")
-        return
+        return 0
 
     rows = (
         await db.execute(select(PushSubscription).where(PushSubscription.user_id.in_(user_ids)))
     ).scalars().all()
     if not rows:
-        return
+        logger.info("Web Push skipped: no subscriptions for %s recipient(s)", len(user_ids))
+        return 0
 
     payload = json.dumps(
         {"title": title, "body": body or "", "url": url or "/projects", "tag": tag or "takt"},
@@ -98,6 +100,7 @@ async def send_push_to_users(
     )
     vapid_claims = {"sub": settings.VAPID_SUBJECT}
     dead: list[PushSubscription] = []
+    accepted = 0
 
     for sub in rows:
         try:
@@ -110,6 +113,7 @@ async def send_push_to_users(
                 vapid_private_key=settings.VAPID_PRIVATE_KEY,
                 vapid_claims=vapid_claims,
             )
+            accepted += 1
         except WebPushException as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             if status in (404, 410):
@@ -121,3 +125,5 @@ async def send_push_to_users(
 
     for sub in dead:
         await db.delete(sub)
+    logger.info("Web Push provider accepted %s/%s subscription(s)", accepted, len(rows))
+    return accepted

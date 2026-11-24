@@ -30,6 +30,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import Settings, get_settings
 from app.db.session import AsyncSessionLocal
 from app.models.digest import DigestDelivery
+from app.models.push_subscription import PushSubscription
 from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.rhythm import CheckinStatus, RhythmCheckin
 from app.models.task import ActivityLog, Task, TaskAssignee
@@ -483,59 +484,106 @@ async def deliver_digest(
     }
     sent = 0
     for user, is_admin in targets:
-        channels = ["in_app"]
-        try:
-            async with db.begin_nested():
-                delivery = DigestDelivery(
-                    project_id=project.id,
-                    recipient_id=user.id,
-                    period=kind,
-                    period_end=end_day,
-                    created_at=now,
+        delivery = await db.scalar(
+            select(DigestDelivery).where(
+                DigestDelivery.project_id == project.id,
+                DigestDelivery.recipient_id == user.id,
+                DigestDelivery.period == kind,
+                DigestDelivery.period_end == end_day,
+            )
+        )
+        created = delivery is None
+        if created:
+            try:
+                async with db.begin_nested():
+                    delivery = DigestDelivery(
+                        project_id=project.id,
+                        recipient_id=user.id,
+                        period=kind,
+                        period_end=end_day,
+                        created_at=now,
+                        channels="in_app",
+                    )
+                    db.add(delivery)
+                    await db.flush()
+            except IntegrityError:
+                # Another worker may have created the idempotency row between the read and insert.
+                delivery = await db.scalar(
+                    select(DigestDelivery).where(
+                        DigestDelivery.project_id == project.id,
+                        DigestDelivery.recipient_id == user.id,
+                        DigestDelivery.period == kind,
+                        DigestDelivery.period_end == end_day,
+                    )
                 )
-                db.add(delivery)
-                await db.flush()
-        except IntegrityError:
+                created = False
+            else:
+                await notify_service.create_in_app(
+                    db,
+                    user_id=user.id,
+                    actor_id=None,
+                    kind=KIND_DIGEST,
+                    title=short_text(full if is_admin else brief),
+                    body=f"Проект {project.name}",
+                    project_id=project.id,
+                )
+        if delivery is None:
             continue
+
+        channels = set((delivery.channels or "").split(","))
+        # Older releases stored a single `push` flag after calling both providers. Keep FCM
+        # from being duplicated, but retry Web Push if this account subscribed after that send.
+        if "push" in channels:
+            channels.discard("push")
+            channels.add("fcm")
+            web_subscription_at_delivery = await db.scalar(
+                select(PushSubscription.id)
+                .where(
+                    PushSubscription.user_id == user.id,
+                    PushSubscription.updated_at <= delivery.created_at,
+                )
+                .limit(1)
+            )
+            if web_subscription_at_delivery is not None:
+                channels.add("web_push")
         digest = full if is_admin else brief
         title = short_text(digest)
         url = f"/app/projects/{project.id}?view=digest&period={kind}"
-        await notify_service.create_in_app(
-            db,
-            user_id=user.id,
-            actor_id=None,
-            kind=KIND_DIGEST,
-            title=title,
-            body=f"Проект {project.name}",
-            project_id=project.id,
-        )
-        if push:
+        if push and "push" not in channels:
             from app.services import fcm_service, push_service
 
-            await push_service.send_push_to_users(
-                db,
-                settings,
-                user_ids=[user.id],
-                title=title,
-                body=project.name,
-                url=url,
-                tag=f"digest-{project.id}-{kind}",
-            )
-            await fcm_service.send_fcm_to_users(
-                db,
-                settings,
-                user_ids=[user.id],
-                title=title,
-                body=project.name,
-                data={
-                    "kind": KIND_DIGEST,
-                    "project_id": str(project.id),
-                    "period": kind,
-                    "url": url,
-                },
-            )
-            channels.append("push")
-        if push and settings.DIGEST_EMAIL_ENABLED:
+            if "web_push" not in channels:
+                web_accepted = await push_service.send_push_to_users(
+                    db,
+                    settings,
+                    user_ids=[user.id],
+                    title=title,
+                    body=project.name,
+                    url=url,
+                    tag=f"digest-{project.id}-{kind}",
+                )
+                if web_accepted:
+                    channels.add("web_push")
+            if "fcm" not in channels:
+                fcm_accepted = await fcm_service.send_fcm_to_users(
+                    db,
+                    settings,
+                    user_ids=[user.id],
+                    title=title,
+                    body=project.name,
+                    data={
+                        "kind": KIND_DIGEST,
+                        "project_id": str(project.id),
+                        "period": kind,
+                        "url": url,
+                    },
+                )
+                if fcm_accepted:
+                    channels.add("fcm")
+            delivery.channels = ",".join(
+                channel for channel in ("in_app", "web_push", "fcm") if channel in channels
+            ) or "in_app"
+        if push and settings.DIGEST_EMAIL_ENABLED and "email" not in channels:
             from app.services import email_service
 
             subject, text_body, html_body = email_bodies(digest, app_url=settings.APP_PUBLIC_URL)
@@ -543,11 +591,15 @@ async def deliver_digest(
                 await email_service.send_html_email(
                     to=user.email, subject=subject, text_body=text_body, html_body=html_body
                 )
-                channels.append("email")
+                channels.add("email")
             except Exception:  # noqa: BLE001 — a failed letter must not block in-app/push
                 logger.exception("digest email failed for project %s", project.id)
-        delivery.channels = ",".join(channels)
-        sent += 1
+        delivery.channels = ",".join(
+            channel
+            for channel in ("in_app", "web_push", "fcm", "email")
+            if channel in channels
+        ) or "in_app"
+        sent += int(created)
     return sent
 
 
@@ -580,7 +632,9 @@ async def run_digest_pass(
                     sent += await deliver_digest(
                         db, project, kind=kind, end_day=end_day, settings=settings, now=now
                     )
-                if sent:
+                if due:
+                    # A retry may update provider channel state without creating a new in-app
+                    # delivery row; commit those channel updates even when `sent == 0`.
                     await db.commit()
                 else:
                     await db.rollback()

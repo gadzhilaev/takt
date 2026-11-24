@@ -63,6 +63,10 @@ class _NotificationToastHostState extends State<NotificationToastHost> with Widg
     if (state == AppLifecycleState.resumed) {
       _schedulePoll();
       unawaited(_pollApi());
+      if (context.read<AuthCubit>().state is AuthAuthenticated) {
+        final fcm = _fcm;
+        if (fcm != null) unawaited(fcm.registerForUser().then<void>((_) {}));
+      }
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       _poll?.cancel();
       _poll = null;

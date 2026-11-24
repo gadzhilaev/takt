@@ -15,19 +15,24 @@ class NotificationsIntroPage extends StatefulWidget {
 
 class _NotificationsIntroPageState extends State<NotificationsIntroPage> {
   bool _busy = false;
+  String? _error;
 
   Future<void> _allow() async {
     if (_busy) return;
     setState(() => _busy = true);
     final fcm = context.read<FcmBootstrap>();
-    try {
-      await fcm.enablePush();
-      await fcm.registerForUser();
-    } catch (_) {
-      await fcm.markPromptNever();
-    }
+    final registered = await fcm.enablePush();
     if (!mounted) return;
-    context.go('/projects');
+    if (registered) {
+      await fcm.markPromptNever();
+      if (!mounted) return;
+      context.go('/projects');
+    } else {
+      setState(() {
+        _busy = false;
+        _error = 'Не удалось подключить push. Проверьте разрешение уведомлений и попробуйте ещё раз.';
+      });
+    }
   }
 
   Future<void> _notNow() async {
@@ -118,6 +123,14 @@ class _NotificationsIntroPageState extends State<NotificationsIntroPage> {
                       const SizedBox(height: 10),
                       _Benefit(icon: AppIcons.status, text: 'Важные изменения задач', dark: dark),
                       const SizedBox(height: 24),
+                      if (_error != null) ...[
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: TaktColors.danger, fontSize: 13),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       FilledButton(
                         onPressed: _busy ? null : _allow,
                         child: _busy

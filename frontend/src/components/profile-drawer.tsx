@@ -46,6 +46,27 @@ export function ProfileDrawer({
       api<{ items: { id: string }[]; unread: number }>("/api/v1/notifications?page_size=20"),
     refetchInterval: open ? 30_000 : false,
   });
+  const sessionsQuery = useQuery({
+    queryKey: ["account-sessions"], enabled: open,
+    queryFn: () => api<{ items: { id: string; label: string; created_at: string; last_activity_at: string; is_current: boolean }[] }>("/api/v1/auth/sessions"),
+  });
+  const pushDevicesQuery = useQuery({
+    queryKey: ["push-devices"], enabled: open,
+    queryFn: () => api<{ items: { id: string; kind: "browser" | "app"; label: string; app_version?: string | null; created_at: string; last_activity_at: string }[] }>("/api/v1/notifications/devices"),
+  });
+
+  function formatDeviceDate(value: string) {
+    return new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  }
+  async function revokeSession(id: string) {
+    await api(`/api/v1/auth/sessions/${id}`, { method: "DELETE" });
+    await sessionsQuery.refetch();
+  }
+  async function revokePushDevice(kind: "browser" | "app", id: string) {
+    await api(`/api/v1/notifications/devices/${kind}/${id}`, { method: "DELETE" });
+    await pushDevicesQuery.refetch();
+    setPushState(await getPushStatus().catch(() => null));
+  }
 
   useEffect(() => {
     if (open) {
@@ -279,6 +300,41 @@ export function ProfileDrawer({
               {pushMsg && <p className="text-xs text-muted">{pushMsg}</p>}
             </div>
           </div>
+
+          <section className="border-t border-hairline pt-4">
+            <h3 className="text-sm font-semibold">Сеансы входа</h3>
+            <p className="mb-2 mt-1 text-xs text-muted">Браузеры и устройства, где открыт аккаунт.</p>
+            <div className="space-y-2">
+              {sessionsQuery.isLoading && <p className="text-xs text-muted">Загрузка…</p>}
+              {sessionsQuery.data?.items.map((session) => (
+                <div key={session.id} className="flex items-start justify-between gap-3 rounded-md border border-hairline p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{session.label}{session.is_current ? " · это устройство" : ""}</p>
+                    <p className="mt-1 text-xs text-muted">Активность: {formatDeviceDate(session.last_activity_at)}</p>
+                  </div>
+                  <button type="button" className="shrink-0 text-xs font-medium text-[var(--danger)] hover:underline" onClick={() => revokeSession(session.id).catch((e) => setErr((e as Error).message))}>Завершить</button>
+                </div>
+              ))}
+              {!sessionsQuery.isLoading && !sessionsQuery.data?.items.length && <p className="text-xs text-muted">Активных сеансов нет.</p>}
+            </div>
+          </section>
+          <section className="border-t border-hairline pt-4">
+            <h3 className="text-sm font-semibold">Получатели push</h3>
+            <p className="mb-2 mt-1 text-xs text-muted">Регистрации браузеров и приложения.</p>
+            <div className="space-y-2">
+              {pushDevicesQuery.isLoading && <p className="text-xs text-muted">Загрузка…</p>}
+              {pushDevicesQuery.data?.items.map((device) => (
+                <div key={`${device.kind}:${device.id}`} className="flex items-start justify-between gap-3 rounded-md border border-hairline p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{device.label}{device.app_version ? ` · ${device.app_version}` : ""}</p>
+                    <p className="mt-1 text-xs text-muted">Активность: {formatDeviceDate(device.last_activity_at)}</p>
+                  </div>
+                  <button type="button" className="shrink-0 text-xs font-medium text-[var(--danger)] hover:underline" onClick={() => revokePushDevice(device.kind, device.id).catch((e) => setErr((e as Error).message))}>Отключить</button>
+                </div>
+              ))}
+              {!pushDevicesQuery.isLoading && !pushDevicesQuery.data?.items.length && <p className="text-xs text-muted">Push-устройства не подключены.</p>}
+            </div>
+          </section>
 
           <SignInMethodsSection
             onMessage={(m) => {

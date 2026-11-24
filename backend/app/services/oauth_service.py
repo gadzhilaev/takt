@@ -948,6 +948,10 @@ async def unlink_identity(db: AsyncSession, user: User, identity_id: uuid.UUID) 
     await db.flush()
 
 
-async def issue_session(db: AsyncSession, user: User) -> tuple[str, str]:
-    access, refresh, _ = await auth_service.create_token_pair(db, user)
+async def issue_session(
+    db: AsyncSession, user: User, *, user_agent: str | None = None, platform: str | None = None
+) -> tuple[str, str]:
+    access, refresh, _ = await auth_service.create_token_pair(
+        db, user, user_agent=user_agent, platform=platform
+    )
     return access, refresh

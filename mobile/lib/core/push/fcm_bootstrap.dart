@@ -103,33 +103,15 @@ class FcmBootstrap {
   }
 
   /// Call after the in-app intro: system permission dialog, then token.
-  Future<void> enablePush() async {
+  Future<bool> enablePush() async {
     if (!firebaseReady) {
       await init();
-      if (!firebaseReady) {
-        await markPromptNever();
-        return;
-      }
+      if (!firebaseReady) return false;
     }
     try {
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: true, sound: true);
-      await messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      // ignore: deprecated_member_use
-      token = await messaging.getToken();
-      await _refreshSub?.cancel();
-      // ignore: deprecated_member_use
-      _refreshSub = messaging.onTokenRefresh.listen((t) async {
-        token = t;
-        await _register(t);
-      });
-      ready = true;
-      debugPrint('FCM ready, token=${token != null}');
-      if (token != null) await _register(token!);
+      return await registerForUser();
     } catch (e) {
       ready = false;
       final msg = e.toString();
@@ -138,18 +120,52 @@ class FcmBootstrap {
       } else {
         debugPrint('FCM enable failed: $e');
       }
-    } finally {
-      await markPromptNever();
+      return false;
     }
   }
 
-  Future<void> registerForUser() async {
-    if (!ready) return;
-    // ignore: deprecated_member_use
-    final t = token ?? await FirebaseMessaging.instance.getToken();
-    if (t == null) return;
-    token = t;
-    await _register(t);
+  Future<bool> registerForUser() async {
+    if (!firebaseReady) await init();
+    if (!firebaseReady) return false;
+    try {
+      final messaging = FirebaseMessaging.instance;
+      final permission = await messaging.getNotificationSettings();
+      final allowed = permission.authorizationStatus == AuthorizationStatus.authorized ||
+          permission.authorizationStatus == AuthorizationStatus.provisional;
+      if (!allowed) {
+        ready = false;
+        return false;
+      }
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      // ignore: deprecated_member_use
+      token = await messaging.getToken();
+      ready = token != null;
+      await _refreshSub?.cancel();
+      // ignore: deprecated_member_use
+      _refreshSub = messaging.onTokenRefresh.listen((t) async {
+        token = t;
+        await _register(t);
+      });
+      if (token != null) {
+        ready = await _register(token!);
+        if (ready) await markPromptNever();
+        return ready;
+      }
+      ready = false;
+      return false;
+    } catch (e) {
+      ready = false;
+      if (e.toString().contains('apns-token-not-set')) {
+        debugPrint('FCM: APNs token is not ready yet; registration will retry on resume');
+      } else {
+        debugPrint('FCM registration setup failed: $e');
+      }
+      return false;
+    }
   }
 
   Future<void> unregister() async {
@@ -164,14 +180,17 @@ class FcmBootstrap {
     }
   }
 
-  Future<void> _register(String t) async {
+  Future<bool> _register(String t) async {
     try {
       await _notifications.registerDeviceToken(
         token: t,
         platform: Platform.isIOS ? 'ios' : 'android',
       );
+      debugPrint('FCM token registered for signed-in user');
+      return true;
     } catch (e) {
       debugPrint('FCM register failed: $e');
+      return false;
     }
   }
 

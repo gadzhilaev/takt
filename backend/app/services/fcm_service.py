@@ -145,28 +145,33 @@ async def send_fcm_to_users(
     data: dict[str, str] | None = None,
     apns_category: str | None = None,
     android_data_only: bool = False,
-) -> None:
+) -> int:
     """Send to every device of ``user_ids``.
 
     ``apns_category`` — iOS notification category (action buttons registered by the app).
     ``android_data_only`` — Android gets a high-priority data message (title/body in data);
     the app shows the notification itself with action buttons.
     """
-    if not user_ids or not _ensure_firebase(settings):
-        return
+    if not user_ids:
+        return 0
+    if not _ensure_firebase(settings):
+        logger.info("FCM skipped: Firebase is not configured")
+        return 0
     try:
         from firebase_admin import messaging
     except ImportError:
         logger.warning("firebase-admin not installed — skip FCM")
-        return
+        return 0
 
     rows = (
         await db.execute(select(DevicePushToken).where(DevicePushToken.user_id.in_(user_ids)))
     ).scalars().all()
     if not rows:
-        return
+        logger.info("FCM skipped: no device tokens for %s recipient(s)", len(user_ids))
+        return 0
 
     dead: list[DevicePushToken] = []
+    accepted = 0
     for row in rows:
         message = build_message(
             messaging,
@@ -180,6 +185,7 @@ async def send_fcm_to_users(
         )
         try:
             messaging.send(message)
+            accepted += 1
         except Exception as exc:  # noqa: BLE001
             msg = str(exc).lower()
             if "not-registered" in msg or "invalid-registration" in msg or "unregistered" in msg:
@@ -188,3 +194,5 @@ async def send_fcm_to_users(
                 logger.info("FCM failed for %s: %s", row.id, exc)
     for row in dead:
         await db.delete(row)
+    logger.info("FCM provider accepted %s/%s device token(s)", accepted, len(rows))
+    return accepted

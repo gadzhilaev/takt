@@ -54,7 +54,10 @@ export async function enableWebPush(): Promise<{ ok: boolean; message: string }>
       message: "Браузерные push пока недоступны. In-app уведомления работают как обычно.",
     };
   }
-  const permission = await Notification.requestPermission();
+  // Reuse an existing grant without opening a browser permission prompt.
+  const permission = Notification.permission === "granted"
+    ? "granted"
+    : await Notification.requestPermission();
   if (permission !== "granted") {
     return { ok: false, message: "Разрешение на уведомления не выдано" };
   }
@@ -68,15 +71,26 @@ export async function enableWebPush(): Promise<{ ok: boolean; message: string }>
     });
   }
   const json = sub.toJSON();
-  await api("/api/v1/notifications/push/subscribe", {
-    method: "POST",
-    json: {
-      endpoint: json.endpoint,
-      keys: json.keys,
-      user_agent: navigator.userAgent,
-    },
-  });
-  return { ok: true, message: "Уведомления включены" };
+  let lastError: unknown;
+  // Registration is idempotent server-side. Retry transient network/server errors
+  // so a granted browser permission is recovered without another user gesture.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await api("/api/v1/notifications/push/subscribe", {
+        method: "POST",
+        json: {
+          endpoint: json.endpoint,
+          keys: json.keys,
+          user_agent: navigator.userAgent,
+        },
+      });
+      return { ok: true, message: "Уведомления включены" };
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Не удалось сохранить подписку на уведомления");
 }
 
 export async function disableWebPush(): Promise<void> {

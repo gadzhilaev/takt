@@ -1,7 +1,9 @@
+import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_cookies import set_auth_cookies, user_public
@@ -12,6 +14,7 @@ from app.core.limiter import limiter
 from app.core.security import decode_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.email_code import EmailCodePurpose
+from app.models.auth import RefreshToken
 from app.models.user import User, UserRole
 from app.schemas.auth import (
     ChangePasswordConfirmRequest,
@@ -124,7 +127,9 @@ async def register_confirm(
     # Link pending email invites; membership only after explicit accept on /invite/{token}.
     await invite_service.link_pending_invites_to_user(db, user)
 
-    access, refresh, _ = await auth_service.create_token_pair(db, user)
+    access, refresh, _ = await auth_service.create_token_pair(
+        db, user, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform")
+    )
     from app.services.activity_service import record_activity
 
     await record_activity(db, user.id, "register")
@@ -181,7 +186,9 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {"code": e.code, "message": e.message}},
         )
-    access, refresh, _ = await auth_service.create_token_pair(db, user)
+    access, refresh, _ = await auth_service.create_token_pair(
+        db, user, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform")
+    )
     from app.services.activity_service import record_activity
 
     await record_activity(db, user.id, "login_email")
@@ -206,7 +213,9 @@ async def logout(
     if refresh_token:
         payload = decode_token(refresh_token)
         if payload and payload.get("jti"):
-            await auth_service.revoke_refresh_token(db, payload["jti"])
+            row = await db.scalar(select(RefreshToken).where(RefreshToken.jti == payload["jti"]))
+            if row:
+                await auth_service.revoke_session(db, row.user_id, row.session_id)
             await db.commit()
     from app.core.config import get_settings
 
@@ -223,6 +232,73 @@ async def logout(
 @router.get("/me")
 async def me(user: Annotated[User, Depends(get_current_user)]):
     return {"user": user_public(user)}
+
+
+def _device_label(user_agent: str | None, platform: str | None) -> str:
+    if platform:
+        value = platform.strip().lower()
+        if value == "ios": return "Приложение · iOS"
+        if value == "android": return "Приложение · Android"
+        if value == "mobile": return "Мобильное приложение"
+    ua = (user_agent or "").lower()
+    browser = "Браузер"
+    if "edg/" in ua: browser = "Microsoft Edge"
+    elif "firefox/" in ua: browser = "Firefox"
+    elif "chrome/" in ua or "crios/" in ua: browser = "Chrome"
+    elif "safari/" in ua: browser = "Safari"
+    if "iphone" in ua or "ipad" in ua: os_name = " · iOS"
+    elif "android" in ua: os_name = " · Android"
+    elif "windows" in ua: os_name = " · Windows"
+    elif "mac os" in ua or "macintosh" in ua: os_name = " · macOS"
+    elif "linux" in ua: os_name = " · Linux"
+    else: os_name = ""
+    return browser + os_name
+
+
+@router.get("/sessions")
+async def list_sessions(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    refresh_token: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
+):
+    current_payload = decode_token(refresh_token) if refresh_token else None
+    current_jti = current_payload.get("jti") if current_payload else None
+    rows = (await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > func.now(),
+        ).order_by(RefreshToken.updated_at.desc())
+    )).scalars().all()
+    grouped: dict[uuid.UUID, tuple[RefreshToken, datetime]] = {}
+    for row in rows:
+        prev = grouped.get(row.session_id)
+        grouped[row.session_id] = (
+            row if prev is None or row.updated_at > prev[0].updated_at else prev[0],
+            row.created_at if prev is None else min(prev[1], row.created_at),
+        )
+    items = []
+    for session_id, (row, created_at) in grouped.items():
+        items.append({
+            "id": str(session_id),
+            "label": _device_label(row.user_agent, row.platform),
+            "created_at": created_at,
+            "last_activity_at": row.updated_at,
+            "is_current": any(r.session_id == session_id and r.jti == current_jti for r in rows),
+        })
+    return {"items": sorted(items, key=lambda item: item["last_activity_at"], reverse=True)}
+
+
+@router.delete("/sessions/{session_id}", dependencies=[Depends(verify_csrf)])
+async def delete_session(
+    session_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not await auth_service.revoke_session(db, user.id, session_id):
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Сеанс не найден"}})
+    await db.commit()
+    return {"ok": True}
 
 
 @router.post("/refresh")
