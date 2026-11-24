@@ -21,6 +21,7 @@ from app.models.platform import (
 )
 from app.models.auth import RefreshToken
 from app.models.project import Project, ProjectMember
+from app.models.team import TaskStatus
 from app.models.task import (
     ActivityLog,
     AdminAuditLog,
@@ -680,14 +681,117 @@ async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
             .order_by(ProjectMember.created_at.asc())
         )
     ).all()
+    owner = next((user for member, user in rows if member.role.value == "admin"), None)
+    statuses = (
+        await db.execute(
+            select(TaskStatus)
+            .where(TaskStatus.project_id == project.id)
+            .order_by(TaskStatus.position.asc(), TaskStatus.created_at.asc())
+        )
+    ).scalars().all()
+    task_counts = dict(
+        (
+            await db.execute(
+                select(Task.status_id, func.count(Task.id))
+                .where(Task.project_id == project.id, Task.deleted_at.is_(None))
+                .group_by(Task.status_id)
+            )
+        ).all()
+    )
+    open_task_filter = (
+        Task.project_id == project.id,
+        Task.deleted_at.is_(None),
+        Task.archived_at.is_(None),
+        TaskStatus.is_done.is_(False),
+    )
+    active_tasks = await db.scalar(
+        select(func.count(Task.id))
+        .join(TaskStatus, TaskStatus.id == Task.status_id)
+        .where(*open_task_filter)
+    ) or 0
+    done_tasks = await db.scalar(
+        select(func.count(Task.id))
+        .join(TaskStatus, TaskStatus.id == Task.status_id)
+        .where(
+            Task.project_id == project.id,
+            Task.deleted_at.is_(None),
+            Task.archived_at.is_(None),
+            TaskStatus.is_done.is_(True),
+        )
+    ) or 0
+    archived_tasks = await db.scalar(
+        select(func.count(Task.id)).where(
+            Task.project_id == project.id,
+            Task.deleted_at.is_(None),
+            Task.archived_at.is_not(None),
+        )
+    ) or 0
+    overdue_tasks = await db.scalar(
+        select(func.count(Task.id))
+        .join(TaskStatus, TaskStatus.id == Task.status_id)
+        .where(*open_task_filter, Task.due_date.is_not(None), Task.due_date < datetime.now(UTC))
+    ) or 0
+    blocked_tasks = await db.scalar(
+        select(func.count(Task.id)).join(TaskStatus, TaskStatus.id == Task.status_id).where(
+            *open_task_filter, Task.blocked_at.is_not(None)
+        )
+    ) or 0
+    unassigned_tasks = await db.scalar(
+        select(func.count(Task.id))
+        .join(TaskStatus, TaskStatus.id == Task.status_id)
+        .outerjoin(TaskAssignee, TaskAssignee.task_id == Task.id)
+        .where(*open_task_filter, TaskAssignee.task_id.is_(None))
+    ) or 0
     return {
         "id": str(project.id),
         "name": project.name,
+        "description": project.description,
+        "color": project.color,
+        "icon": project.icon,
+        "is_default": project.is_default,
         "is_demo": project.is_demo,
         "is_archived": project.is_archived,
         "created_at": project.created_at.isoformat() if project.created_at else None,
+        "updated_at": project.updated_at.isoformat() if project.updated_at else None,
         "member_count": member_count,
+        "owner": (
+            {"id": str(owner.id), "name": owner.name, "email": owner.email}
+            if owner
+            else None
+        ),
         "task_count": task_count,
+        "task_stats": {
+            "active": active_tasks,
+            "done": done_tasks,
+            "archived": archived_tasks,
+            "overdue": overdue_tasks,
+            "blocked": blocked_tasks,
+            "unassigned": unassigned_tasks,
+        },
+        "statuses": [
+            {
+                "id": str(status.id),
+                "name": status.name,
+                "color": status.color,
+                "is_done": status.is_done,
+                "task_count": task_counts.get(status.id, 0),
+            }
+            for status in statuses
+        ],
+        "settings": {
+            "auto_urgency_from_due": project.auto_urgency_from_due,
+            "rhythm": {
+                "enabled": project.rhythm_enabled,
+                "time": project.rhythm_time.strftime("%H:%M"),
+                "timezone": project.rhythm_timezone,
+                "days": project.rhythm_days,
+            },
+            "digest": {
+                "daily": project.digest_daily,
+                "weekly": project.digest_weekly,
+                "time": project.digest_time.strftime("%H:%M"),
+            },
+        },
         "restricted": bool(restriction),
         "restriction_reason": restriction.reason if restriction else None,
         "members": [
@@ -697,6 +801,7 @@ async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
                 "email": u.email,
                 "role": m.role.value,
                 "joined_at": m.created_at.isoformat() if m.created_at else None,
+                "digest_subscribed": m.digest_subscribed,
             }
             for m, u in rows
         ],
