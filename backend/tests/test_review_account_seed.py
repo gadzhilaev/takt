@@ -65,15 +65,14 @@ async def test_seed_creates_account_and_is_idempotent(client: AsyncClient):
 
         tasks = (
             await db.scalars(
-                select(Task).join(ProjectMember, ProjectMember.project_id == Task.project_id)
+                select(Task)
+                .join(ProjectMember, ProjectMember.project_id == Task.project_id)
                 .where(ProjectMember.user_id == me.id)
             )
         ).all()
         now = datetime.now(UTC)
         assert any(t.due_date and t.due_date < now and t.closed_at is None for t in tasks)
-        assert any(
-            t.due_date and 0 < (t.due_date - now).total_seconds() < 48 * 3600 for t in tasks
-        )
+        assert any(t.due_date and 0 < (t.due_date - now).total_seconds() < 48 * 3600 for t in tasks)
         assert {t.priority.value for t in tasks} >= {"low", "medium", "high", "urgent"}
         for t in tasks:
             assert not FORBIDDEN.search(t.title), t.title
@@ -85,9 +84,7 @@ async def test_seed_creates_account_and_is_idempotent(client: AsyncClient):
         for att in (await db.scalars(select(Attachment))).all():
             assert attachment_path(att).exists()
 
-        staff = (
-            await db.scalars(select(User).where(User.email.like("demo.review.%")))
-        ).all()
+        staff = (await db.scalars(select(User).where(User.email.like("demo.review.%")))).all()
         assert staff and all(u.is_demo for u in staff)
         projects = (
             await db.scalars(
@@ -137,20 +134,26 @@ async def test_seed_removes_reviewer_from_foreign_projects(client: AsyncClient):
     email = "reviewer-old@example.com"
     async with TestSession() as db:
         me = User(email=email, name="Ревьюер", password_hash=hash_password("x" * 12))
-        colleague = User(email="real-colleague@example.com", name="Коллега Реальный",
-                         password_hash=hash_password("y" * 12))
+        colleague = User(
+            email="real-colleague@example.com",
+            name="Коллега Реальный",
+            password_hash=hash_password("y" * 12),
+        )
         db.add_all([me, colleague])
         await db.flush()
         solo = Project(name="Проверка магазина", is_demo=False)
         shared = Project(name="Чужой рабочий проект", is_demo=False)
         db.add_all([solo, shared])
         await db.flush()
-        db.add_all([
-            ProjectMember(project_id=solo.id, user_id=me.id, role=ProjectMemberRole.admin),
-            ProjectMember(project_id=shared.id, user_id=me.id, role=ProjectMemberRole.admin),
-            ProjectMember(project_id=shared.id, user_id=colleague.id,
-                          role=ProjectMemberRole.member),
-        ])
+        db.add_all(
+            [
+                ProjectMember(project_id=solo.id, user_id=me.id, role=ProjectMemberRole.admin),
+                ProjectMember(project_id=shared.id, user_id=me.id, role=ProjectMemberRole.admin),
+                ProjectMember(
+                    project_id=shared.id, user_id=colleague.id, role=ProjectMemberRole.member
+                ),
+            ]
+        )
         await db.commit()
         solo_id, shared_id, colleague_id = solo.id, shared.id, colleague.id
 
@@ -160,9 +163,14 @@ async def test_seed_removes_reviewer_from_foreign_projects(client: AsyncClient):
             await seed_review_account(db, email=email)
     async with TestSession() as db:
         assert await db.get(Project, solo_id) is not None
-        assert await db.scalar(
-            select(func.count()).select_from(Project).where(Project.name == REVIEW_PROJECTS[0].name)
-        ) == 0
+        assert (
+            await db.scalar(
+                select(func.count())
+                .select_from(Project)
+                .where(Project.name == REVIEW_PROJECTS[0].name)
+            )
+            == 0
+        )
 
     async with TestSession() as db:
         report = await seed_review_account(db, email=email, force_foreign_projects=True)
@@ -178,8 +186,7 @@ async def test_seed_removes_reviewer_from_foreign_projects(client: AsyncClient):
         names = set(
             (
                 await db.scalars(
-                    select(Project.name).join(ProjectMember)
-                    .where(ProjectMember.user_id == me.id)
+                    select(Project.name).join(ProjectMember).where(ProjectMember.user_id == me.id)
                 )
             ).all()
         )
@@ -229,7 +236,11 @@ async def test_plan_and_cli_dry_run_change_nothing():
     backend = Path(__file__).resolve().parents[1]
     out = subprocess.run(
         [sys.executable, "scripts/seed_review_account.py", "--email", email],
-        cwd=backend, env=os.environ.copy(), capture_output=True, text=True, timeout=60,
+        cwd=backend,
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert out.returncode == 0, out.stderr
     assert "DRY-RUN" in out.stdout
@@ -349,8 +360,8 @@ async def test_seed_gives_reviewer_non_empty_weekly_digest():
     async with TestSession() as db:
         me = await db.scalar(select(User).where(User.email == email))
         n = await db.scalar(
-            select(func.count()).select_from(Notification).where(
-                Notification.user_id == me.id, Notification.kind == "digest"
-            )
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.user_id == me.id, Notification.kind == "digest")
         )
         assert n == 3

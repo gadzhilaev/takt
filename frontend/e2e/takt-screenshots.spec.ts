@@ -15,6 +15,7 @@ const OUT = path.join(__dirname, "../../docs/screenshots/.e2e-capture");
 async function loginUi(page: Page) {
   await page.goto("/login");
   await page.waitForSelector("#login-email");
+  await page.waitForLoadState("networkidle");
   await page.locator("#login-email").fill(ADMIN.email);
   await page.locator("#login-password").fill(ADMIN.password);
   await page.getByRole("button", { name: /войти/i }).click();

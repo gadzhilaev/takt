@@ -106,9 +106,15 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
                 "Обновить правила приёма на сайте",
                 "Опубликовать актуальную версию правил приёма и перечень специальностей. "
                 "Проверить даты начала и окончания подачи документов.",
-                P.urgent, 1, (ME, "sokolova"), "sokolova", 6,
-                due_in_hours=-20, in_status_days=3,
-                attachment="pdf", attachment_name="Правила приёма — проект.pdf",
+                P.urgent,
+                1,
+                (ME, "sokolova"),
+                "sokolova",
+                6,
+                due_in_hours=-20,
+                in_status_days=3,
+                attachment="pdf",
+                attachment_name="Правила приёма — проект.pdf",
                 comments=(
                     ("sokolova", "Юристы прислали правки по разделу о целевом обучении."),
                     (ME, "Внесу правки сегодня и отправлю на проверку."),
@@ -117,28 +123,48 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Подготовить график дня открытых дверей",
                 "Расписание по аудиториям, ответственные за экскурсии, регистрация гостей.",
-                P.high, 0, ("belova", ME), "belova", 2,
-                due_in_hours=30, in_status_days=2,
+                P.high,
+                0,
+                ("belova", ME),
+                "belova",
+                2,
+                due_in_hours=30,
+                in_status_days=2,
             ),
             SeedTask(
                 "Собрать ответы на частые вопросы абитуриентов",
                 "Вопросы из приёмной и чата за прошлый год: общежитие, проходной балл, "
                 "документы, сроки. Сформулировать короткие ответы.",
-                P.medium, 0, ("lebedeva", ME), ME, 3,
+                P.medium,
+                0,
+                ("lebedeva", ME),
+                ME,
+                3,
                 due_in_hours=24 * 6,
             ),
             SeedTask(
                 "Напечатать буклеты для приёмной комиссии",
                 "Тираж 500 шт., макет согласован. Нужен счёт от типографии.",
-                P.medium, 1, ("orlov",), "sokolova", 5,
-                due_in_hours=40, in_status_days=2,
-                attachment="image", attachment_name="Макет буклета.png",
+                P.medium,
+                1,
+                ("orlov",),
+                "sokolova",
+                5,
+                due_in_hours=40,
+                in_status_days=2,
+                attachment="image",
+                attachment_name="Макет буклета.png",
             ),
             SeedTask(
                 "Проверить работу телефона горячей линии",
                 "Переадресация на дежурного, автоответчик в нерабочее время.",
-                P.high, 2, ("kuznetsov", ME), ME, 4,
-                due_in_hours=10, in_status_days=1,
+                P.high,
+                2,
+                ("kuznetsov", ME),
+                ME,
+                4,
+                due_in_hours=10,
+                in_status_days=1,
                 comments=(
                     ("kuznetsov", "Переадресацию настроил, осталось записать автоответчик."),
                 ),
@@ -146,12 +172,22 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Утвердить состав приёмной комиссии",
                 "Приказ подписан, состав доведён до сотрудников.",
-                P.medium, 3, ("sokolova", ME), "sokolova", 12, in_status_days=4,
+                P.medium,
+                3,
+                ("sokolova", ME),
+                "sokolova",
+                12,
+                in_status_days=4,
             ),
             SeedTask(
                 "Разместить объявление о приёме в соцсетях",
                 "Пост и сторис с датами подачи документов и ссылкой на правила приёма.",
-                P.low, 3, ("lebedeva",), ME, 9, in_status_days=2,
+                P.low,
+                3,
+                ("lebedeva",),
+                ME,
+                9,
+                in_status_days=2,
             ),
         ),
     ),
@@ -164,8 +200,13 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Перенести расписание занятий в электронный журнал",
                 "Расписание на весенний семестр по всем группам. Сверить с учебной частью.",
-                P.urgent, 1, ("morozov", ME), "morozov", 7,
-                due_in_hours=-4, in_status_days=4,
+                P.urgent,
+                1,
+                ("morozov", ME),
+                "morozov",
+                7,
+                due_in_hours=-4,
+                in_status_days=4,
                 comments=(
                     ("morozov", "Осталось три группы второго курса."),
                     ("belova", "Учебная часть пришлёт исправления по субботам."),
@@ -174,38 +215,67 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Настроить проектор в актовом зале",
                 "Не определяется ноутбук по HDMI. Проверить кабель и переходник.",
-                P.high, 0, (ME, "kuznetsov"), ME, 1,
+                P.high,
+                0,
+                (ME, "kuznetsov"),
+                ME,
+                1,
                 due_in_hours=20,
-                attachment="image", attachment_name="Фото подключения.png",
+                attachment="image",
+                attachment_name="Фото подключения.png",
             ),
             SeedTask(
                 "Выдать преподавателям доступ к электронному журналу",
                 "12 новых преподавателей. Логины отправить на рабочую почту.",
-                P.high, 2, ("morozov", ME), "belova", 5,
-                due_in_hours=48, in_status_days=1,
+                P.high,
+                2,
+                ("morozov", ME),
+                "belova",
+                5,
+                due_in_hours=48,
+                in_status_days=1,
             ),
             SeedTask(
                 "Обновить раздел «Студенту» на сайте",
                 "Ссылки на расписание, стипендии, справки, контакты кураторов.",
-                P.medium, 0, ("lebedeva", "orlov"), "sokolova", 4,
+                P.medium,
+                0,
+                ("lebedeva", "orlov"),
+                "sokolova",
+                4,
                 due_in_hours=24 * 9,
             ),
             SeedTask(
                 "Заменить картриджи в кабинете 204",
                 "Два принтера, модели указаны в заявке.",
-                P.low, 3, ("kuznetsov",), "kuznetsov", 8, in_status_days=5,
+                P.low,
+                3,
+                ("kuznetsov",),
+                "kuznetsov",
+                8,
+                in_status_days=5,
             ),
             SeedTask(
                 "Проверить Wi‑Fi в библиотеке",
                 "Жалобы студентов на обрывы связи. Замерить скорость в читальном зале.",
-                P.medium, 1, ("orlov", ME), ME, 3,
-                due_in_hours=60, in_status_days=1,
+                P.medium,
+                1,
+                ("orlov", ME),
+                ME,
+                3,
+                due_in_hours=60,
+                in_status_days=1,
                 comments=(("orlov", "Нужна ещё одна точка доступа у окна."),),
             ),
             SeedTask(
                 "Сделать резервную копию журнала успеваемости",
                 "Копия за осенний семестр, хранение на сервере колледжа.",
-                P.medium, 3, ("morozov",), ME, 10, in_status_days=3,
+                P.medium,
+                3,
+                ("morozov",),
+                ME,
+                10,
+                in_status_days=3,
             ),
         ),
     ),
@@ -218,9 +288,15 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Собрать рабочие программы на новый учебный год",
                 "Программы по всем дисциплинам от предметно-цикловых комиссий.",
-                P.urgent, 1, ("belova", ME), "belova", 10,
-                due_in_hours=-30, in_status_days=6,
-                attachment="pdf", attachment_name="Список дисциплин.pdf",
+                P.urgent,
+                1,
+                ("belova", ME),
+                "belova",
+                10,
+                due_in_hours=-30,
+                in_status_days=6,
+                attachment="pdf",
+                attachment_name="Список дисциплин.pdf",
                 comments=(
                     ("belova", "Не хватает программ по трём дисциплинам."),
                     (ME, "Напомню председателям комиссий на планёрке."),
@@ -229,26 +305,44 @@ REVIEW_PROJECTS: tuple[SeedProject, ...] = (
             SeedTask(
                 "Составить график открытых уроков",
                 "Не меньше одного открытого урока от каждой комиссии в семестре.",
-                P.medium, 0, ("sokolova",), "belova", 2,
+                P.medium,
+                0,
+                ("sokolova",),
+                "belova",
+                2,
                 due_in_hours=24 * 5,
             ),
             SeedTask(
                 "Оформить заявки на курсы повышения квалификации",
                 "Список преподавателей, у которых истекает срок удостоверения.",
-                P.high, 2, ("lebedeva", ME), "sokolova", 6,
-                due_in_hours=16, in_status_days=2,
+                P.high,
+                2,
+                ("lebedeva", ME),
+                "sokolova",
+                6,
+                due_in_hours=16,
+                in_status_days=2,
                 comments=(("lebedeva", "Заявки готовы, нужна подпись директора."),),
             ),
             SeedTask(
                 "Подготовить отчёт по успеваемости за семестр",
                 "Сводная таблица по группам и пояснительная записка.",
-                P.high, 0, (ME,), "belova", 1,
+                P.high,
+                0,
+                (ME,),
+                "belova",
+                1,
                 due_in_hours=36,
             ),
             SeedTask(
                 "Провести семинар для молодых преподавателей",
                 "Тема: оценивание практических работ. Материалы разосланы.",
-                P.medium, 3, ("sokolova", "belova"), ME, 14, in_status_days=3,
+                P.medium,
+                3,
+                ("sokolova", "belova"),
+                ME,
+                14,
+                in_status_days=3,
             ),
         ),
     ),
@@ -475,19 +569,23 @@ async def _projects_shared_with_real_users(db: AsyncSession, me: User) -> list[s
     """Names of the account's projects that have other real (non-demo) members."""
     my_projects = select(ProjectMember.project_id).where(ProjectMember.user_id == me.id)
     rows = (
-        await db.execute(
-            select(Project.name)
-            .join(ProjectMember, ProjectMember.project_id == Project.id)
-            .join(User, User.id == ProjectMember.user_id)
-            .where(
-                Project.id.in_(my_projects),
-                ProjectMember.user_id != me.id,
-                User.is_demo.is_(False),
+        (
+            await db.execute(
+                select(Project.name)
+                .join(ProjectMember, ProjectMember.project_id == Project.id)
+                .join(User, User.id == ProjectMember.user_id)
+                .where(
+                    Project.id.in_(my_projects),
+                    ProjectMember.user_id != me.id,
+                    User.is_demo.is_(False),
+                )
+                .distinct()
+                .order_by(Project.name)
             )
-            .distinct()
-            .order_by(Project.name)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -529,8 +627,7 @@ async def _exit_foreign_projects(db: AsyncSession, me: User) -> tuple[list[dict]
         )
     await db.flush()
     rows = [
-        {"name": p["name"], "action": p["action"], "new_admin": p.get("new_admin")}
-        for p in plans
+        {"name": p["name"], "action": p["action"], "new_admin": p.get("new_admin")} for p in plans
     ]
     return rows, file_dirs
 
@@ -675,8 +772,13 @@ async def seed_review_account(
                         )
                         db.add(
                             _log(
-                                task.id, mover.id, "moved", step_at,
-                                "status_id", str(prev.id), str(nxt.id),
+                                task.id,
+                                mover.id,
+                                "moved",
+                                step_at,
+                                "status_id",
+                                str(prev.id),
+                                str(nxt.id),
                             )
                         )
                         prev = nxt
@@ -695,8 +797,11 @@ async def seed_review_account(
                     at = created_at + (now - created_at) * (i + 1) / (len(st.comments) + 1)
                     db.add(
                         Comment(
-                            task_id=task.id, author_id=author_c.id, body=body,
-                            created_at=at, updated_at=at,
+                            task_id=task.id,
+                            author_id=author_c.id,
+                            body=body,
+                            created_at=at,
+                            updated_at=at,
                         )
                     )
                     report["comments"] += 1
@@ -741,8 +846,13 @@ async def seed_review_account(
                     )
                     db.add(
                         _log(
-                            task.id, uploader.id, "attachment_added", at,
-                            "filename", None, st.attachment_name,
+                            task.id,
+                            uploader.id,
+                            "attachment_added",
+                            at,
+                            "filename",
+                            None,
+                            st.attachment_name,
                         )
                     )
                     report["attachments"] += 1
@@ -762,8 +872,13 @@ async def seed_review_account(
         if not has_log:
             db.add(
                 _log(
-                    blocked.id, blocker.id, "checkin", now - timedelta(hours=3),
-                    "blocked", None, BLOCKED_REASON,
+                    blocked.id,
+                    blocker.id,
+                    "checkin",
+                    now - timedelta(hours=3),
+                    "blocked",
+                    None,
+                    BLOCKED_REASON,
                 )
             )
         report["blocked_task"] = blocked.title
@@ -810,7 +925,8 @@ async def seed_review_account(
     for pname, project in projects_by_name.items():
         today = local_today(project, now)
         members = {
-            k for t in next(p for p in REVIEW_PROJECTS if p.name == pname).tasks
+            k
+            for t in next(p for p in REVIEW_PROJECTS if p.name == pname).tasks
             for k in t.assignees
         }
         for key in sorted(members):
@@ -861,8 +977,14 @@ async def seed_review_account(
     for project in projects_by_name.values():
         end_day = period_window(project, "week", now=now).end_day
         await deliver_digest(
-            db, project, kind="week", end_day=end_day, settings=settings, now=now,
-            push=False, only_user_ids={me.id},
+            db,
+            project,
+            kind="week",
+            end_day=end_day,
+            settings=settings,
+            now=now,
+            push=False,
+            only_user_ids={me.id},
         )
     digest = await build_digest(
         db, projects_by_name[CHECKIN_PROJECT], kind="week", now=now, include_members=True

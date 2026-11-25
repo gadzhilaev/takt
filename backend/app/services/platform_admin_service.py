@@ -9,6 +9,7 @@ from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
+from app.models.auth import RefreshToken
 from app.models.platform import (
     ModerationAction,
     ModerationReport,
@@ -19,9 +20,7 @@ from app.models.platform import (
     UserBlock,
     UserIdentity,
 )
-from app.models.auth import RefreshToken
 from app.models.project import Project, ProjectMember
-from app.models.team import TaskStatus
 from app.models.task import (
     ActivityLog,
     AdminAuditLog,
@@ -30,6 +29,7 @@ from app.models.task import (
     Task,
     TaskAssignee,
 )
+from app.models.team import TaskStatus
 from app.models.user import PLATFORM_ROLE_RANK, PlatformRole, User, UserRole
 from app.services import admin_service
 from app.services.auth_service import revoke_all_user_tokens
@@ -49,28 +49,39 @@ async def dashboard_stats(db: AsyncSession) -> dict:
     month = now - timedelta(days=30)
 
     users_total = await db.scalar(select(func.count()).select_from(User)) or 0
-    users_new_7d = await db.scalar(
-        select(func.count()).select_from(User).where(User.created_at >= week)
-    ) or 0
+    users_new_7d = (
+        await db.scalar(select(func.count()).select_from(User).where(User.created_at >= week)) or 0
+    )
     projects_total = await db.scalar(select(func.count()).select_from(Project)) or 0
-    tasks_total = await db.scalar(
-        select(func.count()).select_from(Task).where(Task.deleted_at.is_(None))
-    ) or 0
-    open_reports = await db.scalar(
-        select(func.count())
-        .select_from(ModerationReport)
-        .where(ModerationReport.status.in_([ModerationReportStatus.open, ModerationReportStatus.in_review]))
-    ) or 0
-    active_blocks = await db.scalar(
-        select(func.count())
-        .select_from(User)
-        .where(
-            or_(
-                and_(User.blocked_until.is_not(None), User.blocked_until > now),
-                User.is_active.is_(False),
+    tasks_total = (
+        await db.scalar(select(func.count()).select_from(Task).where(Task.deleted_at.is_(None)))
+        or 0
+    )
+    open_reports = (
+        await db.scalar(
+            select(func.count())
+            .select_from(ModerationReport)
+            .where(
+                ModerationReport.status.in_(
+                    [ModerationReportStatus.open, ModerationReportStatus.in_review]
+                )
             )
         )
-    ) or 0
+        or 0
+    )
+    active_blocks = (
+        await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(
+                or_(
+                    and_(User.blocked_until.is_not(None), User.blocked_until > now),
+                    User.is_active.is_(False),
+                )
+            )
+        )
+        or 0
+    )
 
     async def distinct_active(since: datetime) -> int:
         return (
@@ -87,15 +98,18 @@ async def dashboard_stats(db: AsyncSession) -> dict:
     dau_events = await distinct_active(day)
     wau_events = await distinct_active(week)
     mau_events = await distinct_active(month)
-    dau_login = await db.scalar(
-        select(func.count()).select_from(User).where(User.last_login_at >= day)
-    ) or 0
-    wau_login = await db.scalar(
-        select(func.count()).select_from(User).where(User.last_login_at >= week)
-    ) or 0
-    mau_login = await db.scalar(
-        select(func.count()).select_from(User).where(User.last_login_at >= month)
-    ) or 0
+    dau_login = (
+        await db.scalar(select(func.count()).select_from(User).where(User.last_login_at >= day))
+        or 0
+    )
+    wau_login = (
+        await db.scalar(select(func.count()).select_from(User).where(User.last_login_at >= week))
+        or 0
+    )
+    mau_login = (
+        await db.scalar(select(func.count()).select_from(User).where(User.last_login_at >= month))
+        or 0
+    )
 
     activity_by_day = (
         await db.execute(
@@ -163,9 +177,16 @@ async def list_users(
             stmt = stmt.where(or_(User.name.ilike(like), User.email.ilike(like)))
     now = datetime.now(UTC)
     if status == "active":
-        stmt = stmt.where(User.is_active.is_(True), or_(User.blocked_until.is_(None), User.blocked_until <= now))
+        stmt = stmt.where(
+            User.is_active.is_(True), or_(User.blocked_until.is_(None), User.blocked_until <= now)
+        )
     elif status == "blocked":
-        stmt = stmt.where(or_(User.is_active.is_(False), and_(User.blocked_until.is_not(None), User.blocked_until > now)))
+        stmt = stmt.where(
+            or_(
+                User.is_active.is_(False),
+                and_(User.blocked_until.is_not(None), User.blocked_until > now),
+            )
+        )
     elif status == "inactive":
         stmt = stmt.where(User.is_active.is_(False))
     if registered_from:
@@ -178,23 +199,27 @@ async def list_users(
     ascending = (sort_dir or "desc").lower() == "asc"
     order = col.asc().nulls_last() if ascending else col.desc().nulls_last()
     rows = (
-        await db.execute(stmt.order_by(order).offset((page - 1) * page_size).limit(page_size))
-    ).scalars().all()
+        (await db.execute(stmt.order_by(order).offset((page - 1) * page_size).limit(page_size)))
+        .scalars()
+        .all()
+    )
 
     providers_by_user: dict[uuid.UUID, list[str]] = {u.id: [] for u in rows}
     if rows:
         idents = (
-            await db.execute(
-                select(UserIdentity).where(UserIdentity.user_id.in_([u.id for u in rows]))
+            (
+                await db.execute(
+                    select(UserIdentity).where(UserIdentity.user_id.in_([u.id for u in rows]))
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for ident in idents:
             providers_by_user.setdefault(ident.user_id, []).append(ident.provider.value)
 
     return {
-        "items": [
-            _user_row(u, oauth_providers=providers_by_user.get(u.id, [])) for u in rows
-        ],
+        "items": [_user_row(u, oauth_providers=providers_by_user.get(u.id, [])) for u in rows],
         "page": page,
         "page_size": page_size,
         "total": total,
@@ -233,8 +258,10 @@ async def user_detail(db: AsyncSession, user_id: uuid.UUID) -> dict:
     if not user:
         raise PlatformError("not_found", "Пользователь не найден", 404)
     identities = (
-        await db.execute(select(UserIdentity).where(UserIdentity.user_id == user_id))
-    ).scalars().all()
+        (await db.execute(select(UserIdentity).where(UserIdentity.user_id == user_id)))
+        .scalars()
+        .all()
+    )
     memberships = (
         await db.execute(
             select(ProjectMember, Project)
@@ -243,13 +270,17 @@ async def user_detail(db: AsyncSession, user_id: uuid.UUID) -> dict:
         )
     ).all()
     audits = (
-        await db.execute(
-            select(AdminAuditLog)
-            .where(AdminAuditLog.target_user_id == user_id)
-            .order_by(AdminAuditLog.created_at.desc())
-            .limit(50)
+        (
+            await db.execute(
+                select(AdminAuditLog)
+                .where(AdminAuditLog.target_user_id == user_id)
+                .order_by(AdminAuditLog.created_at.desc())
+                .limit(50)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return {
         "user": _user_row(user, oauth_providers=[i.provider.value for i in identities]),
         "identities": [
@@ -298,7 +329,9 @@ async def block_user(
         raise PlatformError("self", "Нельзя ограничить себя")
     if PLATFORM_ROLE_RANK[target.platform_role] >= PLATFORM_ROLE_RANK[PlatformRole.admin]:
         if PLATFORM_ROLE_RANK[admin.platform_role] < PLATFORM_ROLE_RANK[PlatformRole.super_admin]:
-            raise PlatformError("forbidden", "Только super_admin может ограничивать администраторов")
+            raise PlatformError(
+                "forbidden", "Только super_admin может ограничивать администраторов"
+            )
     target.blocked_until = until
     target.block_reason = reason[:2000]
     if until is None:
@@ -327,10 +360,16 @@ async def unblock_user(db: AsyncSession, admin: User, target_id: uuid.UUID) -> U
     target.block_reason = None
     target.is_active = True
     open_blocks = (
-        await db.execute(
-            select(UserBlock).where(UserBlock.user_id == target_id, UserBlock.lifted_at.is_(None))
+        (
+            await db.execute(
+                select(UserBlock).where(
+                    UserBlock.user_id == target_id, UserBlock.lifted_at.is_(None)
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     now = datetime.now(UTC)
     for b in open_blocks:
         b.lifted_at = now
@@ -340,7 +379,9 @@ async def unblock_user(db: AsyncSession, admin: User, target_id: uuid.UUID) -> U
     return target
 
 
-async def set_platform_role(db: AsyncSession, admin: User, target_id: uuid.UUID, role: PlatformRole) -> User:
+async def set_platform_role(
+    db: AsyncSession, admin: User, target_id: uuid.UUID, role: PlatformRole
+) -> User:
     if PLATFORM_ROLE_RANK[admin.platform_role] < PLATFORM_ROLE_RANK[PlatformRole.super_admin]:
         raise PlatformError("forbidden", "Только super_admin назначает роли", 403)
     target = await db.get(User, target_id)
@@ -364,16 +405,19 @@ def _assert_can_manage(admin: User, target: User, *, action: str) -> None:
         raise PlatformError("self", "Нельзя удалить свой аккаунт")
     admin_rank = PLATFORM_ROLE_RANK[admin.platform_role or PlatformRole.none]
     target_rank = PLATFORM_ROLE_RANK[target.platform_role or PlatformRole.none]
-    if target_rank >= PLATFORM_ROLE_RANK[PlatformRole.admin] and admin_rank < PLATFORM_ROLE_RANK[
-        PlatformRole.super_admin
-    ]:
+    if (
+        target_rank >= PLATFORM_ROLE_RANK[PlatformRole.admin]
+        and admin_rank < PLATFORM_ROLE_RANK[PlatformRole.super_admin]
+    ):
         raise PlatformError(
             "forbidden",
             "Только super_admin может изменять или удалять администраторов",
             403,
         )
     if target_rank > admin_rank:
-        raise PlatformError("forbidden", "Нельзя управлять пользователем с более высокой ролью", 403)
+        raise PlatformError(
+            "forbidden", "Нельзя управлять пользователем с более высокой ролью", 403
+        )
 
 
 async def update_user(
@@ -431,9 +475,10 @@ async def update_user(
         changes.append("password")
         await revoke_all_user_tokens(db, target.id)
     if platform_role is not None and platform_role != target.platform_role:
-        if PLATFORM_ROLE_RANK[admin.platform_role or PlatformRole.none] < PLATFORM_ROLE_RANK[
-            PlatformRole.super_admin
-        ]:
+        if (
+            PLATFORM_ROLE_RANK[admin.platform_role or PlatformRole.none]
+            < PLATFORM_ROLE_RANK[PlatformRole.super_admin]
+        ):
             raise PlatformError("forbidden", "Только super_admin назначает роли", 403)
         if target.id == admin.id and platform_role != PlatformRole.super_admin:
             raise PlatformError("self", "Нельзя снять с себя super_admin")
@@ -446,9 +491,7 @@ async def update_user(
 
     if not changes:
         return target
-    await admin_service.audit(
-        db, admin.id, "user_updated", target.id, ", ".join(changes)[:500]
-    )
+    await admin_service.audit(db, admin.id, "user_updated", target.id, ", ".join(changes)[:500])
     await db.flush()
     return target
 
@@ -471,9 +514,7 @@ async def delete_user(db: AsyncSession, admin: User, target_id: uuid.UUID) -> No
     await db.execute(delete(RefreshToken).where(RefreshToken.user_id == target.id))
 
     # Reassign non-cascading FK references to the acting admin, then delete.
-    await db.execute(
-        update(Task).where(Task.author_id == target.id).values(author_id=admin.id)
-    )
+    await db.execute(update(Task).where(Task.author_id == target.id).values(author_id=admin.id))
     await db.execute(delete(TaskAssignee).where(TaskAssignee.user_id == target.id))
     await db.execute(
         update(Comment).where(Comment.author_id == target.id).values(author_id=admin.id)
@@ -492,19 +533,13 @@ async def delete_user(db: AsyncSession, admin: User, target_id: uuid.UUID) -> No
         .values(target_user_id=None)
     )
     await db.execute(
-        update(AdminAuditLog)
-        .where(AdminAuditLog.admin_id == target.id)
-        .values(admin_id=admin.id)
+        update(AdminAuditLog).where(AdminAuditLog.admin_id == target.id).values(admin_id=admin.id)
     )
     await db.execute(
-        update(UserBlock)
-        .where(UserBlock.created_by_id == target.id)
-        .values(created_by_id=admin.id)
+        update(UserBlock).where(UserBlock.created_by_id == target.id).values(created_by_id=admin.id)
     )
     await db.execute(
-        update(UserBlock)
-        .where(UserBlock.lifted_by_id == target.id)
-        .values(lifted_by_id=None)
+        update(UserBlock).where(UserBlock.lifted_by_id == target.id).values(lifted_by_id=None)
     )
     await db.execute(delete(UserBlock).where(UserBlock.user_id == target.id))
     await db.execute(
@@ -601,18 +636,28 @@ async def list_projects(
     order = col.asc().nulls_last() if ascending else col.desc().nulls_last()
 
     projects = (
-        await db.execute(stmt.order_by(order).offset((page - 1) * page_size).limit(page_size))
-    ).scalars().all()
+        (await db.execute(stmt.order_by(order).offset((page - 1) * page_size).limit(page_size)))
+        .scalars()
+        .all()
+    )
     items = []
     for p in projects:
-        member_count = await db.scalar(
-            select(func.count()).select_from(ProjectMember).where(ProjectMember.project_id == p.id)
-        ) or 0
-        task_count = await db.scalar(
-            select(func.count())
-            .select_from(Task)
-            .where(Task.project_id == p.id, Task.deleted_at.is_(None))
-        ) or 0
+        member_count = (
+            await db.scalar(
+                select(func.count())
+                .select_from(ProjectMember)
+                .where(ProjectMember.project_id == p.id)
+            )
+            or 0
+        )
+        task_count = (
+            await db.scalar(
+                select(func.count())
+                .select_from(Task)
+                .where(Task.project_id == p.id, Task.deleted_at.is_(None))
+            )
+            or 0
+        )
         restriction = await db.scalar(
             select(ProjectRestriction).where(
                 ProjectRestriction.project_id == p.id, ProjectRestriction.active.is_(True)
@@ -660,14 +705,22 @@ async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
     project = await db.get(Project, project_id)
     if not project:
         raise PlatformError("not_found", "Проект не найден", 404)
-    member_count = await db.scalar(
-        select(func.count()).select_from(ProjectMember).where(ProjectMember.project_id == project.id)
-    ) or 0
-    task_count = await db.scalar(
-        select(func.count())
-        .select_from(Task)
-        .where(Task.project_id == project.id, Task.deleted_at.is_(None))
-    ) or 0
+    member_count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(ProjectMember)
+            .where(ProjectMember.project_id == project.id)
+        )
+        or 0
+    )
+    task_count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Task)
+            .where(Task.project_id == project.id, Task.deleted_at.is_(None))
+        )
+        or 0
+    )
     restriction = await db.scalar(
         select(ProjectRestriction).where(
             ProjectRestriction.project_id == project.id, ProjectRestriction.active.is_(True)
@@ -683,12 +736,16 @@ async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
     ).all()
     owner = next((user for member, user in rows if member.role.value == "admin"), None)
     statuses = (
-        await db.execute(
-            select(TaskStatus)
-            .where(TaskStatus.project_id == project.id)
-            .order_by(TaskStatus.position.asc(), TaskStatus.created_at.asc())
+        (
+            await db.execute(
+                select(TaskStatus)
+                .where(TaskStatus.project_id == project.id)
+                .order_by(TaskStatus.position.asc(), TaskStatus.created_at.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     task_counts = dict(
         (
             await db.execute(
@@ -704,44 +761,62 @@ async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
         Task.archived_at.is_(None),
         TaskStatus.is_done.is_(False),
     )
-    active_tasks = await db.scalar(
-        select(func.count(Task.id))
-        .join(TaskStatus, TaskStatus.id == Task.status_id)
-        .where(*open_task_filter)
-    ) or 0
-    done_tasks = await db.scalar(
-        select(func.count(Task.id))
-        .join(TaskStatus, TaskStatus.id == Task.status_id)
-        .where(
-            Task.project_id == project.id,
-            Task.deleted_at.is_(None),
-            Task.archived_at.is_(None),
-            TaskStatus.is_done.is_(True),
+    active_tasks = (
+        await db.scalar(
+            select(func.count(Task.id))
+            .join(TaskStatus, TaskStatus.id == Task.status_id)
+            .where(*open_task_filter)
         )
-    ) or 0
-    archived_tasks = await db.scalar(
-        select(func.count(Task.id)).where(
-            Task.project_id == project.id,
-            Task.deleted_at.is_(None),
-            Task.archived_at.is_not(None),
+        or 0
+    )
+    done_tasks = (
+        await db.scalar(
+            select(func.count(Task.id))
+            .join(TaskStatus, TaskStatus.id == Task.status_id)
+            .where(
+                Task.project_id == project.id,
+                Task.deleted_at.is_(None),
+                Task.archived_at.is_(None),
+                TaskStatus.is_done.is_(True),
+            )
         )
-    ) or 0
-    overdue_tasks = await db.scalar(
-        select(func.count(Task.id))
-        .join(TaskStatus, TaskStatus.id == Task.status_id)
-        .where(*open_task_filter, Task.due_date.is_not(None), Task.due_date < datetime.now(UTC))
-    ) or 0
-    blocked_tasks = await db.scalar(
-        select(func.count(Task.id)).join(TaskStatus, TaskStatus.id == Task.status_id).where(
-            *open_task_filter, Task.blocked_at.is_not(None)
+        or 0
+    )
+    archived_tasks = (
+        await db.scalar(
+            select(func.count(Task.id)).where(
+                Task.project_id == project.id,
+                Task.deleted_at.is_(None),
+                Task.archived_at.is_not(None),
+            )
         )
-    ) or 0
-    unassigned_tasks = await db.scalar(
-        select(func.count(Task.id))
-        .join(TaskStatus, TaskStatus.id == Task.status_id)
-        .outerjoin(TaskAssignee, TaskAssignee.task_id == Task.id)
-        .where(*open_task_filter, TaskAssignee.task_id.is_(None))
-    ) or 0
+        or 0
+    )
+    overdue_tasks = (
+        await db.scalar(
+            select(func.count(Task.id))
+            .join(TaskStatus, TaskStatus.id == Task.status_id)
+            .where(*open_task_filter, Task.due_date.is_not(None), Task.due_date < datetime.now(UTC))
+        )
+        or 0
+    )
+    blocked_tasks = (
+        await db.scalar(
+            select(func.count(Task.id))
+            .join(TaskStatus, TaskStatus.id == Task.status_id)
+            .where(*open_task_filter, Task.blocked_at.is_not(None))
+        )
+        or 0
+    )
+    unassigned_tasks = (
+        await db.scalar(
+            select(func.count(Task.id))
+            .join(TaskStatus, TaskStatus.id == Task.status_id)
+            .outerjoin(TaskAssignee, TaskAssignee.task_id == Task.id)
+            .where(*open_task_filter, TaskAssignee.task_id.is_(None))
+        )
+        or 0
+    )
     return {
         "id": str(project.id),
         "name": project.name,
@@ -755,9 +830,7 @@ async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
         "updated_at": project.updated_at.isoformat() if project.updated_at else None,
         "member_count": member_count,
         "owner": (
-            {"id": str(owner.id), "name": owner.name, "email": owner.email}
-            if owner
-            else None
+            {"id": str(owner.id), "name": owner.name, "email": owner.email} if owner else None
         ),
         "task_count": task_count,
         "task_stats": {
@@ -809,7 +882,9 @@ async def project_detail(db: AsyncSession, project_id: uuid.UUID) -> dict:
     }
 
 
-async def restrict_project(db: AsyncSession, admin: User, project_id: uuid.UUID, reason: str) -> dict:
+async def restrict_project(
+    db: AsyncSession, admin: User, project_id: uuid.UUID, reason: str
+) -> dict:
     project = await db.get(Project, project_id)
     if not project:
         raise PlatformError("not_found", "Проект не найден", 404)
@@ -885,8 +960,12 @@ async def analytics(db: AsyncSession, days: int = 30) -> dict:
     return {
         "days": days,
         "registrations": [{"day": r[0].date().isoformat(), "count": r[1]} for r in regs if r[0]],
-        "projects_created": [{"day": r[0].date().isoformat(), "count": r[1]} for r in projects if r[0]],
-        "tasks_created": [{"day": r[0].date().isoformat(), "count": r[1]} for r in tasks_created if r[0]],
+        "projects_created": [
+            {"day": r[0].date().isoformat(), "count": r[1]} for r in projects if r[0]
+        ],
+        "tasks_created": [
+            {"day": r[0].date().isoformat(), "count": r[1]} for r in tasks_created if r[0]
+        ],
         "tasks_completed": None,
         "retention": None,
         "note": (
@@ -905,7 +984,9 @@ async def system_health(db: AsyncSession, settings) -> dict:
         "database": "ok",
         "email": {
             "configured": is_email_configured(),
-            "from": settings.SMTP_FROM_EMAIL.split("<")[-1].rstrip(">") if settings.SMTP_FROM_EMAIL else None,
+            "from": settings.SMTP_FROM_EMAIL.split("<")[-1].rstrip(">")
+            if settings.SMTP_FROM_EMAIL
+            else None,
         },
         "web_push": {
             "configured": bool(settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY),
