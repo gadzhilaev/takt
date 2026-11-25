@@ -1,11 +1,12 @@
 from logging.config import fileConfig
 
-from alembic import context
-from sqlalchemy import create_engine, pool
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
+from sqlalchemy import create_engine, inspect, pool
 from sqlalchemy.engine import Connection
 
+from alembic import context
 from app.core.config import get_settings
-from app.models.base import Base
 from app.models import (  # noqa: F401
     ActivityLog,
     AdminAuditLog,
@@ -15,6 +16,9 @@ from app.models import (  # noqa: F401
     Comment,
     EmailCode,
     Label,
+    MCPAuthorizationCode,
+    MCPOAuthClient,
+    MCPRefreshGrant,
     ModerationReport,
     OAuthLoginState,
     PlatformSetting,
@@ -32,6 +36,7 @@ from app.models import (  # noqa: F401
     UserBlock,
     UserIdentity,
 )
+from app.models.base import Base
 
 config = context.config
 if config.config_file_name is not None:
@@ -67,7 +72,18 @@ def run_migrations_offline() -> None:
 def do_run_migrations(connection: Connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
-        context.run_migrations()
+        tables = set(inspect(connection).get_table_names())
+        application_tables = tables - {"alembic_version"}
+        if not application_tables:
+            # Revision 001 creates the current model metadata. Running every
+            # historical revision afterward would re-add columns already
+            # present in that schema and can break a fresh installation.
+            target_metadata.create_all(connection)
+            MigrationContext.configure(connection).stamp(
+                ScriptDirectory.from_config(config), "head"
+            )
+        else:
+            context.run_migrations()
 
 
 def run_migrations_online() -> None:

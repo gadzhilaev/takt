@@ -5,6 +5,18 @@
 {$DOMAIN:localhost} {
 	encode gzip
 
+	handle /.well-known/oauth-* {
+		reverse_proxy backend:8000
+	}
+
+	handle /oauth/* {
+		reverse_proxy backend:8000
+	}
+
+	handle /mcp* {
+		reverse_proxy backend:8000
+	}
+
 	handle /api/* {
 		reverse_proxy backend:8000
 	}

@@ -13,10 +13,12 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.router import api_router
+from app.api.mcp_oauth import router as mcp_oauth_router
 from app.api.v1.ws import router as ws_router
 from app.core.config import get_settings
 from app.core.limiter import limiter
 from app.db.session import AsyncSessionLocal
+from app.mcp_server import create_mcp_asgi_app, mcp
 from app.services.bootstrap import bootstrap_db
 from app.services.digest_service import digest_loop
 from app.services.due_reminder_service import due_reminder_loop
@@ -57,7 +59,8 @@ def run_migrations() -> None:
         hint = (
             "\n\n--- Не удалось подключиться к PostgreSQL ---\n"
             f"DATABASE_URL: {settings.DATABASE_URL}\n"
-            "Локально на Windows часто на :5432 уже стоит свой PostgreSQL (не пользователь track).\n"
+            "Локально на Windows часто на :5432 уже стоит свой PostgreSQL "
+            "(не пользователь track).\n"
             "1) Запустите БД проекта:  cd ..  &&  docker compose up db -d\n"
             "2) В .env используйте порт 5433 и пароль POSTGRES_PASSWORD (см. .env.example)\n"
             "3) Один раз:  alembic upgrade head\n"
@@ -82,16 +85,29 @@ async def lifespan(app: FastAPI):
             await seed_demo(db)
     stop = asyncio.Event()
     reminder_task: asyncio.Task | None = None
-    if settings.BACKGROUND_JOBS_ENABLED and settings.DUE_REMINDER_ENABLED and settings.DUE_REMINDER_INTERVAL_SECONDS > 0:
+    if (
+        settings.BACKGROUND_JOBS_ENABLED
+        and settings.DUE_REMINDER_ENABLED
+        and settings.DUE_REMINDER_INTERVAL_SECONDS > 0
+    ):
         reminder_task = asyncio.create_task(due_reminder_loop(stop))
     rhythm_task: asyncio.Task | None = None
-    if settings.BACKGROUND_JOBS_ENABLED and settings.RHYTHM_ENABLED and settings.RHYTHM_INTERVAL_SECONDS > 0:
+    if (
+        settings.BACKGROUND_JOBS_ENABLED
+        and settings.RHYTHM_ENABLED
+        and settings.RHYTHM_INTERVAL_SECONDS > 0
+    ):
         rhythm_task = asyncio.create_task(rhythm_loop(stop))
     digest_task: asyncio.Task | None = None
-    if settings.BACKGROUND_JOBS_ENABLED and settings.DIGEST_ENABLED and settings.DIGEST_INTERVAL_SECONDS > 0:
+    if (
+        settings.BACKGROUND_JOBS_ENABLED
+        and settings.DIGEST_ENABLED
+        and settings.DIGEST_INTERVAL_SECONDS > 0
+    ):
         digest_task = asyncio.create_task(digest_loop(stop))
     try:
-        yield
+        async with mcp.session_manager.run():
+            yield
     finally:
         stop.set()
         for task in (reminder_task, rhythm_task, digest_task):
@@ -187,6 +203,11 @@ async def health():
 
 app.include_router(api_router)
 app.include_router(ws_router)
+app.include_router(mcp_oauth_router)
+
+# Mount at the root after the product routes so `/mcp` is handled without a
+# trailing-slash redirect that some MCP clients do not follow for POST.
+app.mount("/", create_mcp_asgi_app(), name="mcp")
 
 
 @app.exception_handler(Exception)

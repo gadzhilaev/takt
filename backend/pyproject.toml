@@ -17,6 +17,7 @@ dependencies = [
     "xlsxwriter>=3.2.0",
     "slowapi>=0.1.9",
     "itsdangerous>=2.2.0",
+    "mcp>=1.26,<2",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +39,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+ignore = ["UP042", "UP046"]
 
 [tool.ruff.lint.per-file-ignores]
 # Forward refs в relationship() — строки-имена моделей без локального импорта.
