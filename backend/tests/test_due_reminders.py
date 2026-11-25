@@ -114,12 +114,16 @@ async def test_due_soon_and_overdue_once(client: AsyncClient):
 
     async with AsyncSessionLocal() as db:
         notes = (
-            await db.execute(
-                select(Notification).where(
-                    Notification.task_id.in_([soon_id, overdue_id, done_id])
+            (
+                await db.execute(
+                    select(Notification).where(
+                        Notification.task_id.in_([soon_id, overdue_id, done_id])
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         kinds = {(str(n.task_id), n.kind) for n in notes}
         assert (soon_id, "task_due_soon") in kinds
         assert (overdue_id, "task_overdue") in kinds

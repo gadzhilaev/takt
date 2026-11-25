@@ -36,7 +36,9 @@ class RhythmCheckin(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True,
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
         nullable=False,
     )
     # Local calendar day in the project's rhythm timezone.
@@ -65,11 +67,15 @@ class RhythmCheckinItem(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checkin_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("rhythm_checkins.id", ondelete="CASCADE"), index=True,
+        UUID(as_uuid=True),
+        ForeignKey("rhythm_checkins.id", ondelete="CASCADE"),
+        index=True,
         nullable=False,
     )
     task_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), index=True,
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        index=True,
         nullable=False,
     )
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

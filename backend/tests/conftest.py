@@ -12,9 +12,7 @@ from sqlalchemy.pool import NullPool
 os.environ["ENV"] = "test"
 # Always use the dedicated test database — never inherit DATABASE_URL from .env
 # (that pointed at `track` and drop_all wiped the working demo workspace).
-os.environ["DATABASE_URL"] = (
-    "postgresql+asyncpg://track:track_dev_pass@localhost:5433/track_test"
-)
+os.environ["DATABASE_URL"] = "postgresql+asyncpg://track:track_dev_pass@localhost:5433/track_test"
 os.environ["SECRET_KEY"] = "test-secret-key-minimum-32-characters-long"
 os.environ["ADMIN_EMAIL"] = "admin@test.com"
 os.environ["ADMIN_PASSWORD"] = "Admin123!Test"
@@ -31,10 +29,10 @@ from app.core.config import get_settings
 
 get_settings.cache_clear()
 
-from app.db.session import get_db
-from app.main import app
-from app.models.base import Base
-from app.services.bootstrap import bootstrap_db
+from app.db.session import get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models.base import Base  # noqa: E402
+from app.services.bootstrap import bootstrap_db  # noqa: E402
 
 engine = create_async_engine(os.environ["DATABASE_URL"], echo=False, poolclass=NullPool)
 TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

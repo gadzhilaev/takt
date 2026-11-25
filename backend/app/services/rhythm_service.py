@@ -128,20 +128,25 @@ async def open_tasks_for(
     db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, *, now: datetime, limit: int
 ) -> list[Task]:
     rows = (
-        await db.execute(
-            select(Task)
-            .join(TaskAssignee, TaskAssignee.task_id == Task.id)
-            .join(TaskStatus, TaskStatus.id == Task.status_id)
-            .where(
-                Task.project_id == project_id,
-                TaskAssignee.user_id == user_id,
-                Task.deleted_at.is_(None),
-                Task.archived_at.is_(None),
-                Task.closed_at.is_(None),
-                TaskStatus.is_done.is_(False),
+        (
+            await db.execute(
+                select(Task)
+                .join(TaskAssignee, TaskAssignee.task_id == Task.id)
+                .join(TaskStatus, TaskStatus.id == Task.status_id)
+                .where(
+                    Task.project_id == project_id,
+                    TaskAssignee.user_id == user_id,
+                    Task.deleted_at.is_(None),
+                    Task.archived_at.is_(None),
+                    Task.closed_at.is_(None),
+                    TaskStatus.is_done.is_(False),
+                )
             )
         )
-    ).scalars().unique().all()
+        .scalars()
+        .unique()
+        .all()
+    )
     return sorted(rows, key=lambda t: _task_sort_key(t, now))[:limit]
 
 
@@ -182,17 +187,21 @@ async def generate_project_checkins(
         return result
 
     members = (
-        await db.execute(
-            select(ProjectMember.user_id)
-            .join(User, User.id == ProjectMember.user_id)
-            .where(
-                ProjectMember.project_id == project.id,
-                ProjectMember.role.in_([ProjectMemberRole.admin, ProjectMemberRole.member]),
-                User.is_active.is_(True),
-                User.is_demo.is_(False),
+        (
+            await db.execute(
+                select(ProjectMember.user_id)
+                .join(User, User.id == ProjectMember.user_id)
+                .where(
+                    ProjectMember.project_id == project.id,
+                    ProjectMember.role.in_([ProjectMemberRole.admin, ProjectMemberRole.member]),
+                    User.is_active.is_(True),
+                    User.is_demo.is_(False),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     existing = set(
         (
             await db.scalars(
@@ -311,9 +320,7 @@ async def start_checkin_now(
     found = await existing()
     if found is not None:
         return found
-    created = await create_user_checkin(
-        db, project, user.id, day=day, now=now, settings=settings
-    )
+    created = await create_user_checkin(db, project, user.id, day=day, now=now, settings=settings)
     if created is None:
         found = await existing()  # lost a race with the loop — reuse it
         if found is not None:
@@ -330,17 +337,21 @@ async def startable_project_ids(
     the person has open tasks."""
     now = now or datetime.now(UTC)
     rows = (
-        await db.execute(
-            select(Project)
-            .join(ProjectMember, ProjectMember.project_id == Project.id)
-            .where(
-                ProjectMember.user_id == user.id,
-                ProjectMember.role.in_([ProjectMemberRole.admin, ProjectMemberRole.member]),
-                Project.rhythm_enabled.is_(True),
-                Project.is_archived.is_(False),
+        (
+            await db.execute(
+                select(Project)
+                .join(ProjectMember, ProjectMember.project_id == Project.id)
+                .where(
+                    ProjectMember.user_id == user.id,
+                    ProjectMember.role.in_([ProjectMemberRole.admin, ProjectMemberRole.member]),
+                    Project.rhythm_enabled.is_(True),
+                    Project.is_archived.is_(False),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     out: list[uuid.UUID] = []
     for project in rows:
         day = local_today(project, now)
@@ -578,9 +589,7 @@ async def apply_answer(
 ) -> AppliedAnswer:
     """Apply one answer. Access must be checked by the caller (``load_checkin_for``)."""
     now = now or datetime.now(UTC)
-    task = await db.scalar(
-        task_service.task_query_base().where(Task.id == item.task_id)
-    )
+    task = await db.scalar(task_service.task_query_base().where(Task.id == item.task_id))
     if task is None:
         raise RhythmError("task_gone", "Задача удалена", 409)
     if not any(a.user_id == user.id for a in task.assignees or []):
@@ -618,9 +627,7 @@ async def apply_answer(
     return result
 
 
-async def load_checkin_for(
-    db: AsyncSession, user: User, checkin_id: uuid.UUID
-) -> RhythmCheckin:
+async def load_checkin_for(db: AsyncSession, user: User, checkin_id: uuid.UUID) -> RhythmCheckin:
     """Own check-in in a project where the user is still a member (not viewer)."""
     checkin = await db.scalar(
         select(RhythmCheckin)

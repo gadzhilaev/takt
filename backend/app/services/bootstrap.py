@@ -49,13 +49,19 @@ async def ensure_default_statuses(db: AsyncSession, project: Project) -> None:
     if count and count > 0:
         # Backfill orphan statuses
         orphans = (
-            await db.execute(select(TaskStatus).where(TaskStatus.project_id.is_(None)))
-        ).scalars().all()
+            (await db.execute(select(TaskStatus).where(TaskStatus.project_id.is_(None))))
+            .scalars()
+            .all()
+        )
         for s in orphans:
             s.project_id = project.id
         return
     # Migrate legacy global statuses if any
-    legacy = (await db.execute(select(TaskStatus).where(TaskStatus.project_id.is_(None)))).scalars().all()
+    legacy = (
+        (await db.execute(select(TaskStatus).where(TaskStatus.project_id.is_(None))))
+        .scalars()
+        .all()
+    )
     if legacy:
         for s in legacy:
             s.project_id = project.id
@@ -108,8 +114,14 @@ async def ensure_project_memberships(db: AsyncSession, project: Project) -> None
     Ordinary users join via project create / invites.
     """
     admins = (
-        await db.execute(select(User).where(User.role == UserRole.admin, User.is_active.is_(True)))
-    ).scalars().all()
+        (
+            await db.execute(
+                select(User).where(User.role == UserRole.admin, User.is_active.is_(True))
+            )
+        )
+        .scalars()
+        .all()
+    )
     for user in admins:
         exists = await db.scalar(
             select(ProjectMember.id).where(
@@ -138,8 +150,6 @@ async def bootstrap_db(db: AsyncSession, settings: Settings) -> None:
     from app.models.task import Task
 
     await db.execute(
-        Task.__table__.update()
-        .where(Task.project_id.is_(None))
-        .values(project_id=project.id)
+        Task.__table__.update().where(Task.project_id.is_(None)).values(project_id=project.id)
     )
     await db.commit()

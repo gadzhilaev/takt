@@ -59,8 +59,8 @@ class User(Base, TimestampMixin):
     blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     block_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
-    identities: Mapped[list["UserIdentity"]] = relationship(back_populates="user")
-    created_tasks: Mapped[list["Task"]] = relationship(
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(back_populates="user")
+    identities: Mapped[list[UserIdentity]] = relationship(back_populates="user")
+    created_tasks: Mapped[list[Task]] = relationship(
         back_populates="author", foreign_keys="Task.author_id"
     )

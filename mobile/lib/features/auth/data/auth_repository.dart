@@ -92,7 +92,10 @@ class AuthRepository {
 
   Future<void> logout() async {
     try {
-      await api.dio.post('/api/v1/auth/logout');
+      await api.dio.post(
+        '/api/v1/auth/logout',
+        data: {'refresh_token': await tokens.readRefresh()},
+      );
     } on DioException {
       /* ignore network on logout */
     }

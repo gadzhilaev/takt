@@ -61,6 +61,7 @@ export function ProfileDrawer({
   async function revokeSession(id: string) {
     await api(`/api/v1/auth/sessions/${id}`, { method: "DELETE" });
     await sessionsQuery.refetch();
+    await pushDevicesQuery.refetch();
   }
   async function revokePushDevice(kind: "browser" | "app", id: string) {
     await api(`/api/v1/notifications/devices/${kind}/${id}`, { method: "DELETE" });

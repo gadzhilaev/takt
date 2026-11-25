@@ -80,8 +80,13 @@ async def _join(project_id: str, owner: AsyncClient, *, name: str, email: str) -
 async def _create_project(client: AsyncClient, name: str) -> str:
     created = await client.post(
         "/api/v1/projects",
-        json={"name": name, "description": "", "color": "#315F72", "icon": "folder",
-              "member_ids": []},
+        json={
+            "name": name,
+            "description": "",
+            "color": "#315F72",
+            "icon": "folder",
+            "member_ids": [],
+        },
     )
     assert created.status_code == 200, created.text
     return created.json()["project"]["id"]
@@ -158,13 +163,21 @@ async def test_sole_admin_with_only_demo_members_deletes_project(client: AsyncCl
 
     async with TestSession() as db:
         me = await db.scalar(select(User).where(User.email == "demoonly@test.com"))
-        demo = User(email="demo.staff.x@example.com", name="Демо Сотрудник",
-                    password_hash=None, is_demo=True)
+        demo = User(
+            email="demo.staff.x@example.com",
+            name="Демо Сотрудник",
+            password_hash=None,
+            is_demo=True,
+        )
         db.add(demo)
         await db.flush()
         import uuid as _uuid
-        db.add(ProjectMember(project_id=_uuid.UUID(project_id), user_id=demo.id,
-                             role=ProjectMemberRole.member))
+
+        db.add(
+            ProjectMember(
+                project_id=_uuid.UUID(project_id), user_id=demo.id, role=ProjectMemberRole.member
+            )
+        )
         await db.commit()
 
     preview = await client.get("/api/v1/users/me/delete-preview")
@@ -178,9 +191,11 @@ async def test_sole_admin_with_only_demo_members_deletes_project(client: AsyncCl
         await db.commit()
     async with TestSession() as db:
         assert await db.get(Project, _uuid.UUID(project_id)) is None
-        left = (await db.scalars(
-            select(ProjectMember).where(ProjectMember.project_id == _uuid.UUID(project_id))
-        )).all()
+        left = (
+            await db.scalars(
+                select(ProjectMember).where(ProjectMember.project_id == _uuid.UUID(project_id))
+            )
+        ).all()
         assert left == []
 
 
@@ -224,9 +239,11 @@ async def test_review_account_can_be_deleted_after_seed(client: AsyncClient):
     deleted = await client.delete("/api/v1/users/me")
     assert deleted.status_code == 200, deleted.text
     import uuid as _uuid
+
     async with TestSession() as db:
         left = await db.scalar(
-            select(func.count()).select_from(Project)
+            select(func.count())
+            .select_from(Project)
             .where(Project.id.in_([_uuid.UUID(i) for i in ids]))
         )
         assert left == 0
@@ -278,11 +295,11 @@ async def test_files_survive_rollback_and_go_after_commit(client: AsyncClient):
     async with TestSession() as db:
         project_files = [
             attachment_path(a)
-            for a in (await db.scalars(
-                select(Attachment).join(Attachment.task).where(
-                    Task.project_id == project_id
+            for a in (
+                await db.scalars(
+                    select(Attachment).join(Attachment.task).where(Task.project_id == project_id)
                 )
-            )).all()
+            ).all()
         ]
     assert project_files
     r = await client.delete(f"/api/v1/projects/{project_id}")

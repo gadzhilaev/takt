@@ -18,7 +18,10 @@ REFRESH_COOKIE = "refresh_token"
 def effective_platform_role(user: User) -> PlatformRole:
     """Legacy UserRole.admin maps to at least platform admin."""
     role = user.platform_role or PlatformRole.none
-    if user.role == UserRole.admin and PLATFORM_ROLE_RANK[role] < PLATFORM_ROLE_RANK[PlatformRole.admin]:
+    if (
+        user.role == UserRole.admin
+        and PLATFORM_ROLE_RANK[role] < PLATFORM_ROLE_RANK[PlatformRole.admin]
+    ):
         return PlatformRole.super_admin if role == PlatformRole.none else role
     return role
 
@@ -34,6 +37,24 @@ def _token_from_auth_header(authorization: str | None) -> str | None:
     if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
         return None
     return parts[1].strip()
+
+
+def get_current_session_id(request: Request) -> uuid.UUID | None:
+    """Resolve the stable device session from a signed access token or client ID."""
+    raw_token = request.cookies.get(ACCESS_COOKIE) or _token_from_auth_header(
+        request.headers.get("authorization")
+    )
+    payload = decode_token(raw_token) if raw_token else None
+    raw_session_id = payload.get("sid") if isinstance(payload, dict) else None
+    raw_session_id = (
+        raw_session_id
+        or request.headers.get("x-client-device-id")
+        or request.cookies.get("takt_device_id")
+    )
+    try:
+        return uuid.UUID(raw_session_id) if raw_session_id else None
+    except (ValueError, TypeError):
+        return None
 
 
 async def get_current_user_optional(

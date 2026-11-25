@@ -31,6 +31,9 @@ async def test_refresh_reuses_refresh_token(monkeypatch):
     stored = SimpleNamespace(
         jti=jti,
         user_id=user_id,
+        session_id=uuid4(),
+        platform="ios",
+        user_agent="TaktMobile/1.0",
         revoked_at=None,
         expires_at=datetime.now(UTC) + timedelta(days=60),
     )
@@ -66,6 +69,5 @@ async def test_refresh_reuses_refresh_token(monkeypatch):
     assert out_user is user
     # Must not rotate/revoke on a healthy long-lived refresh.
     assert not any(
-        getattr(c, "args", None) and "revoked" in str(c).lower()
-        for c in db.method_calls
+        getattr(c, "args", None) and "revoked" in str(c).lower() for c in db.method_calls
     )

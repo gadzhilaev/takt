@@ -2,7 +2,7 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import (
@@ -12,6 +12,8 @@ from app.core.security import (
     verify_password,
 )
 from app.models.auth import RefreshToken
+from app.models.device_push_token import DevicePushToken
+from app.models.push_subscription import PushSubscription
 from app.models.user import User
 
 
@@ -108,33 +110,100 @@ async def create_token_pair(
     """
     touch_last_login(user)
     jti = secrets.token_urlsafe(32)
-    access = create_access_token(str(user.id), {"role": user.role.value})
+    stable_session_id = session_id or uuid.uuid4()
+    if platform is None:
+        await merge_browser_sessions(
+            db,
+            user_id=user.id,
+            session_id=stable_session_id,
+            user_agent=user_agent,
+        )
+    access = create_access_token(
+        str(user.id), {"role": user.role.value, "sid": str(stable_session_id)}
+    )
     refresh = create_refresh_token(str(user.id), jti)
     from app.core.config import get_settings
 
     settings = get_settings()
     expires = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    db.add(RefreshToken(
-        user_id=user.id,
-        jti=jti,
-        session_id=session_id or uuid.uuid4(),
-        user_agent=user_agent[:512] if user_agent else None,
-        platform=platform[:32] if platform else None,
-        expires_at=expires,
-    ))
+    db.add(
+        RefreshToken(
+            user_id=user.id,
+            jti=jti,
+            session_id=stable_session_id,
+            user_agent=user_agent[:512] if user_agent else None,
+            platform=platform[:32] if platform else None,
+            expires_at=expires,
+        )
+    )
     await db.flush()
     return access, refresh, jti
 
 
+async def merge_browser_sessions(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    user_agent: str | None,
+) -> None:
+    """Coalesce legacy daily login rows for the same browser into its device session."""
+    if not user_agent or "mozilla/" not in user_agent.lower():
+        return
+    now = datetime.now(UTC)
+    old_ids = (
+        await db.execute(
+            select(RefreshToken.session_id)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.user_agent == user_agent[:512],
+                RefreshToken.platform.is_(None),
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > now,
+            )
+            .distinct()
+        )
+    ).scalars().all()
+    if old_ids:
+        await db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.user_agent == user_agent[:512],
+                RefreshToken.platform.is_(None),
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > now,
+            )
+            .values(session_id=session_id)
+        )
+    await db.execute(
+        update(PushSubscription)
+        .where(
+            PushSubscription.user_id == user_id,
+            PushSubscription.user_agent == user_agent[:512],
+            (PushSubscription.session_id.is_(None))
+            | (PushSubscription.session_id.in_(old_ids or [session_id])),
+        )
+        .values(session_id=session_id)
+    )
+
+
 async def revoke_refresh_token(db: AsyncSession, jti: str) -> None:
     await db.execute(
-        update(RefreshToken)
-        .where(RefreshToken.jti == jti)
-        .values(revoked_at=datetime.now(UTC))
+        update(RefreshToken).where(RefreshToken.jti == jti).values(revoked_at=datetime.now(UTC))
     )
 
 
 async def revoke_session(db: AsyncSession, user_id: uuid.UUID, session_id: uuid.UUID) -> bool:
+    rows = (
+        await db.execute(
+            select(RefreshToken.user_agent).where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.session_id == session_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+        )
+    ).scalars().all()
     result = await db.execute(
         update(RefreshToken)
         .where(
@@ -144,7 +213,25 @@ async def revoke_session(db: AsyncSession, user_id: uuid.UUID, session_id: uuid.
         )
         .values(revoked_at=datetime.now(UTC))
     )
-    return bool(result.rowcount)
+    revoked = bool(result.rowcount)
+    if revoked:
+        await db.execute(
+            delete(PushSubscription).where(
+                PushSubscription.user_id == user_id,
+                (PushSubscription.session_id == session_id)
+                | (
+                    PushSubscription.session_id.is_(None)
+                    & PushSubscription.user_agent.in_([ua for ua in rows if ua])
+                ),
+            )
+        )
+        await db.execute(
+            delete(DevicePushToken).where(
+                DevicePushToken.user_id == user_id,
+                DevicePushToken.session_id == session_id,
+            )
+        )
+    return revoked
 
 
 async def revoke_all_user_tokens(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -153,6 +240,8 @@ async def revoke_all_user_tokens(db: AsyncSession, user_id: uuid.UUID) -> None:
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=datetime.now(UTC))
     )
+    await db.execute(delete(PushSubscription).where(PushSubscription.user_id == user_id))
+    await db.execute(delete(DevicePushToken).where(DevicePushToken.user_id == user_id))
 
 
 async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, str, User]:
@@ -182,6 +271,14 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, st
     if not user or not user.is_active:
         raise AuthError("inactive", "Учётная запись отключена")
 
+    if stored.platform is None:
+        await merge_browser_sessions(
+            db,
+            user_id=user.id,
+            session_id=stored.session_id,
+            user_agent=stored.user_agent,
+        )
+
     stored.updated_at = now
 
     # Backfill empty activity for sessions opened before register/confirm stamped login.
@@ -196,19 +293,22 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, st
     # Sliding: if less than 30 days remain, issue a new refresh but do not revoke old.
     if jwt_exp - now <= timedelta(days=30):
         access, new_refresh, _ = await create_token_pair(
-            db, user, session_id=stored.session_id,
-            user_agent=stored.user_agent, platform=stored.platform,
+            db,
+            user,
+            session_id=stored.session_id,
+            user_agent=stored.user_agent,
+            platform=stored.platform,
         )
         return access, new_refresh, user
 
-    access = create_access_token(str(user.id), {"role": user.role.value})
+    access = create_access_token(
+        str(user.id), {"role": user.role.value, "sid": str(stored.session_id)}
+    )
     await db.flush()
     return access, refresh_token, user
 
 
-async def change_password(
-    db: AsyncSession, user: User, current: str, new_password: str
-) -> None:
+async def change_password(db: AsyncSession, user: User, current: str, new_password: str) -> None:
     if not verify_password(user.password_hash, current):
         raise AuthError("invalid_password", "Неверный текущий пароль")
     user.password_hash = hash_password(new_password)

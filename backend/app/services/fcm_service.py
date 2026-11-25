@@ -53,6 +53,7 @@ async def upsert_device_token(
     token: str,
     platform: str,
     app_version: str | None = None,
+    session_id: uuid.UUID | None = None,
 ) -> DevicePushToken:
     now = datetime.now(UTC)
     plat = platform.lower().strip()
@@ -65,6 +66,8 @@ async def upsert_device_token(
         existing.user_id = user_id
         existing.platform = plat
         existing.app_version = app_version
+        if session_id is not None:
+            existing.session_id = session_id
         existing.updated_at = now
         return existing
     row = DevicePushToken(
@@ -72,6 +75,7 @@ async def upsert_device_token(
         token=token,
         platform=plat,
         app_version=app_version,
+        session_id=session_id,
         created_at=now,
         updated_at=now,
     )
@@ -96,8 +100,10 @@ async def delete_device_token(db: AsyncSession, *, user_id: uuid.UUID, token: st
 
 async def delete_all_for_user(db: AsyncSession, *, user_id: uuid.UUID) -> None:
     rows = (
-        await db.execute(select(DevicePushToken).where(DevicePushToken.user_id == user_id))
-    ).scalars().all()
+        (await db.execute(select(DevicePushToken).where(DevicePushToken.user_id == user_id)))
+        .scalars()
+        .all()
+    )
     for row in rows:
         await db.delete(row)
 
@@ -164,8 +170,10 @@ async def send_fcm_to_users(
         return 0
 
     rows = (
-        await db.execute(select(DevicePushToken).where(DevicePushToken.user_id.in_(user_ids)))
-    ).scalars().all()
+        (await db.execute(select(DevicePushToken).where(DevicePushToken.user_id.in_(user_ids))))
+        .scalars()
+        .all()
+    )
     if not rows:
         logger.info("FCM skipped: no device tokens for %s recipient(s)", len(user_ids))
         return 0

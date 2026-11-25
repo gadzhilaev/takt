@@ -53,6 +53,9 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          options.headers['X-Client-Platform'] =
+              defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+          options.headers['X-Client-Device-ID'] = await tokens.readOrCreateDeviceId();
           final access = await tokens.readAccess();
           if (access != null && access.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $access';

@@ -7,11 +7,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, verify_csrf
+from app.api.deps import get_current_session_id, get_current_user, verify_csrf
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models.notification import Notification
 from app.models.device_push_token import DevicePushToken
+from app.models.notification import Notification
 from app.models.project import Project
 from app.models.push_subscription import PushSubscription
 from app.models.user import User
@@ -38,17 +38,28 @@ class DeviceTokenIn(BaseModel):
 
 def _browser_label(user_agent: str | None) -> str:
     ua = (user_agent or "").lower()
-    if "edg/" in ua: browser = "Microsoft Edge"
-    elif "firefox/" in ua: browser = "Firefox"
-    elif "chrome/" in ua or "crios/" in ua: browser = "Chrome"
-    elif "safari/" in ua: browser = "Safari"
-    else: browser = "Браузер"
-    if "iphone" in ua or "ipad" in ua: os_name = " · iOS"
-    elif "android" in ua: os_name = " · Android"
-    elif "windows" in ua: os_name = " · Windows"
-    elif "mac os" in ua or "macintosh" in ua: os_name = " · macOS"
-    elif "linux" in ua: os_name = " · Linux"
-    else: os_name = ""
+    if "edg/" in ua:
+        browser = "Microsoft Edge"
+    elif "firefox/" in ua:
+        browser = "Firefox"
+    elif "chrome/" in ua or "crios/" in ua:
+        browser = "Chrome"
+    elif "safari/" in ua:
+        browser = "Safari"
+    else:
+        browser = "Браузер"
+    if "iphone" in ua or "ipad" in ua:
+        os_name = " · iOS"
+    elif "android" in ua:
+        os_name = " · Android"
+    elif "windows" in ua:
+        os_name = " · Windows"
+    elif "mac os" in ua or "macintosh" in ua:
+        os_name = " · macOS"
+    elif "linux" in ua:
+        os_name = " · Linux"
+    else:
+        os_name = ""
     return browser + os_name
 
 
@@ -57,18 +68,41 @@ async def list_push_devices(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    browsers = (await db.execute(select(PushSubscription).where(PushSubscription.user_id == user.id))).scalars().all()
-    apps = (await db.execute(select(DevicePushToken).where(DevicePushToken.user_id == user.id))).scalars().all()
-    return {"items": [
-        *[{
-            "id": str(row.id), "kind": "browser", "label": _browser_label(row.user_agent),
-            "created_at": row.created_at, "last_activity_at": row.updated_at,
-        } for row in browsers],
-        *[{
-            "id": str(row.id), "kind": "app", "label": "Приложение · " + row.platform.capitalize(),
-            "app_version": row.app_version, "created_at": row.created_at, "last_activity_at": row.updated_at,
-        } for row in apps],
-    ]}
+    browsers = (
+        (await db.execute(select(PushSubscription).where(PushSubscription.user_id == user.id)))
+        .scalars()
+        .all()
+    )
+    apps = (
+        (await db.execute(select(DevicePushToken).where(DevicePushToken.user_id == user.id)))
+        .scalars()
+        .all()
+    )
+    return {
+        "items": [
+            *[
+                {
+                    "id": str(row.id),
+                    "kind": "browser",
+                    "label": _browser_label(row.user_agent),
+                    "created_at": row.created_at,
+                    "last_activity_at": row.updated_at,
+                }
+                for row in browsers
+            ],
+            *[
+                {
+                    "id": str(row.id),
+                    "kind": "app",
+                    "label": "Приложение · " + row.platform.capitalize(),
+                    "app_version": row.app_version,
+                    "created_at": row.created_at,
+                    "last_activity_at": row.updated_at,
+                }
+                for row in apps
+            ],
+        ]
+    }
 
 
 @router.delete("/devices/{kind}/{device_id}", dependencies=[Depends(verify_csrf)])
@@ -80,10 +114,16 @@ async def revoke_push_device(
 ):
     model = PushSubscription if kind == "browser" else DevicePushToken if kind == "app" else None
     if model is None:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Устройство не найдено"}})
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "not_found", "message": "Устройство не найдено"}},
+        )
     row = await db.scalar(select(model).where(model.id == device_id, model.user_id == user.id))
     if row is None:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Устройство не найдено"}})
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "not_found", "message": "Устройство не найдено"}},
+        )
     await db.delete(row)
     await db.commit()
     return {"ok": True}
@@ -102,16 +142,18 @@ async def list_notifications(
         q = q.where(Notification.is_read.is_(False))
     total = await db.scalar(select(func.count()).select_from(q.subquery())) or 0
     rows = (
-        await db.execute(
-            q.order_by(Notification.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
+        (
+            await db.execute(
+                q.order_by(Notification.created_at.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     unread = await db.scalar(
-        select(func.count()).where(
-            Notification.user_id == user.id, Notification.is_read.is_(False)
-        )
+        select(func.count()).where(Notification.user_id == user.id, Notification.is_read.is_(False))
     )
     project_ids = {n.project_id for n in rows if n.project_id}
     project_names: dict[uuid.UUID, str] = {}
@@ -148,7 +190,9 @@ async def mark_read(
 ):
     n = await db.get(Notification, notification_id)
     if not n or n.user_id != user.id:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}}
+        )
     n.is_read = True
     await db.commit()
     return {"ok": True}
@@ -188,7 +232,9 @@ async def push_subscribe(
     if not push_service.vapid_configured(settings):
         raise HTTPException(
             status_code=503,
-            detail={"error": {"code": "push_disabled", "message": "Web Push не настроен на сервере"}},
+            detail={
+                "error": {"code": "push_disabled", "message": "Web Push не настроен на сервере"}
+            },
         )
     p256dh = body.keys.get("p256dh")
     auth = body.keys.get("auth")
@@ -205,6 +251,7 @@ async def push_subscribe(
         p256dh=p256dh,
         auth=auth,
         user_agent=ua,
+        session_id=get_current_session_id(request),
     )
     await db.commit()
     return {"ok": True}
@@ -224,6 +271,7 @@ async def push_unsubscribe(
 @router.post("/device-token", dependencies=[Depends(verify_csrf)])
 async def register_device_token(
     body: DeviceTokenIn,
+    request: Request,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -234,6 +282,7 @@ async def register_device_token(
         token=body.token.strip(),
         platform=body.platform,
         app_version=body.app_version,
+        session_id=get_current_session_id(request),
     )
     await db.commit()
     settings = get_settings()
