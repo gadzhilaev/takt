@@ -123,12 +123,16 @@ async def get_attachment(db: AsyncSession, attachment_id: uuid.UUID) -> Attachme
 
 async def list_for_task(db: AsyncSession, task_id: uuid.UUID) -> list[Attachment]:
     rows = (
-        await db.execute(
-            select(Attachment)
-            .where(Attachment.task_id == task_id)
-            .order_by(Attachment.created_at.asc())
+        (
+            await db.execute(
+                select(Attachment)
+                .where(Attachment.task_id == task_id)
+                .order_by(Attachment.created_at.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 

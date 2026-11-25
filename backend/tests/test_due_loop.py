@@ -34,15 +34,23 @@ async def _task_close_to_deadline() -> str:
         db.add(project)
         await db.flush()
         status = TaskStatus(
-            project_id=project.id, name="К выполнению", color="#607FA4",
-            position=0.0, is_done=False,
+            project_id=project.id,
+            name="К выполнению",
+            color="#607FA4",
+            position=0.0,
+            is_done=False,
         )
         db.add(status)
         await db.flush()
         task = Task(
-            project_id=project.id, title="Сдать отчёт", status_id=status.id,
-            priority=TaskPriority.low, author_id=admin.id, position=0.0,
-            due_date=now + timedelta(hours=1), due_basis_at=now - timedelta(days=10),
+            project_id=project.id,
+            title="Сдать отчёт",
+            status_id=status.id,
+            priority=TaskPriority.low,
+            author_id=admin.id,
+            position=0.0,
+            due_date=now + timedelta(hours=1),
+            due_basis_at=now - timedelta(days=10),
         )
         db.add(task)
         await db.commit()

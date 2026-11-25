@@ -20,9 +20,7 @@ async def test_workspace_lists_only_membership_projects(client: AsyncClient):
 
     # Ordinary user creates own non-demo project — admin must not see it in workspace.
     await client.post("/api/v1/auth/logout")
-    reg = await register_verified(
-        client, name="Участник", email="member-iso@example.com"
-    )
+    reg = await register_verified(client, name="Участник", email="member-iso@example.com")
     assert reg["user"]["email"] == "member-iso@example.com"
     foreign = await client.post(
         "/api/v1/projects",

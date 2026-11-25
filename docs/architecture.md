@@ -10,6 +10,7 @@
 | Web | `frontend/` | Лендинг, workspace Kanban, platform admin |
 | Mobile | `mobile/` | iOS/Android + home widgets |
 | Proxy | `deploy/` + Compose `proxy` | TLS; `/` → frontend, `/api` `/ws` → backend |
+| MCP | `backend/app/mcp_server.py`, `backend/app/api/mcp_oauth.py` | Remote Streamable HTTP tools at `/mcp`; OAuth 2.1 + PKCE for ChatGPT, project ACL |
 | DB | PostgreSQL 16 | Volumes с legacy-префиксом `track_*` |
 
 ```mermaid
@@ -71,8 +72,9 @@ sequenceDiagram
 1. **Auth web:** login → cookies + CSRF → mutating requests с заголовком CSRF.
 2. **Auth mobile:** login/OAuth → токены в secure storage → `Authorization: Bearer`.
 3. **Доска:** проекты → statuses → tasks → move/PATCH; realtime через `/ws`.
-4. **Уведомления:** `notify_service` → in-app + опционально Web Push / FCM.
-5. **Демо:** `projects.is_demo` / `users.is_demo`; системный admin без membership demo не видит.
+4. **MCP:** `/mcp` exposes project/task tools over Streamable HTTP; it checks the caller's Takt access JWT or short-lived MCP OAuth token and reuses existing project ACL. OAuth uses authorization code + PKCE and rotating refresh tokens. See [mcp.md](mcp.md).
+5. **Уведомления:** `notify_service` → in-app + опционально Web Push / FCM.
+6. **Демо:** `projects.is_demo` / `users.is_demo`; системный admin без membership demo не видит.
 
 ## Границы ответственности
 

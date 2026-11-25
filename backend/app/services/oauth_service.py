@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import json
 import re
 import secrets
 import time
@@ -68,7 +67,9 @@ class ProviderProfile:
 
 def _pkce_pair() -> tuple[str, str]:
     verifier = secrets.token_urlsafe(64)[:128]
-    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    )
     return verifier, challenge
 
 
@@ -318,9 +319,7 @@ async def start_oauth(
     return {"authorize_url": url, "state": state}
 
 
-async def _consume_state(
-    db: AsyncSession, state: str, provider: OAuthProvider
-) -> OAuthLoginState:
+async def _consume_state(db: AsyncSession, state: str, provider: OAuthProvider) -> OAuthLoginState:
     row = await db.scalar(select(OAuthLoginState).where(OAuthLoginState.state == state))
     if not row or row.provider != provider:
         raise OAuthError("invalid_state", "Неверный state")
@@ -336,8 +335,8 @@ async def _consume_state(
 def _apple_client_secret(settings: Settings) -> str:
     """Build ES256 client_secret JWT for Apple token endpoint."""
     try:
-        from jose import jwt
         from cryptography.hazmat.primitives import serialization
+        from jose import jwt
     except ImportError as e:
         raise OAuthError("apple_deps", "Нужны python-jose и cryptography для Apple ID") from e
 
@@ -396,7 +395,9 @@ async def _exchange_apple(code: str, redirect_uri: str, verifier: str | None) ->
     )
 
 
-async def _exchange_vk(code: str, redirect_uri: str, verifier: str | None, device_id: str | None) -> ProviderProfile:
+async def _exchange_vk(
+    code: str, redirect_uri: str, verifier: str | None, device_id: str | None
+) -> ProviderProfile:
     settings = get_settings()
     data = {
         "grant_type": "authorization_code",
@@ -438,7 +439,9 @@ async def _exchange_vk(code: str, redirect_uri: str, verifier: str | None, devic
                 first = (user_obj.get("first_name") or "").strip()
                 last = (user_obj.get("last_name") or "").strip()
                 display_name = f"{first} {last}".strip() or None
-                raw_avatar = user_obj.get("avatar") or user_obj.get("photo_200") or user_obj.get("photo")
+                raw_avatar = (
+                    user_obj.get("avatar") or user_obj.get("photo_200") or user_obj.get("photo")
+                )
                 if isinstance(raw_avatar, str) and raw_avatar.startswith("http"):
                     avatar = raw_avatar
     if not user_id:
@@ -760,8 +763,10 @@ def _synthetic_email(provider: OAuthProvider, provider_user_id: str) -> str:
     return f"{provider.value}_{safe}@oauth.takt.local"
 
 
-async def _maybe_set_avatar_from_url(user: User, avatar_url: str | None, *, force: bool = False) -> bool:
-    """Download provider photo into local avatar storage. Skip if user already has one (unless force)."""
+async def _maybe_set_avatar_from_url(
+    user: User, avatar_url: str | None, *, force: bool = False
+) -> bool:
+    """Download a provider photo unless the user already has an avatar."""
     if not avatar_url or not avatar_url.startswith(("http://", "https://")):
         return False
     if user.avatar_path and not force:
@@ -837,7 +842,9 @@ async def login_or_register(db: AsyncSession, profile: ProviderProfile) -> tuple
     else:
         email = _synthetic_email(profile.provider, profile.provider_user_id)
 
-    name = profile.display_name or (profile.email.split("@")[0] if profile.email else "Пользователь Takt")
+    name = profile.display_name or (
+        profile.email.split("@")[0] if profile.email else "Пользователь Takt"
+    )
     user = User(
         email=email.lower(),
         password_hash=None,
@@ -877,7 +884,9 @@ async def link_identity(db: AsyncSession, user_id: uuid.UUID, profile: ProviderP
         )
     )
     if taken and taken.user_id != user_id:
-        raise OAuthError("identity_taken", "Этот аккаунт провайдера уже привязан к другому пользователю")
+        raise OAuthError(
+            "identity_taken", "Этот аккаунт провайдера уже привязан к другому пользователю"
+        )
     if taken and taken.user_id == user_id:
         await _maybe_set_avatar_from_url(user, profile.avatar_url)
         return user
@@ -894,9 +903,15 @@ async def link_identity(db: AsyncSession, user_id: uuid.UUID, profile: ProviderP
     return user
 
 
-async def _attach_identity(db: AsyncSession, user_id: uuid.UUID, profile: ProviderProfile) -> UserIdentity:
+async def _attach_identity(
+    db: AsyncSession, user_id: uuid.UUID, profile: ProviderProfile
+) -> UserIdentity:
     # Strip potentially sensitive raw fields — keep only non-secret claims.
-    safe_raw = {k: v for k, v in (profile.raw_claims or {}).items() if k not in ("access_token", "refresh_token")}
+    safe_raw = {
+        k: v
+        for k, v in (profile.raw_claims or {}).items()
+        if k not in ("access_token", "refresh_token")
+    }
     row = UserIdentity(
         id=uuid.uuid4(),
         user_id=user_id,
@@ -915,8 +930,10 @@ async def _attach_identity(db: AsyncSession, user_id: uuid.UUID, profile: Provid
 
 async def list_identities(db: AsyncSession, user_id: uuid.UUID) -> list[dict]:
     rows = (
-        await db.execute(select(UserIdentity).where(UserIdentity.user_id == user_id))
-    ).scalars().all()
+        (await db.execute(select(UserIdentity).where(UserIdentity.user_id == user_id)))
+        .scalars()
+        .all()
+    )
     return [
         {
             "id": str(r.id),
@@ -934,9 +951,12 @@ async def unlink_identity(db: AsyncSession, user: User, identity_id: uuid.UUID) 
     row = await db.get(UserIdentity, identity_id)
     if not row or row.user_id != user.id:
         raise OAuthError("not_found", "Связь не найдена", status_code=404)
-    identity_count = await db.scalar(
-        select(func.count()).select_from(UserIdentity).where(UserIdentity.user_id == user.id)
-    ) or 0
+    identity_count = (
+        await db.scalar(
+            select(func.count()).select_from(UserIdentity).where(UserIdentity.user_id == user.id)
+        )
+        or 0
+    )
     has_password = bool(user.password_hash)
     if identity_count <= 1 and not has_password:
         raise OAuthError(
@@ -949,9 +969,18 @@ async def unlink_identity(db: AsyncSession, user: User, identity_id: uuid.UUID) 
 
 
 async def issue_session(
-    db: AsyncSession, user: User, *, user_agent: str | None = None, platform: str | None = None
+    db: AsyncSession,
+    user: User,
+    *,
+    session_id: uuid.UUID | None = None,
+    user_agent: str | None = None,
+    platform: str | None = None,
 ) -> tuple[str, str]:
     access, refresh, _ = await auth_service.create_token_pair(
-        db, user, user_agent=user_agent, platform=platform
+        db,
+        user,
+        session_id=session_id,
+        user_agent=user_agent,
+        platform=platform,
     )
     return access, refresh

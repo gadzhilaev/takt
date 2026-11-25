@@ -85,9 +85,9 @@ async def test_upload_rejects_over_20mb(admin_client: AsyncClient):
         },
     )
     pid = project.json()["project"]["id"]
-    status_id = (
-        await admin_client.get(f"/api/v1/settings/statuses?project_id={pid}")
-    ).json()["items"][0]["id"]
+    status_id = (await admin_client.get(f"/api/v1/settings/statuses?project_id={pid}")).json()[
+        "items"
+    ][0]["id"]
     uid = (await admin_client.get("/api/v1/auth/me")).json()["user"]["id"]
     task_id = (
         await admin_client.post(

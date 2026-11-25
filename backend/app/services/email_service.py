@@ -23,6 +23,7 @@ def mask_email(address: str | None) -> str:
     local, _, domain = value.partition("@")
     return f"{local[:1]}***@{domain}"
 
+
 _SMTP_BZ_SEND_URL = "https://api.smtp.bz/v1/smtp/send"
 _FROM_RE = re.compile(r"^(?:(.+?)\s*)?<([^>]+)>$")
 
@@ -76,27 +77,27 @@ def _otp_bodies(*, app_name: str, code: str, purpose: str) -> tuple[str, str, st
         "padding:28px 24px;border:1px solid #e6ecef;"
     )
     html_body = (
-        "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"utf-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{subject}</title></head>"
-        f"<body style=\"margin:0;padding:0;background:#f4f7f8;font-family:{font};\">"
-        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" "
-        f"style=\"{wrap}\"><tr><td align=\"center\">"
-        f"<table role=\"presentation\" width=\"100%\" style=\"{card}\">"
-        "<tr><td style=\"font-size:13px;font-weight:600;letter-spacing:0.04em;"
-        "text-transform:uppercase;color:#315f72;padding-bottom:10px;\">"
+        f'<body style="margin:0;padding:0;background:#f4f7f8;font-family:{font};">'
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" '
+        f'style="{wrap}"><tr><td align="center">'
+        f'<table role="presentation" width="100%" style="{card}">'
+        '<tr><td style="font-size:13px;font-weight:600;letter-spacing:0.04em;'
+        'text-transform:uppercase;color:#315f72;padding-bottom:10px;">'
         f"{app_name}</td></tr>"
-        "<tr><td style=\"font-size:22px;font-weight:700;color:#1a2330;"
-        f"padding-bottom:8px;line-height:1.25;\">{heading}</td></tr>"
-        "<tr><td style=\"font-size:14px;line-height:1.5;color:#5b6775;"
-        f"padding-bottom:22px;\">{lead}</td></tr>"
-        "<tr><td align=\"center\" style=\"background:#f4f7f8;border-radius:12px;"
-        "padding:18px 12px;\">"
-        "<span style=\"font-size:32px;letter-spacing:8px;font-weight:700;"
-        f"color:#1a2330;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;\">"
+        '<tr><td style="font-size:22px;font-weight:700;color:#1a2330;'
+        f'padding-bottom:8px;line-height:1.25;">{heading}</td></tr>'
+        '<tr><td style="font-size:14px;line-height:1.5;color:#5b6775;'
+        f'padding-bottom:22px;">{lead}</td></tr>'
+        '<tr><td align="center" style="background:#f4f7f8;border-radius:12px;'
+        'padding:18px 12px;">'
+        '<span style="font-size:32px;letter-spacing:8px;font-weight:700;'
+        f'color:#1a2330;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">'
         f"{code}</span></td></tr>"
-        "<tr><td style=\"font-size:13px;line-height:1.5;color:#8a94a0;"
-        "padding-top:22px;\">"
+        '<tr><td style="font-size:13px;line-height:1.5;color:#8a94a0;'
+        'padding-top:22px;">'
         "Код действует ограниченное время. Если вы не запрашивали его — "
         "просто игнорируйте это письмо.</td></tr>"
         "</table></td></tr></table></body></html>"
@@ -151,9 +152,7 @@ async def _send_via_smtp_bz_api(
     parts: list[str] = []
     for key, value in fields.items():
         parts.append(
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{key}"\r\n\r\n'
-            f"{value}\r\n"
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'
         )
     body = "".join(parts) + f"--{boundary}--\r\n"
 

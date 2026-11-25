@@ -20,12 +20,14 @@ async def test_login_admin(client: AsyncClient):
     assert r.status_code == 200
     data = r.json()
     assert data["user"]["role"] == "admin"
-    assert "access_token" in r.cookies or "access_token" in [c.split("=")[0] for c in r.headers.get_list("set-cookie")]
+    assert "access_token" in r.cookies or "access_token" in [
+        c.split("=")[0] for c in r.headers.get_list("set-cookie")
+    ]
 
 
 @pytest.mark.asyncio
 async def test_member_cannot_admin(client: AsyncClient):
-    login = await client.post(
+    await client.post(
         "/api/v1/auth/login",
         json={"email": "admin@test.com", "password": "Admin123!Test"},
     )

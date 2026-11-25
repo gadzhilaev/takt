@@ -94,7 +94,7 @@ html.dark {
 .platform-admin,
 html.dark .platform-admin {
   color-scheme: light;
-  --background: #f7f8fa;
+  --background: #e9edf2;
   --foreground: #202938;
   --surface: #ffffff;
   --surface-2: #f1f3f5;
@@ -109,7 +109,7 @@ html.dark .platform-admin {
   --danger-soft: #f8e9e8;
   --ring: #315f72;
   color: #202938;
-  background: #f7f8fa;
+  background: #e9edf2;
 }
 
 /* Hard colors — utilities that bake var(--*) still inherit these on the subtree */

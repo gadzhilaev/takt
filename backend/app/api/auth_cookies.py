@@ -1,6 +1,8 @@
 """Shared helpers for web auth cookies and public user payload (used by auth + oauth)."""
 
-from fastapi import Response
+import uuid
+
+from fastapi import Request, Response
 
 from app.api.deps import ACCESS_COOKIE, REFRESH_COOKIE, effective_platform_role
 from app.api.serializers import avatar_url
@@ -8,6 +10,31 @@ from app.core.config import get_settings
 from app.core.csrf import CSRF_COOKIE, generate_csrf_token
 from app.models.user import User
 from app.schemas.auth import UserPublic
+
+DEVICE_ID_COOKIE = "takt_device_id"
+
+
+def resolve_device_session_id(request: Request) -> uuid.UUID:
+    """Use a stable per-installation/browser ID so repeat sign-ins group together."""
+    raw = request.headers.get("x-client-device-id") or request.cookies.get(DEVICE_ID_COOKIE)
+    try:
+        return uuid.UUID(raw) if raw else uuid.uuid4()
+    except (ValueError, TypeError):
+        return uuid.uuid4()
+
+
+def set_device_id_cookie(response: Response, session_id: uuid.UUID) -> None:
+    settings = get_settings()
+    options: dict = {
+        "httponly": True,
+        "secure": settings.COOKIE_SECURE,
+        "samesite": "lax",
+        "path": "/",
+        "max_age": 365 * 24 * 60 * 60,
+    }
+    if settings.COOKIE_DOMAIN:
+        options["domain"] = settings.COOKIE_DOMAIN
+    response.set_cookie(DEVICE_ID_COOKIE, str(session_id), **options)
 
 
 def set_auth_cookies(response: Response, access: str, refresh: str) -> None:

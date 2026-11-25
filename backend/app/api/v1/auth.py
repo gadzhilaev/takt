@@ -6,15 +6,26 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_cookies import set_auth_cookies, user_public
-from app.api.deps import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user, verify_csrf
+from app.api.auth_cookies import (
+    resolve_device_session_id,
+    set_auth_cookies,
+    set_device_id_cookie,
+    user_public,
+)
+from app.api.deps import (
+    ACCESS_COOKIE,
+    REFRESH_COOKIE,
+    get_current_session_id,
+    get_current_user,
+    verify_csrf,
+)
 from app.core.config import get_settings
 from app.core.csrf import CSRF_COOKIE
 from app.core.limiter import limiter
 from app.core.security import decode_token, hash_password, verify_password
 from app.db.session import get_db
-from app.models.email_code import EmailCodePurpose
 from app.models.auth import RefreshToken
+from app.models.email_code import EmailCodePurpose
 from app.models.user import User, UserRole
 from app.schemas.auth import (
     ChangePasswordConfirmRequest,
@@ -55,7 +66,9 @@ async def register_send_code(
     if not (await load_oauth_method_flags(db)).get("email_password", True):
         raise HTTPException(
             status_code=403,
-            detail={"error": {"code": "method_disabled", "message": "Регистрация по email отключена"}},
+            detail={
+                "error": {"code": "method_disabled", "message": "Регистрация по email отключена"}
+            },
         )
     email = str(body.email).lower().strip()
     existing = await db.scalar(select(User).where(User.email == email))
@@ -127,14 +140,20 @@ async def register_confirm(
     # Link pending email invites; membership only after explicit accept on /invite/{token}.
     await invite_service.link_pending_invites_to_user(db, user)
 
+    session_id = resolve_device_session_id(request)
     access, refresh, _ = await auth_service.create_token_pair(
-        db, user, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform")
+        db,
+        user,
+        session_id=session_id,
+        user_agent=request.headers.get("user-agent"),
+        platform=request.headers.get("x-client-platform"),
     )
     from app.services.activity_service import record_activity
 
     await record_activity(db, user.id, "register")
     await db.commit()
     set_auth_cookies(response, access, refresh)
+    set_device_id_cookie(response, session_id)
     return {
         "user": user_public(user),
         "access_token": access,
@@ -186,14 +205,20 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {"code": e.code, "message": e.message}},
         )
+    session_id = resolve_device_session_id(request)
     access, refresh, _ = await auth_service.create_token_pair(
-        db, user, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform")
+        db,
+        user,
+        session_id=session_id,
+        user_agent=request.headers.get("user-agent"),
+        platform=request.headers.get("x-client-platform"),
     )
     from app.services.activity_service import record_activity
 
     await record_activity(db, user.id, "login_email")
     await db.commit()
     set_auth_cookies(response, access, refresh)
+    set_device_id_cookie(response, session_id)
     return {
         "user": user_public(user),
         "access_token": access,
@@ -204,19 +229,27 @@ async def login(
 
 @router.post("/logout")
 async def logout(
+    request: Request,
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     refresh_token: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ):
     # No CSRF: clearing cookies must work when session/CSRF is already dead
     # (client redirect-to-login after failed refresh).
-    if refresh_token:
-        payload = decode_token(refresh_token)
-        if payload and payload.get("jti"):
-            row = await db.scalar(select(RefreshToken).where(RefreshToken.jti == payload["jti"]))
-            if row:
-                await auth_service.revoke_session(db, row.user_id, row.session_id)
-            await db.commit()
+    token = refresh_token
+    if not token:
+        try:
+            body = await request.json()
+            candidate = body.get("refresh_token") if isinstance(body, dict) else None
+            token = candidate.strip() if isinstance(candidate, str) and candidate.strip() else None
+        except Exception:
+            token = None
+    payload = decode_token(token) if token else None
+    if payload and payload.get("type") == "refresh" and payload.get("jti"):
+        row = await db.scalar(select(RefreshToken).where(RefreshToken.jti == payload["jti"]))
+        if row:
+            await auth_service.revoke_session(db, row.user_id, row.session_id)
+        await db.commit()
     from app.core.config import get_settings
 
     cookie_opts: dict = {"path": "/"}
@@ -237,39 +270,62 @@ async def me(user: Annotated[User, Depends(get_current_user)]):
 def _device_label(user_agent: str | None, platform: str | None) -> str:
     if platform:
         value = platform.strip().lower()
-        if value == "ios": return "Приложение · iOS"
-        if value == "android": return "Приложение · Android"
-        if value == "mobile": return "Мобильное приложение"
+        if value == "ios":
+            return "Приложение · iOS"
+        if value == "android":
+            return "Приложение · Android"
+        if value == "mobile":
+            return "Мобильное приложение"
     ua = (user_agent or "").lower()
     browser = "Браузер"
-    if "edg/" in ua: browser = "Microsoft Edge"
-    elif "firefox/" in ua: browser = "Firefox"
-    elif "chrome/" in ua or "crios/" in ua: browser = "Chrome"
-    elif "safari/" in ua: browser = "Safari"
-    if "iphone" in ua or "ipad" in ua: os_name = " · iOS"
-    elif "android" in ua: os_name = " · Android"
-    elif "windows" in ua: os_name = " · Windows"
-    elif "mac os" in ua or "macintosh" in ua: os_name = " · macOS"
-    elif "linux" in ua: os_name = " · Linux"
-    else: os_name = ""
+    if "edg/" in ua:
+        browser = "Microsoft Edge"
+    elif "firefox/" in ua:
+        browser = "Firefox"
+    elif "chrome/" in ua or "crios/" in ua:
+        browser = "Chrome"
+    elif "safari/" in ua:
+        browser = "Safari"
+    if "iphone" in ua or "ipad" in ua:
+        os_name = " · iOS"
+    elif "android" in ua:
+        os_name = " · Android"
+    elif "windows" in ua:
+        os_name = " · Windows"
+    elif "mac os" in ua or "macintosh" in ua:
+        os_name = " · macOS"
+    elif "linux" in ua:
+        os_name = " · Linux"
+    else:
+        os_name = ""
     return browser + os_name
 
 
 @router.get("/sessions")
 async def list_sessions(
+    request: Request,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     refresh_token: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ):
     current_payload = decode_token(refresh_token) if refresh_token else None
     current_jti = current_payload.get("jti") if current_payload else None
-    rows = (await db.execute(
-        select(RefreshToken).where(
-            RefreshToken.user_id == user.id,
-            RefreshToken.revoked_at.is_(None),
-            RefreshToken.expires_at > func.now(),
-        ).order_by(RefreshToken.updated_at.desc())
-    )).scalars().all()
+    current_session_id = get_current_session_id(request)
+    rows = (
+        (
+            await db.execute(
+                select(RefreshToken)
+                .where(
+                    RefreshToken.user_id == user.id,
+                    RefreshToken.revoked_at.is_(None),
+                    RefreshToken.expires_at > func.now(),
+                )
+                .order_by(RefreshToken.updated_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
     grouped: dict[uuid.UUID, tuple[RefreshToken, datetime]] = {}
     for row in rows:
         prev = grouped.get(row.session_id)
@@ -279,13 +335,16 @@ async def list_sessions(
         )
     items = []
     for session_id, (row, created_at) in grouped.items():
-        items.append({
-            "id": str(session_id),
-            "label": _device_label(row.user_agent, row.platform),
-            "created_at": created_at,
-            "last_activity_at": row.updated_at,
-            "is_current": any(r.session_id == session_id and r.jti == current_jti for r in rows),
-        })
+        items.append(
+            {
+                "id": str(session_id),
+                "label": _device_label(row.user_agent, row.platform),
+                "created_at": created_at,
+                "last_activity_at": row.updated_at,
+                "is_current": session_id == current_session_id
+                or any(r.session_id == session_id and r.jti == current_jti for r in rows),
+            }
+        )
     return {"items": sorted(items, key=lambda item: item["last_activity_at"], reverse=True)}
 
 
@@ -296,7 +355,9 @@ async def delete_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if not await auth_service.revoke_session(db, user.id, session_id):
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Сеанс не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Сеанс не найден"}}
+        )
     await db.commit()
     return {"ok": True}
 
@@ -327,9 +388,19 @@ async def refresh(
     try:
         access, new_refresh, user = await auth_service.refresh_session(db, token)
     except auth_service.AuthError as e:
-        raise HTTPException(status_code=401, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=401, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     set_auth_cookies(response, access, new_refresh)
+    if not request.headers.get("x-client-device-id"):
+        refreshed_payload = decode_token(access)
+        raw_session_id = refreshed_payload.get("sid") if refreshed_payload else None
+        try:
+            if raw_session_id:
+                set_device_id_cookie(response, uuid.UUID(raw_session_id))
+        except (ValueError, TypeError):
+            pass
     return {
         "user": user_public(user),
         "access_token": access,

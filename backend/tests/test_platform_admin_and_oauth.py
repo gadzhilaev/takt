@@ -150,3 +150,11 @@ async def test_project_detail_members(admin_client: AsyncClient):
     assert isinstance(body["members"], list)
     assert len(body["members"]) >= 1
     assert "email" in body["members"][0]
+    assert {"active", "done", "archived", "overdue", "blocked", "unassigned"} <= set(
+        body["task_stats"]
+    )
+    assert isinstance(body["statuses"], list) and body["statuses"]
+    assert {"rhythm", "digest", "auto_urgency_from_due"} <= set(body["settings"])
+    assert "digest_subscribed" in body["members"][0]
+    assert body["owner"]["email"] == body["members"][0]["email"]
+    assert "tasks" not in body

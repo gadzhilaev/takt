@@ -212,15 +212,15 @@ async def test_generation_picks_top5_once_per_day(settings, caplog):
     assert second["created"] == 0
     async with TestSession() as db:
         n = await db.scalar(
-            select(func.count()).select_from(RhythmCheckin).where(
-                RhythmCheckin.project_id == w.project_id
-            )
+            select(func.count())
+            .select_from(RhythmCheckin)
+            .where(RhythmCheckin.project_id == w.project_id)
         )
         assert n == 2
         notes = await db.scalar(
-            select(func.count()).select_from(Notification).where(
-                Notification.user_id == w.member.id, Notification.kind == "rhythm_checkin"
-            )
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.user_id == w.member.id, Notification.kind == "rhythm_checkin")
         )
         assert notes == 1
 
@@ -359,9 +359,7 @@ async def test_blocked_cleared_by_in_progress_answer(client, settings, monkeypat
     far = str(w.tasks["far"])
     await client.post(url, headers=h, json={"answers": [{"task_id": far, "answer": "blocked"}]})
     assert (await _task(w.tasks["far"])).blocked_at is not None
-    await client.post(
-        url, headers=h, json={"answers": [{"task_id": far, "answer": "in_progress"}]}
-    )
+    await client.post(url, headers=h, json={"answers": [{"task_id": far, "answer": "in_progress"}]})
     t = await _task(w.tasks["far"])
     assert t.blocked_at is None and t.blocked_reason is None
 
@@ -608,7 +606,11 @@ async def test_manual_start_creates_today_checkin_without_push(client, settings,
     # Same picking as the loop: overdue → nearest deadline → priority, max 5
     t = w.tasks
     assert [i["task_id"] for i in first["items"]] == [
-        str(t["overdue"]), str(t["soon"]), str(t["later"]), str(t["far"]), str(t["urgent"])
+        str(t["overdue"]),
+        str(t["soon"]),
+        str(t["later"]),
+        str(t["far"]),
+        str(t["urgent"]),
     ]
     assert sent == []  # no push for a manual start
 

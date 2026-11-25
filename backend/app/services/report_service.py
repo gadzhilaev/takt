@@ -1,11 +1,11 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.task import ActivityLog, Task, TaskAssignee, TaskPriority
+from app.models.task import ActivityLog, Task, TaskAssignee
 from app.models.team import TaskStatus
 from app.models.user import User
 
@@ -29,7 +29,11 @@ async def report_metrics(
             Task.created_at >= start,
             Task.created_at <= end,
             *(
-                [Task.id.in_(select(TaskAssignee.task_id).where(TaskAssignee.user_id.in_(user_ids)))]
+                [
+                    Task.id.in_(
+                        select(TaskAssignee.task_id).where(TaskAssignee.user_id.in_(user_ids))
+                    )
+                ]
                 if user_ids
                 else []
             ),
@@ -67,11 +71,7 @@ async def report_metrics(
         )
     )
     avg_days = await db.scalar(
-        select(
-            func.avg(
-                func.extract("epoch", Task.closed_at - Task.created_at) / 86400.0
-            )
-        ).where(
+        select(func.avg(func.extract("epoch", Task.closed_at - Task.created_at) / 86400.0)).where(
             Task.deleted_at.is_(None),
             Task.closed_at.isnot(None),
             Task.closed_at >= start,
@@ -90,9 +90,7 @@ async def report_metrics(
         by_status_agg[name] = by_status_agg.get(name, 0) + int(cnt)
     by_status = sorted(by_status_agg.items(), key=lambda x: (-x[1], x[0]))
     by_priority_q = await db.execute(
-        select(Task.priority, func.count())
-        .where(Task.deleted_at.is_(None))
-        .group_by(Task.priority)
+        select(Task.priority, func.count()).where(Task.deleted_at.is_(None)).group_by(Task.priority)
     )
     by_priority = {p.value: c for p, c in by_priority_q.all()}
     return {
@@ -101,18 +99,14 @@ async def report_metrics(
         "in_progress": in_progress,
         "overdue": overdue or 0,
         "avg_days": (
-            round(float(avg_days), 1)
-            if avg_days is not None and (closed or 0) > 0
-            else None
+            round(float(avg_days), 1) if avg_days is not None and (closed or 0) > 0 else None
         ),
         "by_status": by_status,
         "by_priority": by_priority,
     }
 
 
-async def closed_by_day(
-    db: AsyncSession, start: datetime, end: datetime
-) -> list[dict]:
+async def closed_by_day(db: AsyncSession, start: datetime, end: datetime) -> list[dict]:
     day = func.date_trunc("day", Task.closed_at).label("day")
     rows = await db.execute(
         select(day, func.count())
@@ -220,7 +214,9 @@ async def by_employee(db: AsyncSession, start: datetime, end: datetime) -> list[
 async def recent_completed(db: AsyncSession, limit: int = 20) -> list[dict]:
     q = (
         select(Task)
-        .options(selectinload(Task.status), selectinload(Task.assignees).selectinload(TaskAssignee.user))
+        .options(
+            selectinload(Task.status), selectinload(Task.assignees).selectinload(TaskAssignee.user)
+        )
         .where(Task.closed_at.isnot(None), Task.deleted_at.is_(None))
         .order_by(Task.closed_at.desc())
         .limit(limit)
@@ -237,9 +233,7 @@ async def recent_completed(db: AsyncSession, limit: int = 20) -> list[dict]:
     ]
 
 
-async def history_for_export(
-    db: AsyncSession, start: datetime, end: datetime
-) -> list[dict]:
+async def history_for_export(db: AsyncSession, start: datetime, end: datetime) -> list[dict]:
     q = (
         select(ActivityLog)
         .options(selectinload(ActivityLog.task), selectinload(ActivityLog.user))

@@ -56,7 +56,9 @@ class UserIdentity(Base, TimestampMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    provider: Mapped[OAuthProvider] = mapped_column(Enum(OAuthProvider, name="oauth_provider"), nullable=False)
+    provider: Mapped[OAuthProvider] = mapped_column(
+        Enum(OAuthProvider, name="oauth_provider"), nullable=False
+    )
     provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -64,7 +66,7 @@ class UserIdentity(Base, TimestampMixin):
     raw_claims: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    user: Mapped["User"] = relationship(back_populates="identities")
+    user: Mapped[User] = relationship(back_populates="identities")
 
 
 class OAuthLoginState(Base):
@@ -74,11 +76,15 @@ class OAuthLoginState(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     state: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
-    provider: Mapped[OAuthProvider] = mapped_column(Enum(OAuthProvider, name="oauth_provider", create_type=False), nullable=False)
+    provider: Mapped[OAuthProvider] = mapped_column(
+        Enum(OAuthProvider, name="oauth_provider", create_type=False), nullable=False
+    )
     code_verifier: Mapped[str | None] = mapped_column(String(128), nullable=True)
     nonce: Mapped[str | None] = mapped_column(String(128), nullable=True)
     redirect_uri: Mapped[str] = mapped_column(String(500), nullable=False)
-    client_kind: Mapped[str] = mapped_column(String(32), default="web", nullable=False)  # web | mobile
+    client_kind: Mapped[str] = mapped_column(
+        String(32), default="web", nullable=False
+    )  # web | mobile
     # Relative post-login path, e.g. /invite/{token} or /app/projects/{id}.
     return_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     link_user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -102,7 +108,9 @@ class UserBlock(Base, TimestampMixin):
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     lifted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    lifted_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    lifted_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
 
 class ProjectRestriction(Base, TimestampMixin):
@@ -112,10 +120,15 @@ class ProjectRestriction(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), unique=True, nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
     )
     reason: Mapped[str] = mapped_column(Text, nullable=False)
-    created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     lifted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -143,9 +156,13 @@ class ModerationReport(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    decided_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    decided_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # optimistic concurrency
+    version: Mapped[int] = mapped_column(
+        Integer, default=1, nullable=False
+    )  # optimistic concurrency
 
 
 class ModerationAction(Base):
@@ -155,7 +172,9 @@ class ModerationAction(Base):
     report_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("moderation_reports.id", ondelete="CASCADE"), index=True
     )
-    actor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    actor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -166,7 +185,9 @@ class PlatformSetting(Base, TimestampMixin):
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
 
 class UserActivityEvent(Base):
@@ -181,7 +202,9 @@ class UserActivityEvent(Base):
     )
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
 
 
 class AdminMfaSecret(Base, TimestampMixin):

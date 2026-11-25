@@ -1,13 +1,12 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.task import (
     ActivityLog,
-    ChecklistItem,
     Comment,
     Label,
     Task,
@@ -66,15 +65,19 @@ async def apply_status_change(db: AsyncSession, task: Task, new_status: TaskStat
 
 
 def task_query_base():
-    return select(Task).options(
-        selectinload(Task.status),
-        selectinload(Task.author),
-        selectinload(Task.assignees).selectinload(TaskAssignee.user),
-        selectinload(Task.labels).selectinload(TaskLabel.label),
-        selectinload(Task.checklist_items),
-        selectinload(Task.attachments),
-        selectinload(Task.blocked_by),
-    ).where(Task.deleted_at.is_(None))
+    return (
+        select(Task)
+        .options(
+            selectinload(Task.status),
+            selectinload(Task.author),
+            selectinload(Task.assignees).selectinload(TaskAssignee.user),
+            selectinload(Task.labels).selectinload(TaskLabel.label),
+            selectinload(Task.checklist_items),
+            selectinload(Task.attachments),
+            selectinload(Task.blocked_by),
+        )
+        .where(Task.deleted_at.is_(None))
+    )
 
 
 async def list_tasks(
@@ -138,11 +141,7 @@ async def list_tasks(
 async def get_task(db: AsyncSession, task_id: uuid.UUID) -> Task | None:
     # populate_existing: after delete/replace of assignees/labels in the same session,
     # selectinload would otherwise reuse a stale empty collection from the identity map.
-    q = (
-        task_query_base()
-        .where(Task.id == task_id)
-        .execution_options(populate_existing=True)
-    )
+    q = task_query_base().where(Task.id == task_id).execution_options(populate_existing=True)
     result = await db.execute(q)
     return result.scalar_one_or_none()
 

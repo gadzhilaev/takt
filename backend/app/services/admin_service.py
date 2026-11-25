@@ -37,8 +37,10 @@ async def audit(
 
 
 async def count_active_admins(db: AsyncSession, exclude_id: uuid.UUID | None = None) -> int:
-    q = select(func.count()).select_from(User).where(
-        User.role == UserRole.admin, User.is_active.is_(True)
+    q = (
+        select(func.count())
+        .select_from(User)
+        .where(User.role == UserRole.admin, User.is_active.is_(True))
     )
     if exclude_id:
         q = q.where(User.id != exclude_id)
@@ -113,14 +115,15 @@ async def delete_user(
         .where(TaskAssignee.user_id == target.id, Task.deleted_at.is_(None))
     )
     author_count = await db.scalar(
-        select(func.count()).select_from(Task).where(
-            Task.author_id == target.id, Task.deleted_at.is_(None)
-        )
+        select(func.count())
+        .select_from(Task)
+        .where(Task.author_id == target.id, Task.deleted_at.is_(None))
     )
     if (task_count or author_count) and not reassign_to:
         raise AdminError(
             "has_tasks",
-            "У пользователя есть задачи. Укажите пользователя для переназначения или отключите его.",
+            "У пользователя есть задачи. Укажите пользователя для переназначения "
+            "или отключите его.",
         )
     if reassign_to:
         reassign_user = await db.get(User, reassign_to)
@@ -132,9 +135,7 @@ async def delete_user(
             .values(user_id=reassign_to)
         )
         await db.execute(
-            Task.__table__.update()
-            .where(Task.author_id == target.id)
-            .values(author_id=reassign_to)
+            Task.__table__.update().where(Task.author_id == target.id).values(author_id=reassign_to)
         )
     uid = target.id
     await db.execute(delete(User).where(User.id == uid))

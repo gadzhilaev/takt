@@ -29,7 +29,6 @@ class _BoardPageState extends State<BoardPage> {
   KanbanDragEdgeScroll? _edgeScroll;
   int _pageIndex = 0;
   bool _bootstrapped = false;
-  bool _dragging = false;
 
   final _newColumnName = TextEditingController();
   final _newColumnFocus = FocusNode();
@@ -83,7 +82,6 @@ class _BoardPageState extends State<BoardPage> {
   }
 
   void _setDragging(bool value) {
-    setState(() => _dragging = value);
     if (!value) _edgeScroll?.stop();
   }
 
@@ -294,9 +292,9 @@ class _BoardPageState extends State<BoardPage> {
                         controller: _pageController,
                         itemCount: pages,
                         padEnds: false,
-                        physics: _dragging
-                            ? const NeverScrollableScrollPhysics()
-                            : const KanbanPagePhysics(parent: ClampingScrollPhysics()),
+                        // Keep the pager gesture arena active: a second finger can
+                        // swipe columns while the first finger carries a task.
+                        physics: const KanbanPagePhysics(parent: ClampingScrollPhysics()),
                         onPageChanged: (i) {
                           setState(() {
                             _pageIndex = i;

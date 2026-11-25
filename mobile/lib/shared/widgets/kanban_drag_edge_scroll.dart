@@ -10,17 +10,20 @@ class KanbanDragEdgeScroll {
     required this.controller,
     required this.pageCount,
     this.edgePx = 56,
-    this.stepInterval = const Duration(milliseconds: 380),
+    this.edgeDwell = const Duration(milliseconds: 260),
+    this.animationDuration = const Duration(milliseconds: 240),
   });
 
   final PageController controller;
   final int pageCount;
   final double edgePx;
-  final Duration stepInterval;
+  final Duration edgeDwell;
+  final Duration animationDuration;
 
   Timer? _timer;
   int _dir = 0;
   bool _animating = false;
+  bool _armed = true;
 
   void onPointer(Offset global, BuildContext pagerContext) {
     if (pageCount <= 1) return;
@@ -38,9 +41,12 @@ class KanbanDragEdgeScroll {
     _dir = dir;
     _timer?.cancel();
     _timer = null;
-    if (dir == 0) return;
-    _step();
-    _timer = Timer.periodic(stepInterval, (_) => _step());
+    if (dir == 0) {
+      _armed = true;
+      return;
+    }
+    if (!_armed) return;
+    _timer = Timer(edgeDwell, _step);
   }
 
   void stop() {
@@ -48,6 +54,7 @@ class KanbanDragEdgeScroll {
     _timer?.cancel();
     _timer = null;
     _animating = false;
+    _armed = true;
   }
 
   void dispose() => stop();
@@ -57,11 +64,12 @@ class KanbanDragEdgeScroll {
     final page = controller.page?.round() ?? controller.initialPage;
     final next = (page + _dir).clamp(0, pageCount - 1);
     if (next == page) return;
+    _armed = false;
     _animating = true;
     controller
         .animateToPage(
           next,
-          duration: const Duration(milliseconds: 260),
+          duration: animationDuration,
           curve: Curves.easeOutCubic,
         )
         .whenComplete(() => _animating = false);

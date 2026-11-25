@@ -9,7 +9,9 @@ async def _login(client: AsyncClient, email: str, password: str) -> None:
     assert r.status_code == 200, r.text
 
 
-async def _register(client: AsyncClient, name: str, email: str, password: str = "SecurePass123!") -> dict:
+async def _register(
+    client: AsyncClient, name: str, email: str, password: str = "SecurePass123!"
+) -> dict:
     data = await register_verified(client, name=name, email=email, password=password)
     return data["user"]
 

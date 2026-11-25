@@ -161,24 +161,32 @@ async def decline_invite(db: AsyncSession, invite: ProjectInvite, user: User) ->
 
 async def list_pending_for_user(db: AsyncSession, user: User) -> list[ProjectInvite]:
     rows = (
-        await db.execute(
-            select(ProjectInvite).where(
-                ProjectInvite.email == user.email.lower(),
-                ProjectInvite.status == ProjectInviteStatus.pending,
+        (
+            await db.execute(
+                select(ProjectInvite).where(
+                    ProjectInvite.email == user.email.lower(),
+                    ProjectInvite.status == ProjectInviteStatus.pending,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
 async def list_project_invites(db: AsyncSession, project_id: uuid.UUID) -> list[ProjectInvite]:
     rows = (
-        await db.execute(
-            select(ProjectInvite)
-            .where(ProjectInvite.project_id == project_id)
-            .order_by(ProjectInvite.created_at.desc())
+        (
+            await db.execute(
+                select(ProjectInvite)
+                .where(ProjectInvite.project_id == project_id)
+                .order_by(ProjectInvite.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 

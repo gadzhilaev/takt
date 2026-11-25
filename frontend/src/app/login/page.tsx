@@ -119,10 +119,11 @@ function LoginForm() {
           {emailPassword ? (
             <form
               className="space-y-3.5"
-              method="post"
-              action="#"
               noValidate
-              onSubmit={form.handleSubmit(onSubmit)}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void form.handleSubmit(onSubmit)(event);
+              }}
             >
               <div>
                 <label className="label-text" htmlFor="login-email">

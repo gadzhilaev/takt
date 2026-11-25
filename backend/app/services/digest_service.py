@@ -30,8 +30,8 @@ from sqlalchemy.orm import selectinload
 from app.core.config import Settings, get_settings
 from app.db.session import AsyncSessionLocal
 from app.models.digest import DigestDelivery
-from app.models.push_subscription import PushSubscription
 from app.models.project import Project, ProjectMember, ProjectMemberRole
+from app.models.push_subscription import PushSubscription
 from app.models.rhythm import CheckinStatus, RhythmCheckin
 from app.models.task import ActivityLog, Task, TaskAssignee
 from app.models.team import TaskStatus
@@ -580,9 +580,12 @@ async def deliver_digest(
                 )
                 if fcm_accepted:
                     channels.add("fcm")
-            delivery.channels = ",".join(
-                channel for channel in ("in_app", "web_push", "fcm") if channel in channels
-            ) or "in_app"
+            delivery.channels = (
+                ",".join(
+                    channel for channel in ("in_app", "web_push", "fcm") if channel in channels
+                )
+                or "in_app"
+            )
         if push and settings.DIGEST_EMAIL_ENABLED and "email" not in channels:
             from app.services import email_service
 
@@ -594,11 +597,12 @@ async def deliver_digest(
                 channels.add("email")
             except Exception:  # noqa: BLE001 — a failed letter must not block in-app/push
                 logger.exception("digest email failed for project %s", project.id)
-        delivery.channels = ",".join(
-            channel
-            for channel in ("in_app", "web_push", "fcm", "email")
-            if channel in channels
-        ) or "in_app"
+        delivery.channels = (
+            ",".join(
+                channel for channel in ("in_app", "web_push", "fcm", "email") if channel in channels
+            )
+            or "in_app"
+        )
         sent += int(created)
     return sent
 

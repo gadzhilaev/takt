@@ -47,6 +47,7 @@ async def list_users(
 ):
     """List active users. Optional q filters by name/email; exclude_project_id hides members."""
     from sqlalchemy import or_
+
     from app.models.project import ProjectMember
 
     stmt = select(User).where(User.is_active.is_(True))
@@ -57,7 +58,9 @@ async def list_users(
         needle = f"%{q.strip().lower()}%"
         stmt = stmt.where(or_(User.name.ilike(needle), User.email.ilike(needle)))
     if exclude_project_id is not None:
-        member_ids = select(ProjectMember.user_id).where(ProjectMember.project_id == exclude_project_id)
+        member_ids = select(ProjectMember.user_id).where(
+            ProjectMember.project_id == exclude_project_id
+        )
         stmt = stmt.where(User.id.not_in(member_ids))
     users = (await db.execute(stmt.order_by(User.name).limit(50))).scalars().all()
     return {"items": [_public(u) for u in users]}

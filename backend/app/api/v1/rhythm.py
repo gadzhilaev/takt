@@ -56,14 +56,18 @@ def _http(e: RhythmError) -> HTTPException:
 async def _checkin_out(db: AsyncSession, checkin: RhythmCheckin) -> dict:
     project = await db.get(Project, checkin.project_id)
     task_ids = [i.task_id for i in checkin.items]
-    tasks = {
-        t.id: t
-        for t in (
-            await db.execute(
-                select(Task).options(selectinload(Task.status)).where(Task.id.in_(task_ids))
-            )
-        ).scalars()
-    } if task_ids else {}
+    tasks = (
+        {
+            t.id: t
+            for t in (
+                await db.execute(
+                    select(Task).options(selectinload(Task.status)).where(Task.id.in_(task_ids))
+                )
+            ).scalars()
+        }
+        if task_ids
+        else {}
+    )
     items = []
     for i in checkin.items:
         t = tasks.get(i.task_id)
@@ -128,18 +132,22 @@ async def current_checkins(
         return {"checkins": [], "pending": 0, "startable_project_ids": []}
     since = (datetime.now(UTC) - timedelta(days=2)).date()
     rows = (
-        await db.execute(
-            select(RhythmCheckin)
-            .options(selectinload(RhythmCheckin.items))
-            .where(
-                RhythmCheckin.user_id == user.id,
-                RhythmCheckin.project_id.in_(project_ids),
-                RhythmCheckin.date >= since,
-                RhythmCheckin.status != CheckinStatus.skipped.value,
+        (
+            await db.execute(
+                select(RhythmCheckin)
+                .options(selectinload(RhythmCheckin.items))
+                .where(
+                    RhythmCheckin.user_id == user.id,
+                    RhythmCheckin.project_id.in_(project_ids),
+                    RhythmCheckin.date >= since,
+                    RhythmCheckin.status != CheckinStatus.skipped.value,
+                )
+                .order_by(RhythmCheckin.created_at.desc())
             )
-            .order_by(RhythmCheckin.created_at.desc())
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     out: list[dict] = []
     for c in rows:
         project = await db.get(Project, c.project_id)
@@ -170,14 +178,18 @@ async def checkin_history(
     if not project_ids:
         return {"items": []}
     rows = (
-        await db.execute(
-            select(RhythmCheckin)
-            .options(selectinload(RhythmCheckin.items))
-            .where(RhythmCheckin.user_id == user.id, RhythmCheckin.project_id.in_(project_ids))
-            .order_by(RhythmCheckin.date.desc(), RhythmCheckin.created_at.desc())
-            .limit(limit)
+        (
+            await db.execute(
+                select(RhythmCheckin)
+                .options(selectinload(RhythmCheckin.items))
+                .where(RhythmCheckin.user_id == user.id, RhythmCheckin.project_id.in_(project_ids))
+                .order_by(RhythmCheckin.date.desc(), RhythmCheckin.created_at.desc())
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return {"items": [await _checkin_out(db, c) for c in rows]}
 
 
@@ -260,9 +272,7 @@ async def push_answer(
     Authorized by the one-time token from the push payload: only this check-in, only today.
     """
     try:
-        checkin, user = await rhythm_service.checkin_by_push_token(
-            db, body.checkin_id, body.token
-        )
+        checkin, user = await rhythm_service.checkin_by_push_token(db, body.checkin_id, body.token)
         applied = await rhythm_service.answer_checkin(
             db,
             user=user,
@@ -274,4 +284,3 @@ async def push_answer(
         raise _http(e) from e
     await _commit_and_broadcast(db, applied)
     return {"ok": True, "status": checkin.status}
-

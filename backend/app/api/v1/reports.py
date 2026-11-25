@@ -2,17 +2,15 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import Response
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.task import Task, TaskAssignee
 from app.models.team import TeamSettings
 from app.models.user import User
+from app.services import task_service
 from app.services.excel_export import build_report_workbook
 from app.services.report_service import (
     by_employee,
@@ -22,7 +20,6 @@ from app.services.report_service import (
     recent_completed,
     report_metrics,
 )
-from app.services import task_service
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 

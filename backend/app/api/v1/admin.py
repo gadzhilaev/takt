@@ -77,7 +77,9 @@ async def create_user(
             must_change_password=body.must_change_password,
         )
     except admin_service.AdminError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     return UserCreateResult(user=_admin_user(user), temporary_password=temp)
 
@@ -91,13 +93,20 @@ async def update_user(
 ):
     target = await db.get(User, user_id)
     if not target:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}}
+        )
     if body.role == UserRole.member and target.role == UserRole.admin and target.id != admin.id:
         others = await admin_service.count_active_admins(db, exclude_id=target.id)
         if target.is_active and others < 1:
             raise HTTPException(
                 status_code=400,
-                detail={"error": {"code": "last_admin", "message": "Нельзя понизить последнего администратора"}},
+                detail={
+                    "error": {
+                        "code": "last_admin",
+                        "message": "Нельзя понизить последнего администратора",
+                    }
+                },
             )
     if body.role == UserRole.member and target.id == admin.id:
         raise HTTPException(
@@ -124,7 +133,9 @@ async def reset_password(
 ):
     target = await db.get(User, user_id)
     if not target:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}}
+        )
     temp: str | None = None
     pwd = body.password
     if body.generate or not pwd:
@@ -145,11 +156,15 @@ async def deactivate(
 ):
     target = await db.get(User, user_id)
     if not target:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}}
+        )
     try:
         await admin_service.deactivate_user(db, admin, target)
     except admin_service.AdminError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     return {"user": _admin_user(target)}
 
@@ -162,7 +177,9 @@ async def activate(
 ):
     target = await db.get(User, user_id)
     if not target:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}}
+        )
     await admin_service.activate_user(db, admin, target)
     await db.commit()
     return {"user": _admin_user(target)}
@@ -177,11 +194,15 @@ async def delete_user(
 ):
     target = await db.get(User, user_id)
     if not target:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}}
+        )
     try:
         await admin_service.delete_user(db, admin, target, reassign_to)
     except admin_service.AdminError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     return {"ok": True}
 
@@ -237,18 +258,24 @@ async def audit_log(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     logs = (
-        await db.execute(select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc()).limit(200))
-    ).scalars().all()
+        (
+            await db.execute(
+                select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc()).limit(200)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return {
         "items": [
             {
-                "id": str(l.id),
-                "admin_id": str(l.admin_id),
-                "target_user_id": str(l.target_user_id) if l.target_user_id else None,
-                "action": l.action,
-                "details": l.details,
-                "created_at": l.created_at,
+                "id": str(log.id),
+                "admin_id": str(log.admin_id),
+                "target_user_id": str(log.target_user_id) if log.target_user_id else None,
+                "action": log.action,
+                "details": log.details,
+                "created_at": log.created_at,
             }
-            for l in logs
+            for log in logs
         ]
     }

@@ -110,7 +110,9 @@ async def test_verify_accepts_valid_token_with_mocked_jwks(rsa_pair):
     async def fake_fetch(*, force: bool = False):
         return {"keys": [jwk]}
 
-    with patch("app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)):
+    with patch(
+        "app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)
+    ):
         claims = await verify_apple_id_token(token, settings=settings)
     assert claims["sub"] == "001234.abcdef.0100"
     assert claims["email"] == "reviewer@privaterelay.appleid.com"
@@ -130,7 +132,9 @@ async def test_verify_rejects_wrong_signature(rsa_pair):
     async def fake_fetch(*, force: bool = False):
         return {"keys": [jwk]}
 
-    with patch("app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)):
+    with patch(
+        "app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)
+    ):
         with pytest.raises(OAuthError) as ei:
             await verify_apple_id_token(token, settings=Settings())
     assert ei.value.code == "bad_token"
@@ -144,7 +148,9 @@ async def test_verify_rejects_wrong_audience(rsa_pair):
     async def fake_fetch(*, force: bool = False):
         return {"keys": [jwk]}
 
-    with patch("app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)):
+    with patch(
+        "app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)
+    ):
         with pytest.raises(OAuthError) as ei:
             await verify_apple_id_token(token, settings=Settings())
     assert ei.value.code == "bad_token"
@@ -158,7 +164,9 @@ async def test_verify_rejects_expired(rsa_pair):
     async def fake_fetch(*, force: bool = False):
         return {"keys": [jwk]}
 
-    with patch("app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)):
+    with patch(
+        "app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)
+    ):
         with pytest.raises(OAuthError) as ei:
             await verify_apple_id_token(token, settings=Settings())
     assert ei.value.code == "bad_token"
@@ -172,7 +180,9 @@ async def test_verify_nonce_optional_but_checked_when_sent(rsa_pair):
     async def fake_fetch(*, force: bool = False):
         return {"keys": [jwk]}
 
-    with patch("app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)):
+    with patch(
+        "app.services.oauth_service._fetch_apple_jwks", new=AsyncMock(side_effect=fake_fetch)
+    ):
         # build 11: no nonce → ok
         ok = await verify_apple_id_token(token, settings=Settings())
         assert ok["sub"]

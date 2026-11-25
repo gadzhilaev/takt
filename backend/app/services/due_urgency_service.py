@@ -69,7 +69,7 @@ async def apply_auto_urgency(
     *,
     now: datetime | None = None,
 ) -> int:
-    """Bump priorities for open tasks in projects with auto_urgency_from_due. Returns count changed."""
+    """Bump priorities for open tasks with automatic due-date urgency."""
     now = now or datetime.now(UTC)
     if now.tzinfo is None:
         now = now.replace(tzinfo=UTC)

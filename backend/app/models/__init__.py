@@ -4,6 +4,7 @@ from app.models.digest import DigestDelivery
 from app.models.email_code import EmailCode, EmailCodePurpose
 from app.models.invite import ProjectInvite, ProjectInviteStatus
 from app.models.leave_request import ProjectLeaveRequest, ProjectLeaveRequestStatus
+from app.models.mcp_oauth import MCPAuthorizationCode, MCPOAuthClient, MCPRefreshGrant
 from app.models.notification import Notification
 from app.models.platform import (
     AdminMfaSecret,
@@ -19,8 +20,8 @@ from app.models.platform import (
     UserBlock,
     UserIdentity,
 )
-from app.models.push_subscription import PushSubscription
 from app.models.project import Project, ProjectMember, ProjectMemberRole
+from app.models.push_subscription import PushSubscription
 from app.models.rhythm import CheckinAnswer, CheckinStatus, RhythmCheckin, RhythmCheckinItem
 from app.models.task import (
     ActivityLog,
@@ -82,4 +83,7 @@ __all__ = [
     "CheckinStatus",
     "CheckinAnswer",
     "DigestDelivery",
+    "MCPOAuthClient",
+    "MCPAuthorizationCode",
+    "MCPRefreshGrant",
 ]

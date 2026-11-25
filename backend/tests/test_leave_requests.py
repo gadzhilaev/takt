@@ -54,17 +54,13 @@ async def test_leave_request_and_owner_remove(admin_client: AsyncClient):
         assert listed.status_code == 200
         assert any(i["id"] == req_id for i in listed.json()["items"])
 
-        reject = await admin_client.post(
-            f"/api/v1/projects/{pid}/leave-requests/{req_id}/reject"
-        )
+        reject = await admin_client.post(f"/api/v1/projects/{pid}/leave-requests/{req_id}/reject")
         assert reject.status_code == 200, reject.text
 
         leave2 = await member.post(f"/api/v1/projects/{pid}/leave-requests")
         assert leave2.status_code == 200, leave2.text
         req2 = leave2.json()["request"]["id"]
-        approve = await admin_client.post(
-            f"/api/v1/projects/{pid}/leave-requests/{req2}/approve"
-        )
+        approve = await admin_client.post(f"/api/v1/projects/{pid}/leave-requests/{req2}/approve")
         assert approve.status_code == 200, approve.text
 
         projects = await member.get("/api/v1/projects")

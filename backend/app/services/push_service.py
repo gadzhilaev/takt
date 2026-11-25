@@ -28,6 +28,7 @@ async def upsert_subscription(
     p256dh: str,
     auth: str,
     user_agent: str | None,
+    session_id: uuid.UUID | None = None,
 ) -> PushSubscription:
     now = datetime.now(UTC)
     existing = (
@@ -38,6 +39,8 @@ async def upsert_subscription(
         existing.p256dh = p256dh
         existing.auth = auth
         existing.user_agent = user_agent
+        if session_id is not None:
+            existing.session_id = session_id
         existing.updated_at = now
         return existing
     row = PushSubscription(
@@ -46,6 +49,7 @@ async def upsert_subscription(
         p256dh=p256dh,
         auth=auth,
         user_agent=user_agent,
+        session_id=session_id,
         created_at=now,
         updated_at=now,
     )
@@ -88,8 +92,10 @@ async def send_push_to_users(
         return 0
 
     rows = (
-        await db.execute(select(PushSubscription).where(PushSubscription.user_id.in_(user_ids)))
-    ).scalars().all()
+        (await db.execute(select(PushSubscription).where(PushSubscription.user_id.in_(user_ids))))
+        .scalars()
+        .all()
+    )
     if not rows:
         logger.info("Web Push skipped: no subscriptions for %s recipient(s)", len(user_ids))
         return 0

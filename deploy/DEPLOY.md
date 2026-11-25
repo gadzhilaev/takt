@@ -73,6 +73,7 @@ A-запись домена → IP VPS. Переменные: [`.env.example`](.
 | `DEBUG` | `false` |
 | `COOKIE_SECURE` | `true` |
 | `CORS_ORIGINS` | `https://taktapp.ru` (ваш HTTPS origin) |
+| `APP_PUBLIC_URL` | `https://taktapp.ru` (OAuth discovery, issuer and MCP resource URL) |
 | `SEED_DEMO_DATA` | `false` |
 | `NEXT_PUBLIC_API_URL` | пусто (same-origin `/api`) |
 | `NEXT_PUBLIC_WS_URL` | `wss://taktapp.ru/ws` |

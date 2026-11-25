@@ -13,7 +13,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_cookies import set_auth_cookies, user_public
+from app.api.auth_cookies import (
+    resolve_device_session_id,
+    set_auth_cookies,
+    set_device_id_cookie,
+    user_public,
+)
 from app.api.deps import get_current_user, get_current_user_optional, verify_csrf
 from app.core.config import get_settings
 from app.core.limiter import limiter
@@ -81,12 +86,16 @@ async def oauth_start(
     request: Request,
     provider: Literal["apple", "vk", "yandex"],
     db: Annotated[AsyncSession, Depends(get_db)],
+    response: Response,
     redirect_uri: str | None = None,
     client: Literal["web", "mobile"] = "web",
     link: bool = False,
     next: str | None = Query(default=None, alias="next"),
     user: Annotated[User | None, Depends(get_current_user_optional)] = None,
 ):
+    device_session_id = resolve_device_session_id(request)
+    if client == "web":
+        set_device_id_cookie(response, device_session_id)
     settings = get_settings()
     # VK/Yandex consoles only allow HTTPS callbacks. Mobile always uses HTTPS;
     # /callback then bounces to takt:// for ASWebAuthenticationSession.
@@ -103,7 +112,9 @@ async def oauth_start(
     if link and not user:
         raise HTTPException(
             status_code=401,
-            detail={"error": {"code": "unauthorized", "message": "Войдите, чтобы привязать аккаунт"}},
+            detail={
+                "error": {"code": "unauthorized", "message": "Войдите, чтобы привязать аккаунт"}
+            },
         )
     try:
         started = await oauth_service.start_oauth(
@@ -127,7 +138,9 @@ _OAUTH_ERROR_RU: dict[str, str] = {
     "state_reuse": "Этот вход уже был использован. Начните заново.",
     "provider_disabled": "Этот способ входа сейчас недоступен.",
     "access_denied": "Вход отменён.",
-    "email_owned": "Email уже занят. Войдите в существующий аккаунт и привяжите провайдера в профиле.",
+    "email_owned": (
+        "Email уже занят. Войдите в существующий аккаунт и привяжите провайдера в профиле."
+    ),
     "vk_token": "Не удалось войти через VK ID. Попробуйте ещё раз.",
     "yandex_token": "Не удалось войти через Яндекс ID. Попробуйте ещё раз.",
     "apple_token": "Не удалось войти через Apple. Попробуйте ещё раз.",
@@ -135,7 +148,11 @@ _OAUTH_ERROR_RU: dict[str, str] = {
 
 
 def _login_error_redirect(settings, *, code: str, message: str | None = None) -> RedirectResponse:
-    text = (message or "").strip() or _OAUTH_ERROR_RU.get(code) or "Не удалось выполнить вход. Попробуйте ещё раз."
+    text = (
+        (message or "").strip()
+        or _OAUTH_ERROR_RU.get(code)
+        or "Не удалось выполнить вход. Попробуйте ещё раз."
+    )
     q = urlencode({"oauth_error": code, "message": text})
     return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
 
@@ -155,9 +172,15 @@ async def _finish_web(
             db, provider, code=code, state=state, device_id=device_id
         )
         access, refresh = await oauth_service.issue_session(
-            db, user, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform")
+            db,
+            user,
+            session_id=resolve_device_session_id(request),
+            user_agent=request.headers.get("user-agent"),
+            platform=request.headers.get("x-client-platform"),
         )
-        await record_activity(db, user.id, "login_oauth", {"provider": provider.value, "created": created})
+        await record_activity(
+            db, user.id, "login_oauth", {"provider": provider.value, "created": created}
+        )
         await db.commit()
     except oauth_service.OAuthError as e:
         await db.rollback()
@@ -167,6 +190,7 @@ async def _finish_web(
     dest = return_path or "/app/projects"
     redirect = RedirectResponse(f"{settings.APP_PUBLIC_URL}{dest}", status_code=302)
     set_auth_cookies(redirect, access, refresh)
+    set_device_id_cookie(redirect, resolve_device_session_id(request))
     return redirect
 
 
@@ -215,7 +239,7 @@ async def oauth_callback_get(
     device_id: str | None = None,
     provider: Literal["apple", "vk", "yandex"] | None = Query(default=None),
 ):
-    """VK / Yandex redirect here with code+state (no provider query). Resolve provider from state."""
+    """Resolve the VK/Yandex callback provider from the code and state."""
     settings = get_settings()
     row = await _oauth_state_row(db, state) if state else None
     if row and row.client_kind == "mobile":
@@ -234,7 +258,9 @@ async def oauth_callback_get(
         return _mobile_deep_link_bounce(code=code, state=state, device_id=device_id)
 
     if error:
-        return _login_error_redirect(settings, code=str(error), message=_OAUTH_ERROR_RU.get(str(error)))
+        return _login_error_redirect(
+            settings, code=str(error), message=_OAUTH_ERROR_RU.get(str(error))
+        )
     if not code or not state:
         return _login_error_redirect(settings, code="missing_params")
     resolved = OAuthProvider(provider) if provider else (row.provider if row else None)
@@ -259,7 +285,9 @@ async def oauth_callback_post(
     """Apple uses form_post. Provider inferred from state row."""
     settings = get_settings()
     if error:
-        return _login_error_redirect(settings, code=str(error), message=_OAUTH_ERROR_RU.get(str(error)))
+        return _login_error_redirect(
+            settings, code=str(error), message=_OAUTH_ERROR_RU.get(str(error))
+        )
     if not code or not state:
         return _login_error_redirect(settings, code="missing_params")
     resolved = await _provider_from_state(db, state)
@@ -305,7 +333,11 @@ async def oauth_mobile(
             nonce=body.nonce,
         )
         access, refresh = await oauth_service.issue_session(
-            db, u, user_agent=request.headers.get("user-agent"), platform=request.headers.get("x-client-platform") or "mobile"
+            db,
+            u,
+            session_id=resolve_device_session_id(request),
+            user_agent=request.headers.get("user-agent"),
+            platform=request.headers.get("x-client-platform") or "mobile",
         )
         await record_activity(db, u.id, "login_oauth", {"provider": body.provider, "mobile": True})
         await db.commit()
@@ -327,7 +359,10 @@ async def my_identities(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return {"items": await oauth_service.list_identities(db, user.id), "has_password": bool(user.password_hash)}
+    return {
+        "items": await oauth_service.list_identities(db, user.id),
+        "has_password": bool(user.password_hash),
+    }
 
 
 @router.delete("/identities/{identity_id}", dependencies=[Depends(verify_csrf)])

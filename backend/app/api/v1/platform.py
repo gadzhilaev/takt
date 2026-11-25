@@ -334,19 +334,25 @@ async def audit_log(
     limit: int = Query(100, ge=1, le=500),
 ):
     logs = (
-        await db.execute(select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc()).limit(limit))
-    ).scalars().all()
+        (
+            await db.execute(
+                select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc()).limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return {
         "items": [
             {
-                "id": str(l.id),
-                "admin_id": str(l.admin_id),
-                "target_user_id": str(l.target_user_id) if l.target_user_id else None,
-                "action": l.action,
-                "details": l.details,
-                "created_at": l.created_at.isoformat() if l.created_at else None,
+                "id": str(log.id),
+                "admin_id": str(log.admin_id),
+                "target_user_id": str(log.target_user_id) if log.target_user_id else None,
+                "action": log.action,
+                "details": log.details,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
             }
-            for l in logs
+            for log in logs
         ]
     }
 
@@ -368,10 +374,8 @@ async def get_settings_api(
             "yandex": True,
             "email_password": True,
         },
-        "privacy_policy": stored.get("privacy_policy")
-        or {"url": "", "text": ""},
-        "support": stored.get("support")
-        or {"email": "", "url": "", "telegram": ""},
+        "privacy_policy": stored.get("privacy_policy") or {"url": "", "text": ""},
+        "support": stored.get("support") or {"email": "", "url": "", "telegram": ""},
     }
 
 
@@ -387,7 +391,9 @@ async def put_setting(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if not key.replace("_", "").replace("-", "").isalnum():
-        raise HTTPException(status_code=400, detail={"error": {"code": "bad_key", "message": "Некорректный ключ"}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": "bad_key", "message": "Некорректный ключ"}}
+        )
     value = body.value
     if key == "oauth_login_methods":
         allowed = {"apple", "vk", "yandex", "email_password"}
@@ -398,7 +404,12 @@ async def put_setting(
         if not cleaned:
             raise HTTPException(
                 status_code=400,
-                detail={"error": {"code": "bad_value", "message": "Нужен хотя бы один флаг способа входа"}},
+                detail={
+                    "error": {
+                        "code": "bad_value",
+                        "message": "Нужен хотя бы один флаг способа входа",
+                    }
+                },
             )
         value = cleaned
     elif key == "privacy_policy":

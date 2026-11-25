@@ -37,9 +37,10 @@ function readDemoCredentialsFallback(): { email: string | null; password: string
 
 export async function loginUi(page: Page) {
   await page.goto("/login");
+  await page.waitForLoadState("networkidle");
   await page.locator("#login-email").fill(E2E_USER.email);
   await page.locator("#login-password").fill(E2E_USER.password);
-  await page.getByRole("button", { name: /войти/i }).click();
+  await page.getByRole("button", { name: "Войти", exact: true }).click();
   await expect(page).toHaveURL(/\/app\/projects/, { timeout: 15_000 });
 }
 
