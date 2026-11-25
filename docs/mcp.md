@@ -34,6 +34,12 @@ short-lived access tokens, and rotating refresh tokens. Takt passwords are never
 sent to ChatGPT. A database migration creates OAuth client, authorization-code,
 and refresh-grant storage.
 
+The MCP initialize response advertises the Takt website and app icon. After
+updating the server, refresh the Takt app connection in ChatGPT settings so its
+card picks up the latest metadata. The HTTP transport keeps DNS-rebinding
+protection enabled and allows the public `taktapp.ru` host used by the reverse
+proxy.
+
 ## Cursor and Claude Code
 
 Use the deployment's HTTPS endpoint and a Takt access token as Bearer

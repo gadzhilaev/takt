@@ -10,6 +10,8 @@ from typing import Any
 
 from jose import JWTError, jwt
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import Icon
 from sqlalchemy import select
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -37,8 +39,21 @@ mcp = FastMCP(
         "Work with the caller's Takt projects and tasks. Respect project membership. "
         "Before destructive changes, confirm with the user."
     ),
+    website_url="https://taktapp.ru",
+    icons=[
+        Icon(
+            src="https://taktapp.ru/brand/icon-512.png",
+            mimeType="image/png",
+            sizes=["512x512"],
+        )
+    ],
     streamable_http_path="/mcp",
     stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["taktapp.ru", "taktapp.ru:*"],
+        allowed_origins=["https://chatgpt.com"],
+    ),
 )
 
 
