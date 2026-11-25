@@ -42,9 +42,17 @@ def build_report_workbook(
         {"font_name": "Calibri", "font_size": 10, "border": 1, "text_wrap": True}
     )
     alt_fmt = wb.add_format(
-        {"font_name": "Calibri", "font_size": 10, "border": 1, "bg_color": "#f8fafc", "text_wrap": True}
+        {
+            "font_name": "Calibri",
+            "font_size": 10,
+            "border": 1,
+            "bg_color": "#f8fafc",
+            "text_wrap": True,
+        }
     )
-    title_fmt = wb.add_format({"bold": True, "font_size": 16, "font_name": "Calibri", "font_color": brand})
+    title_fmt = wb.add_format(
+        {"bold": True, "font_size": 16, "font_name": "Calibri", "font_color": brand}
+    )
     metric_fmt = wb.add_format(
         {"bold": True, "font_size": 14, "font_name": "Calibri", "align": "center", "border": 1}
     )
@@ -101,7 +109,13 @@ def build_report_workbook(
     for r, t in enumerate(tasks, start=1):
         fmt = alt_fmt if r % 2 == 0 else cell_fmt
         overdue = t.get("overdue") and wb.add_format(
-            {"font_name": "Calibri", "font_size": 10, "border": 1, "font_color": "red", "text_wrap": True}
+            {
+                "font_name": "Calibri",
+                "font_size": 10,
+                "border": 1,
+                "font_color": "red",
+                "text_wrap": True,
+            }
         )
         row_fmt = overdue or fmt
         wt.write(r, 0, str(t.get("id", "")), row_fmt)

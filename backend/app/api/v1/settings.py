@@ -17,9 +17,7 @@ from app.services import project_service
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
-async def _ensure_column_access(
-    db: AsyncSession, user: User, project_id: uuid.UUID | None
-) -> None:
+async def _ensure_column_access(db: AsyncSession, user: User, project_id: uuid.UUID | None) -> None:
     """Project columns: any member+. Global statuses: system admin only."""
     if project_id is None:
         if user.role != UserRole.admin:
@@ -45,7 +43,7 @@ async def get_team(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     team = await db.get(TeamSettings, 1)
-    logo_url = f"/api/v1/files/logo" if team and team.logo_path else None
+    logo_url = "/api/v1/files/logo" if team and team.logo_path else None
     return {
         "team_name": team.team_name if team else "Моя команда",
         "logo_url": logo_url,
@@ -114,7 +112,9 @@ async def update_status(
 ):
     status = await db.get(TaskStatus, status_id)
     if not status:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}}
+        )
     await _ensure_column_access(db, user, status.project_id)
     for key in ("name", "color", "position", "is_done"):
         if key in body:
@@ -132,12 +132,16 @@ async def delete_status(
 ):
     status = await db.get(TaskStatus, status_id)
     if not status:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найден"}}
+        )
     await _ensure_column_access(db, user, status.project_id)
 
     if status.project_id is not None:
         col_count = await db.scalar(
-            select(func.count()).select_from(TaskStatus).where(TaskStatus.project_id == status.project_id)
+            select(func.count())
+            .select_from(TaskStatus)
+            .where(TaskStatus.project_id == status.project_id)
         )
         if (col_count or 0) <= 1:
             raise HTTPException(
@@ -150,11 +154,14 @@ async def delete_status(
                 },
             )
 
-    task_count = await db.scalar(
-        select(func.count()).select_from(Task).where(
-            Task.status_id == status_id, Task.deleted_at.is_(None)
+    task_count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Task)
+            .where(Task.status_id == status_id, Task.deleted_at.is_(None))
         )
-    ) or 0
+        or 0
+    )
 
     if task_count > 0:
         if not move_to_status_id:
@@ -171,18 +178,27 @@ async def delete_status(
         if move_to_status_id == status_id:
             raise HTTPException(
                 status_code=400,
-                detail={"error": {"code": "same_column", "message": "Целевой столбец совпадает с удаляемым"}},
+                detail={
+                    "error": {
+                        "code": "same_column",
+                        "message": "Целевой столбец совпадает с удаляемым",
+                    }
+                },
             )
         target = await db.get(TaskStatus, move_to_status_id)
         if not target:
             raise HTTPException(
                 status_code=400,
-                detail={"error": {"code": "invalid_target", "message": "Целевой столбец не найден"}},
+                detail={
+                    "error": {"code": "invalid_target", "message": "Целевой столбец не найден"}
+                },
             )
         if status.project_id and target.project_id != status.project_id:
             raise HTTPException(
                 status_code=400,
-                detail={"error": {"code": "project_mismatch", "message": "Столбцы из разных проектов"}},
+                detail={
+                    "error": {"code": "project_mismatch", "message": "Столбцы из разных проектов"}
+                },
             )
         max_pos = await db.scalar(
             select(func.max(Task.position)).where(
@@ -191,12 +207,16 @@ async def delete_status(
         )
         base = float(max_pos or 0)
         tasks = (
-            await db.execute(
-                select(Task)
-                .where(Task.status_id == status_id, Task.deleted_at.is_(None))
-                .order_by(Task.position)
+            (
+                await db.execute(
+                    select(Task)
+                    .where(Task.status_id == status_id, Task.deleted_at.is_(None))
+                    .order_by(Task.position)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for i, t in enumerate(tasks, start=1):
             t.status_id = move_to_status_id
             t.position = base + i * 1024

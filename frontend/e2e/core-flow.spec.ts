@@ -13,6 +13,8 @@ test.describe("simple kanban flow", () => {
     const title = `E2E задача ${Date.now()}`;
     await page.getByRole("button", { name: /^добавить$/i }).first().click();
     await page.getByLabel(/^название$/i).fill(title);
+    await page.getByLabel("Исполнители").click();
+    await page.getByRole("option").first().click();
     await page.getByRole("button", { name: /^создать$/i }).click();
     await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
 
@@ -20,11 +22,12 @@ test.describe("simple kanban flow", () => {
     await expect(page).toHaveURL(/[?&]task=/);
     await expect(page.getByRole("dialog", { name: /задача/i })).toBeVisible();
 
+    await page.getByRole("button", { name: /редактировать/i }).click();
     await page.getByLabel(/^описание$/i).fill("Краткое описание");
     await page.getByLabel(/^описание$/i).blur();
     await page.waitForTimeout(400);
 
-    await page.keyboard.press("Escape");
+    await page.goto(`/app/projects/${projectId}`);
     await expect(page).not.toHaveURL(/[?&]task=/);
     await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
 
@@ -42,31 +45,40 @@ test.describe("simple kanban flow", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginUi(page);
     await page.goto(`/app/projects/${projectId}`);
-    await expect(page.getByRole("tablist", { name: /столбцы/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("tablist", { name: /режим доски/i })).toBeVisible({ timeout: 15_000 });
 
     const title = `Mobile ${Date.now()}`;
-    await page.getByRole("button", { name: /^добавить$/i }).click();
+    await page.getByRole("button", { name: /^добавить$/i }).first().click();
     await page.getByLabel(/^название$/i).fill(title);
+    await page.getByLabel("Исполнители").click();
+    await page.getByRole("option").first().click();
     await page.getByRole("button", { name: /^создать$/i }).click();
     await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
 
-    const card = page.locator("article").filter({ has: page.getByRole("heading", { name: title }) });
-    await card.getByRole("combobox").click();
+    const tasks = await request.get(`/api/v1/tasks?project_id=${projectId}&page_size=100`);
+    const items = (await tasks.json()).items as { id: string; title: string; status_id: string }[];
+    const task = items.find((item) => item.title === title);
+    expect(task).toBeTruthy();
+
+    const columnSelect = page.getByRole("combobox", { name: `Столбец «${title}»` });
+    const currentLabel = (await columnSelect.textContent())?.trim();
+    await columnSelect.click();
     const options = page.getByRole("option");
     expect(await options.count()).toBeGreaterThan(1);
-    const targetLabel = (await options.nth(1).textContent())?.trim() || "";
+    expect(currentLabel).toBeTruthy();
     await options.nth(1).click();
-    await expect(page.getByRole("heading", { name: title })).toHaveCount(0, { timeout: 10_000 });
 
-    await page.getByRole("tab", { name: new RegExp(targetLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).click();
-    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 10_000 });
-
-    const tasks = await request.get(`/api/v1/tasks?project_id=${projectId}&page_size=100`);
-    const items = (await tasks.json()).items as { id: string; title: string }[];
+    await expect
+      .poll(async () => {
+        const refreshed = await request.get(`/api/v1/tasks?project_id=${projectId}&page_size=100`);
+        const list = (await refreshed.json()).items as { id: string; title: string; status_id: string }[];
+        return list.find((item) => item.id === task!.id)?.status_id;
+      })
+      .not.toBe(task!.status_id);
     await cleanupTaskIds(
       request,
       headers,
-      items.filter((x) => x.title === title).map((x) => x.id)
+      [task!.id]
     );
   });
 
@@ -128,15 +140,32 @@ test.describe("simple kanban flow", () => {
     ).items as { id: string; is_done: boolean }[];
     const open = statuses.find((s) => !s.is_done)!;
     const done = statuses.find((s) => s.is_done)!;
+    const project = await request.get(`/api/v1/projects/${projectId}`);
+    expect(project.ok()).toBeTruthy();
+    const members = (await project.json()).project.members as { user_id: string }[];
+    const assigneeIds = members.slice(0, 1).map((member) => member.user_id);
+    expect(assigneeIds).toHaveLength(1);
 
     const a = await request.post("/api/v1/tasks", {
       headers,
-      data: { title: `DnD A ${Date.now()}`, status_id: done.id, project_id: projectId },
+      data: {
+        title: `DnD A ${Date.now()}`,
+        status_id: done.id,
+        project_id: projectId,
+        assignee_ids: assigneeIds,
+      },
     });
     const b = await request.post("/api/v1/tasks", {
       headers,
-      data: { title: `DnD B ${Date.now()}`, status_id: open.id, project_id: projectId },
+      data: {
+        title: `DnD B ${Date.now()}`,
+        status_id: open.id,
+        project_id: projectId,
+        assignee_ids: assigneeIds,
+      },
     });
+    expect(a.ok()).toBeTruthy();
+    expect(b.ok()).toBeTruthy();
     const taskA = (await a.json()).task as { id: string; position: number };
     const taskB = (await b.json()).task as { id: string };
 

@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_user, verify_csrf
 from app.api.serializers import attachment_to_out, task_to_out, user_brief
 from app.db.session import get_db
+from app.models.project import ProjectMemberRole
 from app.models.task import (
     ActivityLog,
     ChecklistItem,
@@ -31,7 +32,6 @@ from app.schemas.task import (
     TaskMove,
     TaskUpdate,
 )
-from app.models.project import ProjectMemberRole
 from app.services import attachment_service, notify_service, task_service
 from app.services.activity_format import activity_summary, label_for, resolve_status_labels
 from app.services.attachment_service import AttachmentError
@@ -79,13 +79,17 @@ async def _ensure_assignees_in_project(
     if not assignee_ids:
         return
     rows = (
-        await db.execute(
-            select(ProjectMember.user_id).where(
-                ProjectMember.project_id == project_id,
-                ProjectMember.user_id.in_(assignee_ids),
+        (
+            await db.execute(
+                select(ProjectMember.user_id).where(
+                    ProjectMember.project_id == project_id,
+                    ProjectMember.user_id.in_(assignee_ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     allowed = set(rows)
     missing = [uid for uid in assignee_ids if uid not in allowed]
     if missing:
@@ -186,18 +190,29 @@ async def create_task(
 
     status = await task_service.get_status(db, body.status_id)
     if not status:
-        raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "invalid_status", "message": "Статус не найден"}},
+        )
     project_id = body.project_id or status.project_id
     if not project_id:
-        raise HTTPException(status_code=400, detail={"error": {"code": "no_project", "message": "Укажите проект"}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": "no_project", "message": "Укажите проект"}}
+        )
     try:
         await project_service.ensure_project_access(
             db, user, project_id, min_role=ProjectMemberRole.member
         )
     except PermissionError:
-        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав на создание"}})
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "forbidden", "message": "Нет прав на создание"}},
+        )
     if status.project_id and status.project_id != project_id:
-        raise HTTPException(status_code=400, detail={"error": {"code": "status_mismatch", "message": "Статус из другого проекта"}})
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "status_mismatch", "message": "Статус из другого проекта"}},
+        )
     pos = await task_service.next_position(db, body.status_id)
     now = datetime.now(UTC)
     task = Task(
@@ -255,7 +270,9 @@ async def get_task_route(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task)
     return {"task": await _task_out(db, task)}
 
@@ -269,10 +286,14 @@ async def update_task(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     if body.title is not None:
-        await task_service.log_activity(db, task.id, user.id, "updated", "title", task.title, body.title)
+        await task_service.log_activity(
+            db, task.id, user.id, "updated", "title", task.title, body.title
+        )
         task.title = body.title
     if body.description is not None:
         task.description = body.description
@@ -302,10 +323,15 @@ async def update_task(
     if body.status_id is not None:
         status = await task_service.get_status(db, body.status_id)
         if not status:
-            raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "invalid_status", "message": "Статус не найден"}},
+            )
         old = str(task.status_id)
         newly_done = await task_service.apply_status_change(db, task, status)
-        await task_service.log_activity(db, task.id, user.id, "status_changed", "status_id", old, str(status.id))
+        await task_service.log_activity(
+            db, task.id, user.id, "status_changed", "status_id", old, str(status.id)
+        )
     if body.assignee_ids is not None:
         prev_ids = {a.user_id for a in (task.assignees or [])}
         if task.project_id and body.assignee_ids:
@@ -355,11 +381,16 @@ async def move_task(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     status = await task_service.get_status(db, body.status_id)
     if not status:
-        raise HTTPException(status_code=400, detail={"error": {"code": "invalid_status", "message": "Статус не найден"}})
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "invalid_status", "message": "Статус не найден"}},
+        )
     old_status_id = task.status_id
     newly_done = await task_service.apply_status_change(db, task, status)
     task.position = body.position
@@ -384,10 +415,15 @@ async def delete_task(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     if not task_service.can_delete_task(user, task):
-        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Можно удалять только свои задачи"}})
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "forbidden", "message": "Можно удалять только свои задачи"}},
+        )
     project_id = str(task.project_id) if task.project_id else None
     await task_service.soft_delete_task(db, task)
     await db.commit()
@@ -407,10 +443,14 @@ async def restore_task(
     q = select(Task).where(Task.id == task_id)
     task = (await db.execute(q)).scalar_one_or_none()
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     if not task_service.can_delete_task(user, task):
-        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Недостаточно прав"}})
+        raise HTTPException(
+            status_code=403, detail={"error": {"code": "forbidden", "message": "Недостаточно прав"}}
+        )
     task.deleted_at = None
     task.archived_at = None
     await task_service.log_activity(db, task.id, user.id, "restored")
@@ -429,7 +469,9 @@ async def duplicate_task(
 ):
     source = await task_service.get_task(db, task_id)
     if not source:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, source, min_role=ProjectMemberRole.member)
     pos = await task_service.next_position(db, source.status_id)
     clone_now = datetime.now(UTC)
@@ -478,7 +520,9 @@ async def upload_attachment(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     try:
         att = await attachment_service.save_upload(db, task=task, user=user, upload=file)
@@ -507,11 +551,15 @@ async def delete_attachment(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     att = await attachment_service.get_attachment(db, attachment_id)
     if not att or att.task_id != task_id:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Файл не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Файл не найден"}}
+        )
     filename = att.filename
     await attachment_service.delete_attachment(db, att)
     await task_service.log_activity(
@@ -531,7 +579,9 @@ async def list_comments(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task)
     q = (
         select(Comment)
@@ -564,7 +614,9 @@ async def add_comment(
 ):
     task = await db.get(Task, task_id)
     if not task or task.deleted_at:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     comment = Comment(
         task_id=task_id,
@@ -614,7 +666,9 @@ async def activity(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task)
     q = (
         select(ActivityLog)
@@ -625,7 +679,7 @@ async def activity(
     logs = (await db.execute(q)).scalars().all()
     status_names = await resolve_status_labels(
         db,
-        [v for l in logs for v in (l.old_value, l.new_value)],
+        [value for log in logs for value in (log.old_value, log.new_value)],
     )
     items: list[ActivityOut] = []
     for log in logs:
@@ -662,15 +716,26 @@ async def add_checklist(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     max_pos = await db.scalar(
-        select(ChecklistItem.position).where(ChecklistItem.task_id == task_id).order_by(ChecklistItem.position.desc())
+        select(ChecklistItem.position)
+        .where(ChecklistItem.task_id == task_id)
+        .order_by(ChecklistItem.position.desc())
     )
     item = ChecklistItem(task_id=task_id, title=body.title, position=(max_pos or 0) + 1)
     db.add(item)
     await db.commit()
-    return {"item": {"id": str(item.id), "title": item.title, "is_done": item.is_done, "position": item.position}}
+    return {
+        "item": {
+            "id": str(item.id),
+            "title": item.title,
+            "is_done": item.is_done,
+            "position": item.position,
+        }
+    }
 
 
 @router.patch("/{task_id}/checklist/{item_id}", dependencies=[Depends(verify_csrf)])
@@ -683,11 +748,15 @@ async def update_checklist(
 ):
     task = await task_service.get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Задача не найдена"}}
+        )
     await _require_task_project_access(db, user, task, min_role=ProjectMemberRole.member)
     item = await db.get(ChecklistItem, item_id)
     if not item or item.task_id != task_id:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}}
+        )
     if body.title is not None:
         item.title = body.title
     if body.is_done is not None:
@@ -695,4 +764,11 @@ async def update_checklist(
     if body.position is not None:
         item.position = body.position
     await db.commit()
-    return {"item": {"id": str(item.id), "title": item.title, "is_done": item.is_done, "position": item.position}}
+    return {
+        "item": {
+            "id": str(item.id),
+            "title": item.title,
+            "is_done": item.is_done,
+            "position": item.position,
+        }
+    }

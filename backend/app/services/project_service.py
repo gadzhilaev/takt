@@ -20,11 +20,7 @@ DEFAULT_STATUS_TEMPLATE = [
 
 
 async def get_project(db: AsyncSession, project_id: uuid.UUID) -> Project | None:
-    q = (
-        select(Project)
-        .options(selectinload(Project.members))
-        .where(Project.id == project_id)
-    )
+    q = select(Project).options(selectinload(Project.members)).where(Project.id == project_id)
     return (await db.execute(q)).scalar_one_or_none()
 
 

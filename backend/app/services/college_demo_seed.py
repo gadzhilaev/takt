@@ -162,7 +162,8 @@ COLLEGE_TASKS: list[tuple[str, str, TaskPriority, int, tuple[str, ...]]] = [
     ),
     (
         "Исправить ошибки мобильной версии сайта",
-        "Баги меню и кнопки «Скачать» приложения на ширине <400px. Чек-лист: главная, новости, УПК.",
+        "Баги меню и кнопки «Скачать» приложения на ширине <400px. "
+        "Чек-лист: главная, новости, УПК.",
         TaskPriority.medium,
         1,
         ("gadzhilaev", "akhmedova"),
@@ -186,7 +187,8 @@ COLLEGE_TASKS: list[tuple[str, str, TaskPriority, int, tuple[str, ...]]] = [
     ),
     (
         "Обновить программное обеспечение рабочих компьютеров",
-        "Патчи ОС и браузеров на рабочих местах сотрудников IT. Отчёт: что обновлено / что отложено.",
+        "Патчи ОС и браузеров на рабочих местах сотрудников IT. "
+        "Отчёт: что обновлено / что отложено.",
         TaskPriority.medium,
         2,
         ("abakarov", "kadachiev"),
@@ -286,7 +288,9 @@ async def _ensure_membership(
 async def _ensure_statuses(db: AsyncSession, project: Project) -> dict[int, TaskStatus]:
     rows = (
         await db.scalars(
-            select(TaskStatus).where(TaskStatus.project_id == project.id).order_by(TaskStatus.position)
+            select(TaskStatus)
+            .where(TaskStatus.project_id == project.id)
+            .order_by(TaskStatus.position)
         )
     ).all()
     by_name = {s.name: s for s in rows}
@@ -416,7 +420,9 @@ async def seed_college_demo(db: AsyncSession, settings: Settings | None = None) 
 
     # Clean tech titles on this project + old demo boards the demo user owns
     demo_projects = (
-        await db.scalars(select(Project).where(Project.is_demo.is_(True), Project.is_archived.is_(False)))
+        await db.scalars(
+            select(Project).where(Project.is_demo.is_(True), Project.is_archived.is_(False))
+        )
     ).all()
     report["tech_cleaned"] = await _soft_delete_tech_tasks(db, [p.id for p in demo_projects])
 
@@ -441,7 +447,9 @@ async def seed_college_demo(db: AsyncSession, settings: Settings | None = None) 
             current = {
                 a.user_id
                 for a in (
-                    await db.scalars(select(TaskAssignee).where(TaskAssignee.task_id == existing.id))
+                    await db.scalars(
+                        select(TaskAssignee).where(TaskAssignee.task_id == existing.id)
+                    )
                 ).all()
             }
             want = {u.id for u in assignee_users}
@@ -458,15 +466,20 @@ async def seed_college_demo(db: AsyncSession, settings: Settings | None = None) 
             report["tasks_existing"] += 1
             continue
 
-        pos = float(
-            (await db.scalar(
-                select(Task.position)
-                .where(Task.status_id == status.id, Task.deleted_at.is_(None))
-                .order_by(Task.position.desc())
-                .limit(1)
-            ))
-            or 0
-        ) + 1024
+        pos = (
+            float(
+                (
+                    await db.scalar(
+                        select(Task.position)
+                        .where(Task.status_id == status.id, Task.deleted_at.is_(None))
+                        .order_by(Task.position.desc())
+                        .limit(1)
+                    )
+                )
+                or 0
+            )
+            + 1024
+        )
         task = Task(
             project_id=project.id,
             title=title,

@@ -3,11 +3,15 @@ from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.core.security import hash_password
-from app.db.session import get_db
 from app.models.project import Project, ProjectMember
 from app.models.task import Task
 from app.models.user import User, UserRole
-from app.services.college_demo_seed import COLLEGE_PROJECT_NAME, COLLEGE_TASKS, DEMO_STAFF, seed_college_demo
+from app.services.college_demo_seed import (
+    COLLEGE_PROJECT_NAME,
+    COLLEGE_TASKS,
+    DEMO_STAFF,
+    seed_college_demo,
+)
 
 
 @pytest.mark.asyncio

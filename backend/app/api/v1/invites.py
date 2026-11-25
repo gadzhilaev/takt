@@ -92,11 +92,15 @@ async def accept_invite_by_token(
 ):
     invite = await invite_service.get_invite_by_token(db, token)
     if not invite:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}}
+        )
     try:
         await invite_service.accept_invite(db, invite, user)
     except invite_service.InviteError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     return {"ok": True, "project_id": str(invite.project_id)}
 
@@ -109,11 +113,15 @@ async def accept_invite(
 ):
     invite = await db.get(ProjectInvite, invite_id)
     if not invite:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}}
+        )
     try:
         await invite_service.accept_invite(db, invite, user)
     except invite_service.InviteError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     return {"ok": True, "project_id": str(invite.project_id)}
 
@@ -126,11 +134,15 @@ async def decline_invite(
 ):
     invite = await db.get(ProjectInvite, invite_id)
     if not invite:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}}
+        )
     try:
         await invite_service.decline_invite(db, invite, user)
     except invite_service.InviteError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     return {"ok": True}
 
@@ -146,7 +158,9 @@ async def list_project_invites(
             db, user, project_id, min_role=ProjectMemberRole.admin
         )
     except PermissionError:
-        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}})
+        raise HTTPException(
+            status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}}
+        )
     project = await db.get(Project, project_id)
     invites = await invite_service.list_project_invites(db, project_id)
     return {
@@ -171,15 +185,21 @@ async def create_project_invite(
 ):
     project = await project_service.get_project(db, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Проект не найден"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Проект не найден"}}
+        )
     try:
         invite = await invite_service.create_invite(
             db, project=project, email=str(body.email) if body.email else None, invited_by=user
         )
     except PermissionError:
-        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Только владелец"}})
+        raise HTTPException(
+            status_code=403, detail={"error": {"code": "forbidden", "message": "Только владелец"}}
+        )
     except invite_service.InviteError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     note = (
         "Скопируйте ссылку и отправьте сотруднику — после входа он вступит в проект."
@@ -210,12 +230,18 @@ async def cancel_project_invite(
 ):
     invite = await db.get(ProjectInvite, invite_id)
     if not invite or invite.project_id != project_id:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}})
+        raise HTTPException(
+            status_code=404, detail={"error": {"code": "not_found", "message": "Не найдено"}}
+        )
     try:
         await invite_service.cancel_invite(db, invite, user)
     except PermissionError:
-        raise HTTPException(status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}})
+        raise HTTPException(
+            status_code=403, detail={"error": {"code": "forbidden", "message": "Нет прав"}}
+        )
     except invite_service.InviteError as e:
-        raise HTTPException(status_code=400, detail={"error": {"code": e.code, "message": e.message}})
+        raise HTTPException(
+            status_code=400, detail={"error": {"code": e.code, "message": e.message}}
+        )
     await db.commit()
     return {"ok": True}

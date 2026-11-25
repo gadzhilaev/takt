@@ -20,13 +20,17 @@ class LeaveRequestError(Exception):
 
 async def _admin_user_ids(db: AsyncSession, project_id: uuid.UUID) -> list[uuid.UUID]:
     rows = (
-        await db.execute(
-            select(ProjectMember.user_id).where(
-                ProjectMember.project_id == project_id,
-                ProjectMember.role == ProjectMemberRole.admin,
+        (
+            await db.execute(
+                select(ProjectMember.user_id).where(
+                    ProjectMember.project_id == project_id,
+                    ProjectMember.role == ProjectMemberRole.admin,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -67,14 +71,18 @@ async def remove_member(
     )
     # Cancel pending leave requests for this user.
     pending = (
-        await db.execute(
-            select(ProjectLeaveRequest).where(
-                ProjectLeaveRequest.project_id == project_id,
-                ProjectLeaveRequest.user_id == target_user_id,
-                ProjectLeaveRequest.status == ProjectLeaveRequestStatus.pending,
+        (
+            await db.execute(
+                select(ProjectLeaveRequest).where(
+                    ProjectLeaveRequest.project_id == project_id,
+                    ProjectLeaveRequest.user_id == target_user_id,
+                    ProjectLeaveRequest.status == ProjectLeaveRequestStatus.pending,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     now = datetime.now(UTC)
     for req in pending:
         req.status = ProjectLeaveRequestStatus.cancelled
@@ -121,14 +129,18 @@ async def leave_project_now(
         )
     )
     pending = (
-        await db.execute(
-            select(ProjectLeaveRequest).where(
-                ProjectLeaveRequest.project_id == project_id,
-                ProjectLeaveRequest.user_id == user.id,
-                ProjectLeaveRequest.status == ProjectLeaveRequestStatus.pending,
+        (
+            await db.execute(
+                select(ProjectLeaveRequest).where(
+                    ProjectLeaveRequest.project_id == project_id,
+                    ProjectLeaveRequest.user_id == user.id,
+                    ProjectLeaveRequest.status == ProjectLeaveRequestStatus.pending,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     now = datetime.now(UTC)
     for req in pending:
         req.status = ProjectLeaveRequestStatus.cancelled
@@ -184,8 +196,7 @@ async def create_leave_request(
                 kind="leave_request",
                 title="Заявка на выход из проекта",
                 body=(
-                    f"{user.name} просит удалить его из "
-                    f"«{project.name if project else 'проекта'}»"
+                    f"{user.name} просит удалить его из «{project.name if project else 'проекта'}»"
                 ),
                 created_at=now,
                 is_read=False,

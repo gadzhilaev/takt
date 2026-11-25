@@ -326,13 +326,17 @@ async def seed_readme_demo(db: AsyncSession, settings: Settings | None = None) -
 
     actor = staff["alina"]
     sample = (
-        await db.execute(
-            select(Task)
-            .where(Task.project_id == project.id, Task.deleted_at.is_(None))
-            .order_by(Task.position.asc())
-            .limit(3)
+        (
+            await db.execute(
+                select(Task)
+                .where(Task.project_id == project.id, Task.deleted_at.is_(None))
+                .order_by(Task.position.asc())
+                .limit(3)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for task in sample:
         await create_in_app(
             db,

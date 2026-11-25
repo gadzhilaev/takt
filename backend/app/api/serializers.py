@@ -1,6 +1,13 @@
-from app.models.task import Attachment, ChecklistItem, Task, TaskAssignee, TaskLabel
+from app.models.task import Attachment, ChecklistItem, Task
 from app.models.user import User
-from app.schemas.task import AttachmentOut, ChecklistItemOut, LabelOut, StatusOut, TaskOut, UserBrief
+from app.schemas.task import (
+    AttachmentOut,
+    ChecklistItemOut,
+    LabelOut,
+    StatusOut,
+    TaskOut,
+    UserBrief,
+)
 from app.services.attachment_service import is_image_content_type
 
 
@@ -53,7 +60,9 @@ def attachment_to_out(att: Attachment) -> AttachmentOut:
     )
 
 
-def task_to_out(task: Task, *, comment_count: int = 0, subtask_total: int = 0, subtask_done: int = 0) -> TaskOut:
+def task_to_out(
+    task: Task, *, comment_count: int = 0, subtask_total: int = 0, subtask_done: int = 0
+) -> TaskOut:
     assignees = []
     for a in task.assignees or []:
         if a.user:
@@ -61,9 +70,7 @@ def task_to_out(task: Task, *, comment_count: int = 0, subtask_total: int = 0, s
     labels = []
     for tl in task.labels or []:
         if tl.label:
-            labels.append(
-                LabelOut(id=str(tl.label.id), name=tl.label.name, color=tl.label.color)
-            )
+            labels.append(LabelOut(id=str(tl.label.id), name=tl.label.name, color=tl.label.color))
     items: list[ChecklistItem] = list(task.checklist_items or [])
     attachments = [attachment_to_out(a) for a in (task.attachments or [])]
     return TaskOut(
@@ -79,7 +86,9 @@ def task_to_out(task: Task, *, comment_count: int = 0, subtask_total: int = 0, s
         author=user_brief(task.author) if task.author else None,
         due_date=task.due_date,
         closed_at=task.closed_at,
-        status_entered_at=getattr(task, "status_entered_at", None) or task.updated_at or task.created_at,
+        status_entered_at=getattr(task, "status_entered_at", None)
+        or task.updated_at
+        or task.created_at,
         archived_at=task.archived_at,
         position=task.position,
         created_at=task.created_at,
