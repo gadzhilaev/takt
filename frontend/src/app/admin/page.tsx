@@ -23,6 +23,7 @@ type DayCount = { day: string; count: number };
 
 type Analytics = {
   days?: number;
+  active_users: DayCount[];
   registrations: DayCount[];
   projects_created: DayCount[];
   tasks_created: DayCount[];
@@ -69,19 +70,42 @@ function formatDay(iso: string): string {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 }
 
-function Series({ title, rows }: { title: string; rows: DayCount[] }) {
-  const max = Math.max(1, ...rows.map((r) => r.count));
+function Series({ title, rows, storageKey, totalLabel = "" }: {
+  title: string;
+  rows: DayCount[];
+  storageKey: string;
+  totalLabel?: string;
+}) {
+  const [days, setDays] = useSessionState<number>(storageKey, 30);
+  const countsByDay = new Map(rows.map((row) => [row.day, row.count]));
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const visibleRows = Array.from({ length: days }, (_, index) => {
+    const date = new Date(today);
+    date.setUTCDate(date.getUTCDate() - days + index + 1);
+    const day = date.toISOString().slice(0, 10);
+    return { day, count: countsByDay.get(day) ?? 0 };
+  });
+  const max = Math.max(1, ...visibleRows.map((r) => r.count));
   return (
     <section className="rounded-[var(--radius)] border border-[var(--border)] bg-white p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[14px] font-semibold">{title}</h2>
-        <span className="text-[13px] font-semibold tabular-nums">{sum(rows)}</span>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-[14px] font-semibold">{title}</h2>
+          {totalLabel ? <span className="text-[12px] text-muted">{sum(visibleRows)} {totalLabel}</span> : null}
+        </div>
+        <div className="flex rounded-md border border-[#dce2e7] p-0.5">
+          {RANGES.map((n) => (
+            <Button key={n} type="button" size="sm" variant={days === n ? "default" : "ghost"}
+              className="h-7 px-2 text-[11px]" onClick={() => setDays(n)}>{n}д</Button>
+          ))}
+        </div>
       </div>
-      {!rows.length ? (
+      {!visibleRows.length ? (
         <p className="mt-3 text-[13px] text-muted">Нет данных</p>
       ) : (
         <ul className="mt-3 space-y-1.5">
-          {rows.map((r) => (
+          {visibleRows.map((r) => (
             <li key={r.day} className="grid grid-cols-[4.5rem_1fr_1.5rem] items-center gap-2 text-[13px]">
               <span className="tabular-nums text-muted">{formatDay(r.day)}</span>
               <div className="h-1.5 overflow-hidden rounded-full bg-[#eef1f4]">
@@ -100,15 +124,13 @@ function Series({ title, rows }: { title: string; rows: DayCount[] }) {
 }
 
 export default function AdminDashboardPage() {
-  const [days, setDays] = useSessionState<number>("takt-admin-overview-days", 30);
-
   const dash = useQuery({
     queryKey: ["platform-dashboard"],
     queryFn: () => api<Dash>("/api/v1/platform/dashboard"),
   });
   const analytics = useQuery({
-    queryKey: ["platform-analytics", days],
-    queryFn: () => api<Analytics>(`/api/v1/platform/analytics?days=${days}`),
+    queryKey: ["platform-analytics", 90],
+    queryFn: () => api<Analytics>("/api/v1/platform/analytics?days=90"),
     placeholderData: keepPreviousData,
   });
 
@@ -126,19 +148,6 @@ export default function AdminDashboardPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#81909d]">Рабочая область</p>
           <h1 className="mt-1 text-[1.75rem] font-semibold tracking-tight text-[#202938]">Обзор платформы</h1>
           <p className="mt-1 text-[13px] text-[#667485]">Основные показатели и динамика Takt.</p>
-        </div>
-        <div className="flex rounded-lg border border-[#dce2e7] bg-white p-1">
-          {RANGES.map((n) => (
-            <Button
-              key={n}
-              type="button"
-              size="sm"
-              variant={days === n ? "default" : "ghost"}
-              onClick={() => setDays(n)}
-            >
-              {n} дней
-            </Button>
-          ))}
         </div>
       </div>
 
@@ -189,13 +198,14 @@ export default function AdminDashboardPage() {
       ) : a ? (
         <div>
           <div className="mb-3">
-            <h2 className="text-[15px] font-semibold text-[#202938]">Динамика за {days} дней</h2>
-            <p className="mt-1 text-[12px] text-[#667485]">Новые аккаунты, проекты и задачи.</p>
+            <h2 className="text-[15px] font-semibold text-[#202938]">Динамика по дням</h2>
+            <p className="mt-1 text-[12px] text-[#667485]">Для каждого показателя можно отдельно выбрать 7, 30 или 90 дней.</p>
           </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-          <Series title="Регистрации" rows={a.registrations} />
-          <Series title="Новые проекты" rows={a.projects_created} />
-          <Series title="Созданные задачи" rows={a.tasks_created} />
+          <div className="grid gap-3 lg:grid-cols-2">
+          <Series title="Уникальные реальные пользователи, входившие за день" rows={a.active_users} storageKey="takt-admin-active-users-days" />
+          <Series title="Регистрации" rows={a.registrations} storageKey="takt-admin-registrations-days" totalLabel="за период" />
+          <Series title="Новые проекты" rows={a.projects_created} storageKey="takt-admin-projects-days" totalLabel="за период" />
+          <Series title="Созданные задачи" rows={a.tasks_created} storageKey="takt-admin-tasks-days" totalLabel="за период" />
           </div>
         </div>
       ) : null}

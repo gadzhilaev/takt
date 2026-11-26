@@ -48,13 +48,28 @@ async def dashboard_stats(db: AsyncSession) -> dict:
     week = now - timedelta(days=7)
     month = now - timedelta(days=30)
 
-    users_total = await db.scalar(select(func.count()).select_from(User)) or 0
-    users_new_7d = (
-        await db.scalar(select(func.count()).select_from(User).where(User.created_at >= week)) or 0
+    users_total = (
+        await db.scalar(select(func.count()).select_from(User).where(User.is_demo.is_(False))) or 0
     )
-    projects_total = await db.scalar(select(func.count()).select_from(Project)) or 0
+    users_new_7d = (
+        await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.created_at >= week, User.is_demo.is_(False))
+        ) or 0
+    )
+    projects_total = (
+        await db.scalar(
+            select(func.count()).select_from(Project).where(Project.is_demo.is_(False))
+        ) or 0
+    )
     tasks_total = (
-        await db.scalar(select(func.count()).select_from(Task).where(Task.deleted_at.is_(None)))
+        await db.scalar(
+            select(func.count())
+            .select_from(Task)
+            .join(Project, Project.id == Task.project_id)
+            .where(Task.deleted_at.is_(None), Project.is_demo.is_(False))
+        )
         or 0
     )
     open_reports = (
@@ -86,9 +101,14 @@ async def dashboard_stats(db: AsyncSession) -> dict:
     async def distinct_active(since: datetime) -> int:
         return (
             await db.scalar(
-                select(func.count(func.distinct(UserActivityEvent.user_id))).where(
+                select(func.count(func.distinct(UserActivityEvent.user_id)))
+                .join(User, User.id == UserActivityEvent.user_id)
+                .where(
                     UserActivityEvent.created_at >= since,
-                    UserActivityEvent.event_type.in_(["login", "login_oauth", "session"]),
+                    UserActivityEvent.event_type.in_(
+                        ["login_email", "login_oauth", "register", "login", "session"]
+                    ),
+                    User.is_demo.is_(False),
                 )
             )
             or 0
@@ -99,15 +119,27 @@ async def dashboard_stats(db: AsyncSession) -> dict:
     wau_events = await distinct_active(week)
     mau_events = await distinct_active(month)
     dau_login = (
-        await db.scalar(select(func.count()).select_from(User).where(User.last_login_at >= day))
+        await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.last_login_at >= day, User.is_demo.is_(False))
+        )
         or 0
     )
     wau_login = (
-        await db.scalar(select(func.count()).select_from(User).where(User.last_login_at >= week))
+        await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.last_login_at >= week, User.is_demo.is_(False))
+        )
         or 0
     )
     mau_login = (
-        await db.scalar(select(func.count()).select_from(User).where(User.last_login_at >= month))
+        await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.last_login_at >= month, User.is_demo.is_(False))
+        )
         or 0
     )
 
@@ -934,7 +966,7 @@ async def analytics(db: AsyncSession, days: int = 30) -> dict:
     regs = (
         await db.execute(
             select(func.date_trunc("day", User.created_at).label("day"), func.count())
-            .where(User.created_at >= since)
+            .where(User.created_at >= since, User.is_demo.is_(False))
             .group_by("day")
             .order_by("day")
         )
@@ -942,7 +974,7 @@ async def analytics(db: AsyncSession, days: int = 30) -> dict:
     projects = (
         await db.execute(
             select(func.date_trunc("day", Project.created_at).label("day"), func.count())
-            .where(Project.created_at >= since)
+            .where(Project.created_at >= since, Project.is_demo.is_(False))
             .group_by("day")
             .order_by("day")
         )
@@ -950,7 +982,30 @@ async def analytics(db: AsyncSession, days: int = 30) -> dict:
     tasks_created = (
         await db.execute(
             select(func.date_trunc("day", Task.created_at).label("day"), func.count())
-            .where(Task.created_at >= since, Task.deleted_at.is_(None))
+            .join(Project, Project.id == Task.project_id)
+            .where(
+                Task.created_at >= since,
+                Task.deleted_at.is_(None),
+                Project.is_demo.is_(False),
+            )
+            .group_by("day")
+            .order_by("day")
+        )
+    ).all()
+    active_users = (
+        await db.execute(
+            select(
+                func.date_trunc("day", UserActivityEvent.created_at).label("day"),
+                func.count(func.distinct(UserActivityEvent.user_id)).label("count"),
+            )
+            .join(User, User.id == UserActivityEvent.user_id)
+            .where(
+                UserActivityEvent.created_at >= since,
+                UserActivityEvent.event_type.in_(
+                    ["login_email", "login_oauth", "register", "login", "session"]
+                ),
+                User.is_demo.is_(False),
+            )
             .group_by("day")
             .order_by("day")
         )
@@ -959,6 +1014,9 @@ async def analytics(db: AsyncSession, days: int = 30) -> dict:
     # only report if we have clear data. Use ActivityLog if available — skip inventing.
     return {
         "days": days,
+        "active_users": [
+            {"day": r[0].date().isoformat(), "count": r[1]} for r in active_users if r[0]
+        ],
         "registrations": [{"day": r[0].date().isoformat(), "count": r[1]} for r in regs if r[0]],
         "projects_created": [
             {"day": r[0].date().isoformat(), "count": r[1]} for r in projects if r[0]
