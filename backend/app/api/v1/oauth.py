@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import uuid
 from typing import Annotated, Literal
 from urllib.parse import urlencode, urlparse
@@ -29,6 +30,7 @@ from app.services import oauth_service
 from app.services.activity_service import record_activity
 
 router = APIRouter(prefix="/auth/oauth", tags=["oauth"])
+logger = logging.getLogger(__name__)
 
 # Mobile opens authorize via our domain first (DNS), then 302 to the provider.
 _OAUTH_AUTHORIZE_HOSTS = frozenset(
@@ -183,6 +185,9 @@ async def _finish_web(
         await db.commit()
     except oauth_service.OAuthError as e:
         await db.rollback()
+        # Keep OAuth diagnostics useful without logging authorization codes,
+        # state, provider tokens, or profile data.
+        logger.warning("OAuth callback failed: provider=%s error=%s", provider.value, e.code)
         return _login_error_redirect(settings, code=e.code, message=e.message)
 
     # Keep invite/next path; membership only after explicit «Принять приглашение».
