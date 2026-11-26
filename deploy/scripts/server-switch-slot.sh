@@ -51,6 +51,10 @@ else
     docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --pull=false "backend-$SLOT" "frontend-$SLOT"
   fi
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d "backend-$SLOT" "frontend-$SLOT"
+  # Blue/green slots intentionally disable background jobs. Keep the legacy
+  # backend as the singleton worker, but refresh it from the same release so
+  # digests, reminders and push delivery do not keep running old code.
+  docker compose -f "$ROOT/deploy/docker-compose.prod.yml" --env-file "$ENV_FILE" up -d backend
 fi
 
 wait_healthy() {
