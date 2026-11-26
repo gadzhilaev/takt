@@ -302,7 +302,7 @@ async def start_oauth(
             "scope": "email",
             "state": state,
             "code_challenge": challenge,
-            "code_challenge_method": "sha256",
+            "code_challenge_method": "s256",
             "device_id": vk_device_id or nonce,
             "lang_id": "3",
             "oauth_version": "2",

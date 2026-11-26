@@ -75,7 +75,7 @@ async def test_vk_authorize_includes_current_sdk_parameters(monkeypatch):
     assert params["oauth_version"] == ["2"]
     assert params["scheme"] == ["bright_light"]
     assert params["lang_id"] == ["3"]
-    assert params["code_challenge_method"] == ["sha256"]
+    assert params["code_challenge_method"] == ["s256"]
     assert params["redirect_uri"] == [redirect_uri]
     assert params["state"] == [started["state"]]
     assert params["device_id"]
