@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRight,
   Activity,
   FolderKanban,
   LayoutDashboard,
@@ -78,37 +79,15 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
 
   return (
     <div className="platform-admin min-h-screen text-[#202938]">
-      <header className="sticky top-0 z-40 border-b border-[#dce2e7] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-[3.75rem] max-w-[84rem] items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href="/admin" aria-label="Takt — обзор админки" className="shrink-0">
-              <BrandLogo variant="light" className="h-7 w-auto max-w-[8rem]" />
-            </Link>
-            <span className="hidden h-6 w-px bg-[#dce2e7] sm:block" aria-hidden />
-            <span className="truncate text-[13px] font-medium text-[#667485]">Управление платформой</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="max-w-48 truncate text-[12px] font-semibold leading-4 text-[#202938]">
-                {user.name}
-              </p>
-              <p className="text-[11px] leading-4 text-[#667485]">
-                {platformRoleLabel(user.platform_role)}
-              </p>
-            </div>
-            <Link
-              href="/app/projects"
-              className="inline-flex h-9 items-center rounded-[var(--radius)] border border-[#dce2e7] px-3 text-[12px] font-semibold text-[#315f72] transition-colors hover:bg-[#f1f3f5]"
-            >
-              К проектам
-            </Link>
-          </div>
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-[4.25rem] flex-col border-r border-[#dce2e7] bg-white sm:w-60">
+        <div className="border-b border-[#edf0f2] p-3 sm:px-5 sm:py-4">
+          <Link href="/admin" aria-label="Takt — обзор админки" className="flex h-9 items-center justify-center sm:justify-start">
+            <BrandLogo variant="light" className="hidden h-7 w-auto max-w-[8rem] sm:block" />
+            <span className="text-base font-bold text-[#315f72] sm:hidden">T</span>
+          </Link>
+          <p className="mt-2 hidden text-[11px] font-medium text-[#667485] sm:block">Управление платформой</p>
         </div>
-        <div className="border-t border-[#edf0f2]">
-          <nav
-            aria-label="Разделы админки"
-            className="mx-auto flex max-w-[84rem] gap-1 overflow-x-auto px-3 py-2 sm:px-5"
-          >
+        <nav aria-label="Разделы админки" className="flex-1 space-y-1 overflow-y-auto p-2 sm:p-3">
             {nav.map((item) => {
               const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
               const Icon = item.icon;
@@ -118,21 +97,28 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "inline-flex h-9 shrink-0 items-center gap-2 rounded-[var(--radius)] px-3 text-[13px] font-medium transition-colors",
+                    "flex h-10 items-center justify-center gap-2 rounded-[var(--radius)] px-2 text-[13px] font-medium transition-colors sm:justify-start sm:px-3",
                     active
                       ? "bg-[#e8eef1] text-[#315f72]"
                       : "text-[#667485] hover:bg-[#f4f6f8] hover:text-[#202938]"
                   )}
                 >
                   <Icon size={16} strokeWidth={1.8} aria-hidden />
-                  {item.label}
+                  <span className="hidden sm:inline">{item.label}</span>
                 </Link>
               );
             })}
-          </nav>
+        </nav>
+        <div className="border-t border-[#edf0f2] p-2 sm:p-3">
+          <p className="hidden truncate px-2 text-[12px] font-semibold text-[#202938] sm:block">{user.name}</p>
+          <p className="hidden truncate px-2 pb-2 text-[11px] text-[#667485] sm:block">{platformRoleLabel(user.platform_role)}</p>
+          <Link href="/app/projects" title="К проектам" className="flex h-10 items-center justify-center gap-2 rounded-[var(--radius)] border border-[#dce2e7] px-2 text-[12px] font-semibold text-[#315f72] transition-colors hover:bg-[#f1f3f5] sm:justify-start sm:px-3">
+            <ArrowRight size={16} aria-hidden />
+            <span className="hidden sm:inline">К проектам</span>
+          </Link>
         </div>
-      </header>
-      <main className="mx-auto min-h-[calc(100vh-7rem)] max-w-[84rem] px-4 py-6 sm:px-6 sm:py-8">
+      </aside>
+      <main className="ml-[4.25rem] min-h-screen px-4 py-6 sm:ml-60 sm:px-6 sm:py-8">
         {activeItem && !activeItem.exact ? (
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#81909d]">
             Takt <span className="px-1.5 text-[#b7c0c8]">/</span> {activeItem.label}
