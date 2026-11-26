@@ -40,7 +40,7 @@ async def test_oauth_launch_rejects_foreign_host():
 
 
 @pytest.mark.asyncio
-async def test_vk_authorize_uses_current_domain_and_pkce_method(monkeypatch):
+async def test_vk_authorize_includes_current_sdk_parameters(monkeypatch):
     redirect_uri = "https://taktapp.ru/api/v1/auth/oauth/callback"
     settings = Settings(
         OAUTH_VK_CLIENT_ID="vk-client",
@@ -70,7 +70,12 @@ async def test_vk_authorize_uses_current_domain_and_pkce_method(monkeypatch):
     assert authorize.scheme == "https"
     assert authorize.netloc == "id.vk.ru"
     assert authorize.path == "/authorize"
-    assert params["code_challenge_method"] == ["s256"]
+    assert params["app_id"] == ["vk-client"]
+    assert params["sdk_type"] == ["vkid"]
+    assert params["oauth_version"] == ["2"]
+    assert params["scheme"] == ["bright_light"]
+    assert params["lang_id"] == ["3"]
+    assert params["code_challenge_method"] == ["sha256"]
     assert params["redirect_uri"] == [redirect_uri]
     assert params["state"] == [started["state"]]
     assert params["device_id"]

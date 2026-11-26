@@ -294,14 +294,20 @@ async def start_oauth(
     elif provider == OAuthProvider.vk:
         params = {
             "client_id": settings.OAUTH_VK_CLIENT_ID,
+            # VK's current VK ID page redirects /authorize to /auth and expects
+            # the metadata normally attached by vkid-web-sdk.
+            "app_id": settings.OAUTH_VK_CLIENT_ID,
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "scope": "email",
             "state": state,
             "code_challenge": challenge,
-            # VK ID's OAuth 2.1 endpoint requires the lowercase value used by its SDK.
-            "code_challenge_method": "s256",
+            "code_challenge_method": "sha256",
             "device_id": vk_device_id or nonce,
+            "lang_id": "3",
+            "oauth_version": "2",
+            "scheme": "bright_light",
+            "sdk_type": "vkid",
         }
         url = f"{VK_AUTH}?{urlencode(params)}"
     else:
