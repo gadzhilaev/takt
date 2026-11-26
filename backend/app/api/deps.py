@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
@@ -9,6 +10,7 @@ from app.core.config import get_settings
 from app.core.csrf import CSRF_HEADER, validate_csrf_token
 from app.core.security import decode_token
 from app.db.session import get_db
+from app.models.auth import RefreshToken
 from app.models.user import PLATFORM_ROLE_RANK, PlatformRole, User, UserRole
 
 ACCESS_COOKIE = "access_token"
@@ -70,7 +72,20 @@ async def get_current_user_optional(
         return None
     try:
         user_id = uuid.UUID(payload["sub"])
-    except (KeyError, ValueError):
+        session_id = uuid.UUID(payload["sid"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    # Access tokens are intentionally short-lived, but revoking their refresh
+    # token must also end the current session immediately (web and mobile).
+    session = await db.scalar(
+        select(RefreshToken.id).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.session_id == session_id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > datetime.now(UTC),
+        ).limit(1)
+    )
+    if not session:
         return None
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

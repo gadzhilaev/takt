@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -7,6 +8,7 @@ from app.api.deps import ACCESS_COOKIE
 from app.core.config import get_settings
 from app.core.security import decode_token
 from app.db.session import AsyncSessionLocal
+from app.models.auth import RefreshToken
 from app.models.user import User
 from app.services.websocket_hub import ws_manager
 
@@ -37,9 +39,20 @@ async def _user_from_websocket(websocket: WebSocket) -> User | None:
         return None
     try:
         user_id = uuid.UUID(payload["sub"])
-    except (KeyError, ValueError):
+        session_id = uuid.UUID(payload["sid"])
+    except (KeyError, TypeError, ValueError):
         return None
     async with AsyncSessionLocal() as db:
+        session = await db.scalar(
+            select(RefreshToken.id).where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.session_id == session_id,
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > datetime.now(UTC),
+            ).limit(1)
+        )
+        if not session:
+            return None
         result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user or not user.is_active:
