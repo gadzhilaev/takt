@@ -34,7 +34,6 @@ router = APIRouter(prefix="/auth/oauth", tags=["oauth"])
 _OAUTH_AUTHORIZE_HOSTS = frozenset(
     {
         "oauth.yandex.ru",
-        "id.vk.com",
         "id.vk.ru",
         "login.vk.com",
         "appleid.apple.com",

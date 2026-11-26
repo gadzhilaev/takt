@@ -31,9 +31,9 @@ from app.services.activity_service import record_activity
 APPLE_AUTH = "https://appleid.apple.com/auth/authorize"
 APPLE_TOKEN = "https://appleid.apple.com/auth/token"
 APPLE_KEYS = "https://appleid.apple.com/auth/keys"
-VK_AUTH = "https://id.vk.com/authorize"
-VK_TOKEN = "https://id.vk.com/oauth2/auth"
-VK_USER_INFO = "https://id.vk.com/oauth2/user_info"
+VK_AUTH = "https://id.vk.ru/authorize"
+VK_TOKEN = "https://id.vk.ru/oauth2/auth"
+VK_USER_INFO = "https://id.vk.ru/oauth2/user_info"
 YANDEX_AUTH = "https://oauth.yandex.ru/authorize"
 YANDEX_TOKEN = "https://oauth.yandex.ru/token"
 YANDEX_INFO = "https://login.yandex.ru/info"
@@ -299,7 +299,8 @@ async def start_oauth(
             "scope": "email",
             "state": state,
             "code_challenge": challenge,
-            "code_challenge_method": "S256",
+            # VK ID's OAuth 2.1 endpoint requires the lowercase value used by its SDK.
+            "code_challenge_method": "s256",
             "device_id": vk_device_id or nonce,
         }
         url = f"{VK_AUTH}?{urlencode(params)}"
