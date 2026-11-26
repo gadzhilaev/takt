@@ -33,10 +33,13 @@ const WEB_PROVIDERS = new Set(["vk", "yandex"]);
 export function OAuthButtons({
   mode = "login",
   next,
+  forceVkLogin = false,
 }: {
   mode?: "login" | "register" | "link";
   /** Preserve invite / deep link through OAuth redirect (e.g. /invite/{token}). */
   next?: string | null;
+  /** Reauthenticate with VK after a failed OAuth callback. */
+  forceVkLogin?: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
@@ -51,6 +54,7 @@ export function OAuthButtons({
     setBusy(provider);
     try {
       const qs = new URLSearchParams({ client: "web" });
+      if (provider === "vk" && forceVkLogin) qs.set("force_login", "true");
       if (mode === "link") qs.set("link", "true");
       if (next && next.startsWith("/") && !next.startsWith("//")) {
         qs.set("next", next);

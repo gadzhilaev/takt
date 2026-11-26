@@ -247,6 +247,7 @@ async def start_oauth(
     client_kind: str = "web",
     link_user_id: uuid.UUID | None = None,
     return_path: str | None = None,
+    force_login: bool = False,
 ) -> dict[str, str]:
     settings = get_settings()
     if not await _provider_enabled(db, provider, settings):
@@ -319,7 +320,10 @@ async def start_oauth(
             "scheme": "bright_light",
             "v": "2.6.1",
             "sdk_type": "vkid",
-            "prompt": "",
+            # On a recovery attempt force VK ID to restart its login flow. This
+            # avoids reusing a partially completed provider session after the
+            # app rejected a previous callback.
+            "prompt": "login" if force_login and client_kind == "web" else "",
             "stats_info": stats_info,
         }
         url = f"{VK_AUTH}?{urlencode(params)}"

@@ -20,8 +20,15 @@ from app.api.auth_cookies import (
     set_device_id_cookie,
     user_public,
 )
-from app.api.deps import get_current_user, get_current_user_optional, verify_csrf
+from app.api.deps import (
+    ACCESS_COOKIE,
+    REFRESH_COOKIE,
+    get_current_user,
+    get_current_user_optional,
+    verify_csrf,
+)
 from app.core.config import get_settings
+from app.core.csrf import CSRF_COOKIE
 from app.core.limiter import limiter
 from app.db.session import get_db
 from app.models.platform import OAuthLoginState, OAuthProvider
@@ -92,6 +99,7 @@ async def oauth_start(
     client: Literal["web", "mobile"] = "web",
     link: bool = False,
     next: str | None = Query(default=None, alias="next"),
+    force_login: bool = False,
     user: Annotated[User | None, Depends(get_current_user_optional)] = None,
 ):
     device_session_id = resolve_device_session_id(request)
@@ -125,6 +133,7 @@ async def oauth_start(
             client_kind=client,
             link_user_id=link_user_id,
             return_path=next,
+            force_login=force_login and provider == "vk" and client == "web",
         )
         await db.commit()
     except oauth_service.OAuthError as e:
@@ -154,8 +163,16 @@ def _login_error_redirect(settings, *, code: str, message: str | None = None) ->
         or _OAUTH_ERROR_RU.get(code)
         or "Не удалось выполнить вход. Попробуйте ещё раз."
     )
-    q = urlencode({"oauth_error": code, "message": text})
-    return RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
+    q = urlencode({"oauth_error": code, "message": text, "reauth": "1"})
+    redirect = RedirectResponse(f"{settings.APP_PUBLIC_URL}/login?{q}", status_code=302)
+    # A failed provider callback must not leave an old web session masking the
+    # login page or causing the next attempt to enter a stale refresh flow.
+    cookie_options: dict = {"path": "/"}
+    if settings.COOKIE_DOMAIN:
+        cookie_options["domain"] = settings.COOKIE_DOMAIN
+    for cookie_name in (ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE):
+        redirect.delete_cookie(cookie_name, **cookie_options)
+    return redirect
 
 
 async def _finish_web(

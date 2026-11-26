@@ -42,6 +42,7 @@ function LoginForm() {
   const fromServer = serverFacingText(rawMessage);
   const [error, setError] = useState(hasOauthError ? fromServer : "");
   const [info, setInfo] = useState(!hasOauthError ? fromServer : "");
+  const [forceVkLogin, setForceVkLogin] = useState(hasOauthError);
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
   const { data: oauthMeta } = useOAuthProviders();
   const emailPassword = oauthMeta?.email_password !== false;
@@ -50,6 +51,9 @@ function LoginForm() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Do not silently consume/replay a leftover refresh session after an
+      // OAuth callback failed; let the user start a clean provider login.
+      if (searchParams.get("oauth_error")) return;
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/auth/refresh`, {
           method: "POST",
@@ -80,7 +84,10 @@ function LoginForm() {
 
   useEffect(() => {
     if (!hasOauthError && fromServer) setInfo(fromServer);
-    if (hasOauthError && fromServer) setError(fromServer);
+    if (hasOauthError) {
+      setForceVkLogin(true);
+      if (fromServer) setError(fromServer);
+    }
   }, [fromServer, hasOauthError]);
 
   async function onSubmit(values: z.infer<typeof schema>) {
@@ -175,7 +182,7 @@ function LoginForm() {
               {error}
             </p>
           ) : null}
-          <OAuthButtons mode="login" next={searchParams.get("next")} />
+          <OAuthButtons mode="login" next={searchParams.get("next")} forceVkLogin={forceVkLogin} />
           <AuthLegalNotice />
           <p className="mt-5 text-center text-sm text-muted">
             Нет аккаунта?{" "}
