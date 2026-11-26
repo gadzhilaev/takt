@@ -397,23 +397,30 @@ async def _exchange_apple(code: str, redirect_uri: str, verifier: str | None) ->
 
 
 async def _exchange_vk(
-    code: str, redirect_uri: str, verifier: str | None, device_id: str | None
+    code: str,
+    redirect_uri: str,
+    verifier: str | None,
+    device_id: str | None,
+    state: str | None = None,
 ) -> ProviderProfile:
     settings = get_settings()
-    data = {
+    params = {
         "grant_type": "authorization_code",
-        "code": code,
         "client_id": settings.OAUTH_VK_CLIENT_ID,
-        "client_secret": settings.OAUTH_VK_CLIENT_SECRET,
         "redirect_uri": redirect_uri,
         "code_verifier": verifier or "",
         "device_id": device_id or "",
     }
+    if state:
+        params["state"] = state
     async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.post(VK_TOKEN, data=data)
+        # VK ID expects OAuth parameters in the query and the code in the form body.
+        r = await client.post(VK_TOKEN, params=params, data={"code": code})
         if r.status_code >= 400:
             raise OAuthError("vk_token", "Не удалось обменять код VK ID")
         body = r.json()
+        if state and body.get("state") != state:
+            raise OAuthError("vk_state", "VK ID вернул неверный state")
         access_token = body.get("access_token")
         user_id = body.get("user_id") or (body.get("user") or {}).get("user_id")
         email = body.get("email")
@@ -428,10 +435,8 @@ async def _exchange_vk(
         if access_token:
             info = await client.post(
                 VK_USER_INFO,
-                data={
-                    "client_id": settings.OAUTH_VK_CLIENT_ID,
-                    "access_token": access_token,
-                },
+                params={"client_id": settings.OAUTH_VK_CLIENT_ID},
+                data={"access_token": access_token},
             )
             if info.status_code < 400:
                 user_obj = (info.json() or {}).get("user") or {}
@@ -683,7 +688,9 @@ async def exchange_code(
     """Complete web OAuth. Returns (user, created, return_path)."""
     row = await _consume_state(db, state, provider)
     return_path = sanitize_return_path(row.return_path)
-    profile = await _fetch_profile(provider, code, row.redirect_uri, row.code_verifier, device_id)
+    profile = await _fetch_profile(
+        provider, code, row.redirect_uri, row.code_verifier, device_id, state=row.state
+    )
     if row.link_user_id:
         user = await link_identity(db, row.link_user_id, profile)
         return user, False, return_path
@@ -736,7 +743,9 @@ async def mobile_complete(
             raw_claims={"iss": claims.get("iss"), "aud": claims.get("aud")},
         )
     elif code:
-        profile = await _fetch_profile(provider, code, redirect_uri, code_verifier, device_id)
+        profile = await _fetch_profile(
+            provider, code, redirect_uri, code_verifier, device_id, state=state
+        )
     else:
         raise OAuthError("missing_code", "Нужен code или id_token")
     if link_user_id:
@@ -751,11 +760,13 @@ async def _fetch_profile(
     redirect_uri: str,
     verifier: str | None,
     device_id: str | None,
+    *,
+    state: str | None = None,
 ) -> ProviderProfile:
     if provider == OAuthProvider.apple:
         return await _exchange_apple(code, redirect_uri, verifier)
     if provider == OAuthProvider.vk:
-        return await _exchange_vk(code, redirect_uri, verifier, device_id)
+        return await _exchange_vk(code, redirect_uri, verifier, device_id, state)
     return await _exchange_yandex(code, redirect_uri, verifier)
 
 
