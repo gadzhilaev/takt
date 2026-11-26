@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -66,7 +68,7 @@ async def test_vk_authorize_includes_current_sdk_parameters(monkeypatch):
     )
 
     authorize = urlparse(started["authorize_url"])
-    params = parse_qs(authorize.query)
+    params = parse_qs(authorize.query, keep_blank_values=True)
     assert authorize.scheme == "https"
     assert authorize.netloc == "id.vk.ru"
     assert authorize.path == "/authorize"
@@ -76,6 +78,11 @@ async def test_vk_authorize_includes_current_sdk_parameters(monkeypatch):
     assert params["scheme"] == ["bright_light"]
     assert params["lang_id"] == ["3"]
     assert params["code_challenge_method"] == ["s256"]
+    assert params["v"] == ["2.6.1"]
+    assert params["prompt"] == [""]
+    stats = json.loads(base64.b64decode(params["stats_info"][0]))
+    assert stats["flow_source"] == "from_custom_auth"
+    assert stats["session_id"]
     assert params["redirect_uri"] == [redirect_uri]
     assert params["state"] == [started["state"]]
     assert params["device_id"]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import re
 import secrets
 import time
@@ -292,6 +293,15 @@ async def start_oauth(
         }
         url = f"{APPLE_AUTH}?{urlencode(params)}"
     elif provider == OAuthProvider.vk:
+        # Keep this URL in sync with VK ID SDK's `getVKIDUrl` and `Auth.login`.
+        # VK's authorize handler may render a 404 in browser clients when the
+        # SDK metadata is absent, even though the HTTP redirect itself returns 302.
+        stats_info = base64.b64encode(
+            json.dumps(
+                {"flow_source": "from_custom_auth", "session_id": str(uuid.uuid4())},
+                separators=(",", ":"),
+            ).encode()
+        ).decode()
         params = {
             "client_id": settings.OAUTH_VK_CLIENT_ID,
             # VK's current VK ID page redirects /authorize to /auth and expects
@@ -307,7 +317,10 @@ async def start_oauth(
             "lang_id": "3",
             "oauth_version": "2",
             "scheme": "bright_light",
+            "v": "2.6.1",
             "sdk_type": "vkid",
+            "prompt": "",
+            "stats_info": stats_info,
         }
         url = f"{VK_AUTH}?{urlencode(params)}"
     else:
