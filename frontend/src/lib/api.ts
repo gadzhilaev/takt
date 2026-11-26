@@ -108,7 +108,7 @@ function redirectToLogin() {
   const next = encodeURIComponent(path || "/app/projects");
   // Do NOT call /logout here: a failed refresh in one tab used to revoke cookies
   // for the whole browser and wipe a successful refresh in another tab.
-  window.location.assign(`/login?next=${next}`);
+  window.location.assign(`/login?next=${next}&reauth=1`);
 }
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
