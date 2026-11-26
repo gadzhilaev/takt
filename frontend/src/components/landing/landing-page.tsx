@@ -361,6 +361,11 @@ export function LandingPage() {
               <p className="font-semibold text-foreground">Документы</p>
               <ul className="mt-3 space-y-2 text-muted">
                 <li>
+                  <Link href="/terms" className="hover:text-foreground">
+                    Пользовательское соглашение
+                  </Link>
+                </li>
+                <li>
                   <Link href="/privacy" className="hover:text-foreground">
                     Политика конфиденциальности
                   </Link>

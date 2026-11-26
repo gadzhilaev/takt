@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
+import { AuthLegalNotice } from "@/components/auth-legal-notice";
 import { paths } from "@/lib/paths";
 
 function safeNext(raw: string | null): string {
@@ -187,6 +188,7 @@ function RegisterForm() {
                 </p>
               ) : null}
               <OAuthButtons mode="register" next={searchParams.get("next")} />
+              <AuthLegalNotice />
             </>
           ) : (
             <form className="space-y-3" onSubmit={onConfirm}>

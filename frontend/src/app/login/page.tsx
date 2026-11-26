@@ -12,6 +12,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-mark";
 import { OAuthButtons, useOAuthProviders } from "@/components/oauth/oauth-buttons";
+import { AuthLegalNotice } from "@/components/auth-legal-notice";
 import { paths } from "@/lib/paths";
 
 const schema = z.object({
@@ -175,6 +176,7 @@ function LoginForm() {
             </p>
           ) : null}
           <OAuthButtons mode="login" next={searchParams.get("next")} />
+          <AuthLegalNotice />
           <p className="mt-5 text-center text-sm text-muted">
             Нет аккаунта?{" "}
             <Link
