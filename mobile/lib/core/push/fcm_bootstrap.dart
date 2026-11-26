@@ -26,10 +26,8 @@ class FcmBootstrap {
   FcmBootstrap(this._notifications);
 
   final NotificationsRepository _notifications;
-  static const _promptNeverKey = 'takt_push_prompt_never';
-
-  /// Legacy key from older builds — treated as «больше не показывать».
-  static const _promptSeenLegacyKey = 'takt_push_prompt_seen';
+  static const _pushEnabledKey = 'takt_push_enabled_v2';
+  static const _promptNeverKey = 'takt_push_prompt_never_v2';
 
   /// Firebase initialized (no system permission yet).
   bool firebaseReady = false;
@@ -44,9 +42,10 @@ class FcmBootstrap {
   bool skippedThisSession = false;
 
   bool get promptNever => promptNeverListenable.value;
+  bool pushEnabled = false;
 
   /// Whether router should send user to the soft permission screen.
-  bool get shouldShowPrompt => !promptNever && !skippedThisSession;
+  bool get shouldShowPrompt => !pushEnabled && !promptNever && !skippedThisSession;
 
   /// Back-compat for older call sites / splash.
   bool get promptSeen => promptNever || skippedThisSession;
@@ -62,10 +61,8 @@ class FcmBootstrap {
 
   Future<void> loadPromptState() async {
     final prefs = await SharedPreferences.getInstance();
-    final never =
-        prefs.getBool(_promptNeverKey) ??
-        prefs.getBool(_promptSeenLegacyKey) ??
-        false;
+    pushEnabled = prefs.getBool(_pushEnabledKey) ?? false;
+    final never = prefs.getBool(_promptNeverKey) ?? false;
     promptNeverListenable.value = never;
     promptSeenListenable.value = never || skippedThisSession;
   }
@@ -119,6 +116,16 @@ class FcmBootstrap {
     try {
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: true, sound: true);
+      final permission = await messaging.getNotificationSettings();
+      final allowed =
+          permission.authorizationStatus == AuthorizationStatus.authorized ||
+          permission.authorizationStatus == AuthorizationStatus.provisional;
+      if (!allowed) return false;
+      pushEnabled = true;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_pushEnabledKey, true);
+      await prefs.setBool(_promptNeverKey, false);
+      promptNeverListenable.value = false;
       return await registerForUser();
     } catch (e) {
       ready = false;
@@ -135,6 +142,10 @@ class FcmBootstrap {
   }
 
   Future<bool> registerForUser() async {
+    if (!pushEnabled) {
+      ready = false;
+      return false;
+    }
     if (!firebaseReady) await init();
     if (!firebaseReady) return false;
     try {

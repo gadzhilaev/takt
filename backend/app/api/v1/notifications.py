@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_session_id, get_current_user, verify_csrf
@@ -34,6 +34,7 @@ class DeviceTokenIn(BaseModel):
     token: str = Field(min_length=8)
     platform: str = Field(description="ios | android")
     app_version: str | None = None
+    explicit_opt_in: bool = False
 
 
 def _browser_label(user_agent: str | None) -> str:
@@ -221,6 +222,34 @@ async def vapid_public_key(user: Annotated[User, Depends(get_current_user)]):
     }
 
 
+@router.get("/push/status")
+async def push_status(
+    request: Request,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    session_id = get_current_session_id(request)
+    user_agent = request.headers.get("user-agent")
+    conditions = []
+    if session_id:
+        conditions.append(PushSubscription.session_id == session_id)
+    if user_agent:
+        conditions.append(
+            (PushSubscription.session_id.is_(None))
+            & (PushSubscription.user_agent == user_agent[:512])
+        )
+    registered = False
+    if conditions:
+        registered = bool(
+            await db.scalar(
+                select(PushSubscription.id)
+                .where(PushSubscription.user_id == user.id, or_(*conditions))
+                .limit(1)
+            )
+        )
+    return {"subscribed": registered}
+
+
 @router.post("/push/subscribe", dependencies=[Depends(verify_csrf)])
 async def push_subscribe(
     body: PushSubscribeIn,
@@ -276,6 +305,16 @@ async def register_device_token(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Register FCM token for mobile. Safe to call repeatedly (upsert by token)."""
+    if not body.explicit_opt_in:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": {
+                    "code": "push_opt_in_required",
+                    "message": "Сначала явно включите push-уведомления",
+                }
+            },
+        )
     await fcm_service.upsert_device_token(
         db,
         user_id=user.id,

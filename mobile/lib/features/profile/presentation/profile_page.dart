@@ -472,9 +472,9 @@ class _ProfilePageState extends State<ProfilePage> {
       if (_pushStatus == PushPermission.notDetermined ||
           _pushStatus == PushPermission.authorized ||
           _pushStatus == PushPermission.provisional) {
-        final registered = _pushStatus == PushPermission.notDetermined
-            ? await fcm.enablePush()
-            : await fcm.registerForUser();
+        // Register only after this explicit user action. A previously granted
+        // OS permission alone does not opt the account back into server push.
+        final registered = await fcm.enablePush();
         if (!registered && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Не удалось подключить push. Попробуйте ещё раз.')),

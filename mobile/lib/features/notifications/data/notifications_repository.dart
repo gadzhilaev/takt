@@ -35,7 +35,11 @@ class NotificationsRepository {
   }) async {
     await _api.dio.post(
       '/api/v1/notifications/device-token',
-      data: {'token': token, 'platform': platform},
+      data: {
+        'token': token,
+        'platform': platform,
+        'explicit_opt_in': true,
+      },
     );
   }
 

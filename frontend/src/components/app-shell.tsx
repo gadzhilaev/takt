@@ -25,7 +25,7 @@ import { NotificationToasts } from "@/components/notification-toasts";
 import { NotificationsDrawer } from "@/components/notifications-drawer";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { ProfileDrawer } from "@/components/profile-drawer";
-import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { PushOptInPrompt } from "@/components/push-opt-in-prompt";
 import { ThemeMenu } from "@/components/ui/theme-menu";
 import { clearLastProjectId, getLastProjectId, setLastProjectId } from "@/lib/last-project";
 import { paths } from "@/lib/paths";
@@ -641,7 +641,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <NotificationsDrawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
       {user && (
         <>
-          <PushPermissionPrompt />
+          <PushOptInPrompt />
           <NotificationToasts />
         </>
       )}
